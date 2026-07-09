@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plot Lab</title>
+<style>
+  :root{
+    --bg:#0e1015; --panel:#161922; --panel2:#1d212c; --panel3:#232834;
+    --line:#2a3040; --txt:#e8eaf0; --mut:#98a1b3; --faint:#6b7385;
+    --accent:#7c5cff; --accent2:#22d3ee; --good:#34d399; --warn:#fbbf24; --bad:#fb7185;
+    --radius:14px; --radius-sm:9px;
+    font-synthesis:none;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;overflow:hidden}
+  body{
+    background:radial-gradient(1200px 700px at 80% -10%, #1a1f2e 0%, var(--bg) 55%);
+    color:var(--txt);
+    font-family:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+    font-size:13px; -webkit-font-smoothing:antialiased;
+  }
+  .app{display:flex;height:100vh}
+
+  /* ---------- sidebar ---------- */
+  .sidebar{
+    width:392px;flex:0 0 392px;height:100%;
+    background:linear-gradient(180deg,var(--panel) 0%, #12151d 100%);
+    border-right:1px solid var(--line);display:flex;flex-direction:column;
+  }
+  .brand{display:flex;align-items:center;gap:11px;padding:18px 20px 10px}
+  .logo{width:34px;height:34px;border-radius:10px;flex:0 0 34px;
+    background:conic-gradient(from 210deg,var(--accent),var(--accent2),var(--accent));
+    box-shadow:0 4px 18px -4px var(--accent)}
+  .brand h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.2px}
+  .brand p{margin:0;color:var(--faint);font-size:11px}
+  .pad{padding:0 16px}
+
+  .btn{appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--txt);
+    padding:9px 13px;border-radius:var(--radius-sm);font-size:12.5px;font-weight:550;cursor:pointer;
+    width:100%;transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+  .btn:hover{background:var(--panel3);border-color:#36405a}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:linear-gradient(180deg,#8a6bff,#6d4bf0);border-color:#6d4bf0;
+    box-shadow:0 6px 18px -8px var(--accent)}
+  .btn.primary:hover{filter:brightness(1.07)}
+  .btn.ghost{background:transparent}
+  .btn.sm{width:auto;padding:7px 11px;font-size:11.5px}
+
+  .chip{margin:8px 16px 4px;padding:8px 11px;border:1px dashed var(--line);border-radius:var(--radius-sm);
+    color:var(--mut);font-size:11.5px;display:flex;gap:8px;align-items:center}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+  .chip.on .dot{background:var(--good);box-shadow:0 0 8px var(--good)}
+
+  /* ---------- tabs ---------- */
+  .tabs{display:flex;gap:4px;margin:12px 16px 6px;background:var(--panel2);
+    padding:4px;border-radius:11px;border:1px solid var(--line)}
+  .tab{flex:1;text-align:center;padding:7px 4px;border-radius:8px;font-size:11.5px;font-weight:600;
+    color:var(--mut);cursor:pointer;transition:.15s}
+  .tab.active{background:var(--panel3);color:var(--txt);box-shadow:0 2px 8px -4px #000}
+  .panels{flex:1;overflow-y:auto;padding:6px 4px 14px}
+  .panel{display:none;padding:6px 16px}
+  .panel.active{display:block;animation:fade .18s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  label.lbl{display:block;color:var(--mut);font-size:11px;font-weight:600;margin:11px 0 5px;
+    text-transform:uppercase;letter-spacing:.5px}
+  .field{margin-bottom:4px}
+  select,input[type=text],input[type=number]{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);
+    padding:9px 11px;border-radius:var(--radius-sm);font-size:12.5px;outline:none;transition:.15s}
+  select:focus,input[type=text]:focus,input[type=number]:focus{border-color:var(--accent);box-shadow:0 0 0 3px #7c5cff22}
+  .dpirow{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--mut)}
+  .dpirow input{width:84px}
+  .dpirow .muted{color:var(--faint)}
+  .sectile{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px 13px;margin:12px 0}
+  .sectile h3{margin:0 0 4px;font-size:12.5px;font-weight:650}
+  .sectile p.hint{margin:2px 0 0;color:var(--faint);font-size:11px;line-height:1.45}
+
+  /* slider */
+  .slider{display:flex;align-items:center;gap:10px}
+  .slider input[type=range]{flex:1;appearance:none;height:5px;border-radius:5px;background:var(--panel3);outline:none}
+  .slider input[type=range]::-webkit-slider-thumb{appearance:none;width:15px;height:15px;border-radius:50%;
+    background:var(--accent);cursor:pointer;box-shadow:0 0 0 4px #7c5cff22;transition:.1s}
+  .slider input[type=range]::-webkit-slider-thumb:hover{box-shadow:0 0 0 6px #7c5cff33}
+  .slider .val{min-width:38px;text-align:right;color:var(--mut);font-variant-numeric:tabular-nums;font-size:11.5px}
+
+  .check{display:flex;align-items:center;gap:9px;cursor:pointer;padding:6px 0;color:var(--txt);font-size:12.5px}
+  .check input{appearance:none;width:34px;height:19px;border-radius:11px;background:var(--panel3);
+    border:1px solid var(--line);position:relative;cursor:pointer;transition:.15s;flex:0 0 34px}
+  .check input::after{content:"";position:absolute;top:1px;left:1px;width:15px;height:15px;border-radius:50%;
+    background:var(--faint);transition:.15s}
+  .check input:checked{background:#5a3df0;border-color:#5a3df0}
+  .check input:checked::after{left:16px;background:#fff}
+
+  .row2{display:flex;gap:8px}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+  .row2>*{flex:1}
+  .colorrow{display:flex;align-items:center;gap:9px;margin:6px 0}
+  input[type=color]{width:34px;height:30px;border:1px solid var(--line);border-radius:8px;background:none;padding:2px;cursor:pointer}
+  .scrollbox{max-height:150px;overflow-y:auto;border:1px solid var(--line);border-radius:var(--radius-sm);
+    padding:6px 9px;background:var(--panel2)}
+  .statusbox{margin-top:8px;background:#0c0e13;border:1px solid var(--line);border-radius:var(--radius-sm);
+    padding:9px 11px;font-family:ui-monospace,'Cascadia Code',monospace;font-size:11px;color:var(--mut);
+    white-space:pre-wrap;min-height:34px}
+
+  .footer{padding:12px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px;
+    background:#12151d}
+
+  /* ---------- stage ---------- */
+  .stage{flex:1;display:flex;flex-direction:column;padding:16px;gap:12px;min-width:0}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .anntools{display:flex;align-items:center;gap:6px}
+  .anntools .btn.sm{width:auto;padding:6px 10px}
+  .anntools .btn.act{background:var(--accent);border-color:var(--accent);color:#fff}
+  .topbar .seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px}
+  .topbar .seg div{padding:6px 13px;border-radius:7px;font-size:11.5px;font-weight:600;color:var(--mut);cursor:pointer}
+  .topbar .seg div.on{background:var(--panel3);color:var(--txt)}
+  .layers{color:var(--faint);font-size:11.5px}
+
+  .previewcard{flex:1;position:relative;border:1px solid var(--line);border-radius:var(--radius);
+    background:
+      linear-gradient(var(--panel) 0 0) padding-box,
+      radial-gradient(900px 500px at 50% 0%, #1b2030, var(--panel)) border-box;
+    display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0}
+  .previewcard img{max-width:100%;max-height:100%;display:none;border-radius:8px}
+  .empty{color:var(--faint);text-align:center;padding:30px}
+  .empty .big{font-size:34px;opacity:.5;margin-bottom:8px}
+  #legendBox{position:absolute;cursor:grab;border:1.5px dashed transparent;border-radius:6px;display:none}
+  #legendBox:hover{border-color:#7c5cff88;background:#7c5cff11}
+  #legendBox.drag{cursor:grabbing;border-color:var(--accent);background:#7c5cff1f}
+
+  .rowinfo{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);
+    padding:11px 14px;max-height:140px;overflow:auto;display:none}
+  .rowinfo h4{margin:0 0 7px;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+  .rowinfo table{width:100%;border-collapse:collapse;font-size:12px}
+  .rowinfo td{padding:3px 8px;border-bottom:1px solid var(--panel3)}
+  .rowinfo table, .rowinfo td, .rowinfo th{user-select:text;-webkit-user-select:text;cursor:text}
+  .rowinfohead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .rowinfohead h4{margin:0}
+  .rowinfo td:first-child{color:var(--mut);width:40%}
+
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--panel3);border:1px solid var(--line);padding:11px 16px;border-radius:10px;
+    font-size:12.5px;opacity:0;transition:.25s;pointer-events:none;z-index:9;box-shadow:0 10px 30px -10px #000}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.bad{border-color:var(--bad);color:#fecdd3}
+  .toast.good{border-color:var(--good);color:#bbf7d0}
+  .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20}
+  .modal.show{display:flex}
+  .modal-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    width:min(760px,92vw);max-height:88vh;display:flex;flex-direction:column;box-shadow:0 30px 80px -20px #000}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .modal-head h3{margin:0;font-size:15px}
+  .modal-tools{display:flex;gap:6px;align-items:center;padding:10px 16px;flex-wrap:wrap}
+  .modal-tools .btn.sm{width:auto;padding:6px 10px}
+  .grid-wrap{overflow:auto;padding:0 16px;flex:1}
+  #dataGrid{border-collapse:collapse;width:100%}
+  #dataGrid th,#dataGrid td{border:1px solid var(--line);padding:0}
+  #dataGrid input{width:100%;min-width:80px;background:transparent;border:none;color:var(--txt);padding:7px 9px;font-size:12.5px;outline:none}
+  #dataGrid th input{font-weight:650;background:var(--panel2)}
+  #dataGrid input:focus{background:#7c5cff18}
+  .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 16px;border-top:1px solid var(--line)}
+
+  .panels::-webkit-scrollbar,.scrollbox::-webkit-scrollbar,.rowinfo::-webkit-scrollbar{width:9px}
+  .panels::-webkit-scrollbar-thumb,.scrollbox::-webkit-scrollbar-thumb,.rowinfo::-webkit-scrollbar-thumb{
+    background:var(--panel3);border-radius:9px;border:2px solid transparent;background-clip:padding-box}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo"></div>
+      <div><h1>Plot Lab</h1><p>Figuras de publicação · Python</p></div>
+    </div>
+    <div class="pad row2">
+      <button class="btn primary" onclick="openCsv()">⬆ CSV</button>
+      <button class="btn" onclick="openExcel()">⬆ Excel</button>
+    </div>
+    <div class="pad" style="margin-top:6px"><button class="btn ghost" onclick="openDataEntry()">⌨ Digitar dados (estilo Prism)</button></div>
+    <div id="sheetPick" class="pad" style="display:none;margin-top:6px">
+      <div class="row2"><select id="sheetSel"></select><button class="btn sm" style="flex:0 0 auto" onclick="loadSheet()">Abrir aba</button></div>
+    </div>
+    <div id="chip" class="chip"><span class="dot"></span><span id="chipText">nenhum arquivo</span></div>
+
+    <div class="tabs">
+      <div class="tab active" data-t="g" onclick="tab('g')">Gráfico</div>
+      <div class="tab" data-t="s" onclick="tab('s')">Estilo</div>
+      <div class="tab" data-t="l" onclick="tab('l')">Legenda</div>
+      <div class="tab" data-t="a" onclick="tab('a')">Análise</div>
+      <div class="tab" data-t="x" onclick="tab('x')">Avançado</div>
+    </div>
+
+    <div class="panels">
+      <!-- GRAFICO -->
+      <section class="panel active" id="p-g">
+        <label class="lbl">Filtro (pandas query)</label>
+        <div class="row2">
+          <input type="text" id="filter" placeholder="dose > 5 and grupo == 'alta'">
+          <button class="btn sm" style="flex:0 0 auto" onclick="applyFilter()">Aplicar</button>
+        </div>
+        <label class="lbl">Tipo de gráfico</label>
+        <select id="plotType" onchange="buildConfig()"></select>
+        <div id="plotConfig"></div>
+        <label class="lbl">Rótulos</label>
+        <div class="field"><input type="text" id="title" placeholder="Título" oninput="dRender()"></div>
+        <div class="row2">
+          <input type="text" id="xlabel" placeholder="Rótulo X" oninput="dRender()">
+          <input type="text" id="ylabel" placeholder="Rótulo Y" oninput="dRender()">
+        </div>
+        <div style="margin-top:12px">
+          <button class="btn primary" onclick="plotBase()">▶  Plotar</button>
+          <div class="row2" style="margin-top:7px">
+            <button class="btn sm" onclick="overlay()">＋ Sobrepor</button>
+            <button class="btn sm ghost" onclick="clearLayers()">Limpar</button>
+          </div>
+          <div class="layers" id="layersLbl" style="margin-top:8px">camadas: —</div>
+        </div>
+      </section>
+
+      <!-- ESTILO -->
+      <section class="panel" id="p-s">
+        <label class="lbl">Tema</label>
+        <select id="theme" onchange="dRender()"></select>
+        <label class="lbl">Contexto (escala)</label>
+        <select id="context" onchange="dRender()">
+          <option>paper</option><option selected>notebook</option><option>talk</option><option>poster</option>
+        </select>
+        <label class="lbl">Escala da fonte</label>
+        <div class="slider"><input type="range" id="fontScale" min="0.7" max="1.8" step="0.05" value="1"
+             oninput="badge(this);dRender()"><span class="val">1.00</span></div>
+        <label class="check"><input type="checkbox" id="grid" checked onchange="dRender()"> Grade</label>
+        <div class="sectile">
+          <h3>Override de cor</h3>
+          <p class="hint">Sobrepõe o fundo do tema. Limpe para voltar ao tema.</p>
+          <div class="colorrow"><input type="color" id="figbg" value="#161922" onchange="setOv('fig_bg',this.value)"><span style="color:var(--mut)">Fundo da figura</span></div>
+          <div class="colorrow"><input type="color" id="axbg" value="#161922" onchange="setOv('ax_bg',this.value)"><span style="color:var(--mut)">Fundo do eixo</span></div>
+          <button class="btn sm ghost" style="margin-top:6px" onclick="clearOv()">Limpar overrides</button>
+        </div>
+        <div class="sectile">
+          <h3>Cores por grupo (color picker)</h3>
+          <p class="hint">Escolha a cor <b>exata</b> de cada categoria do hue (ou X). Sobrepõe a paleta e não se embaralha ao trocar os eixos ou filtrar (cada categoria mantém a cor).</p>
+          <button class="btn sm" style="width:100%" onclick="loadGroupColors()">Carregar grupos do hue/X atual</button>
+          <div id="groupColors" style="margin-top:6px"></div>
+          <button class="btn sm ghost" id="clearColorsBtn" style="display:none;margin-top:4px" onclick="clearColors()">Limpar cores</button>
+        </div>
+        <div class="sectile">
+          <h3>Eixos</h3>
+          <div class="row2">
+            <label class="check"><input type="checkbox" id="logx" onchange="dRender()"> Log X</label>
+            <label class="check"><input type="checkbox" id="logy" onchange="dRender()"> Log Y</label>
+          </div>
+          <label class="lbl">Limites X (min / max)</label>
+          <div class="row2"><input type="text" id="xmin" placeholder="auto" oninput="dRender()"><input type="text" id="xmax" placeholder="auto" oninput="dRender()"></div>
+          <label class="lbl">Limites Y (min / max)</label>
+          <div class="row2"><input type="text" id="ymin" placeholder="auto" oninput="dRender()"><input type="text" id="ymax" placeholder="auto" oninput="dRender()"></div>
+          <label class="check"><input type="checkbox" id="despine" onchange="dRender()"> Esconder bordas topo/direita (despine)</label>
+          <label class="lbl">Tamanho dos ticks (0 = padrão)</label>
+          <div class="slider"><input type="range" id="ticksize" min="0" max="18" step="1" value="0" oninput="badge(this);dRender()"><span class="val">0</span></div>
+        </div>
+        <div class="sectile">
+          <h3>Tamanho / forma do gráfico</h3>
+          <p class="hint">Largura × altura em mm controla a <b>forma</b> do gráfico (ex.: 180×70 = achatado, 80×160 = alto/comprido) e vale tanto no preview quanto na exportação. Vazio = tamanho padrão fixo (o preview acompanha a janela, mas o arquivo exportado é sempre igual).</p>
+          <div class="row2"><input type="text" id="figwmm" placeholder="larg. mm" oninput="dRender()"><input type="text" id="fighmm" placeholder="alt. mm" oninput="dRender()"></div>
+        </div>
+      </section>
+
+      <!-- LEGENDA -->
+      <section class="panel" id="p-l">
+        <label class="check"><input type="checkbox" id="legShow" checked onchange="dRender()"> Mostrar legenda</label>
+        <label class="lbl">Posição</label>
+        <select id="legPos" onchange="dRender()">
+          <option value="upper right">Superior direita</option>
+          <option value="upper left">Superior esquerda</option>
+          <option value="lower right">Inferior direita</option>
+          <option value="lower left">Inferior esquerda</option>
+          <option value="center">Centro</option>
+          <option value="outside">Fora (direita)</option>
+          <option value="free">Livre (arraste no gráfico)</option>
+        </select>
+        <label class="lbl">Tamanho da fonte</label>
+        <div class="slider"><input type="range" id="legSize" min="6" max="20" step="0.5" value="9"
+             oninput="badge(this);dRender()"><span class="val">9</span></div>
+        <label class="lbl">Colunas</label>
+        <div class="slider"><input type="range" id="legCol" min="1" max="4" step="1" value="1"
+             oninput="badge(this);dRender()"><span class="val">1</span></div>
+        <label class="check"><input type="checkbox" id="legFrame" checked onchange="dRender()"> Moldura</label>
+        <label class="check"><input type="checkbox" id="legFit" checked onchange="dRender()"> Abrir espaço (legenda fora). Desligue para arrastá-la para dentro do gráfico.</label>
+        <label class="lbl">Título da legenda</label>
+        <input type="text" id="legTitle" placeholder="(padrão = nome do grupo)" oninput="dRender()">
+        <div class="sectile">
+          <h3>Renomear itens</h3>
+          <p class="hint">Troca os nomes que aparecem na legenda (não altera os dados).</p>
+          <button class="btn sm" onclick="loadLegendLabels()">Carregar itens do grupo atual</button>
+          <div id="legRelabel" style="margin-top:6px"></div>
+        </div>
+        <div class="sectile">
+          <h3>Renomear colunas (rótulos)</h3>
+          <p class="hint">Nome bonito da coluna nos eixos e no título/sub-títulos da legenda — ex.: <b>gene_exp_2 → Gene Expression</b>. Só visual: não altera os dados, o filtro nem o código exportado.</p>
+          <button class="btn sm" onclick="loadColumnAliases()">Carregar colunas atuais</button>
+          <div id="aliasList" style="margin-top:6px"></div>
+        </div>
+        <div class="sectile"><p class="hint">Dica: você pode <b>clicar e arrastar a legenda</b> direto no gráfico — ela passa para o modo "Livre" e fica onde você soltar.</p></div>
+      </section>
+
+      <!-- ANALISE -->
+      <section class="panel" id="p-a">
+        <div class="sectile">
+          <h3>Redução de dimensionalidade</h3>
+          <label class="lbl">Colunas numéricas</label>
+          <div class="scrollbox" id="numCols"><span style="color:var(--faint)">carregue um CSV</span></div>
+          <label class="lbl">Método</label>
+          <select id="method"><option>PCA</option><option>t-SNE</option><option>UMAP</option></select>
+          <button class="btn sm" style="margin-top:8px;width:100%" id="reduceBtn" onclick="runReduce()">Rodar redução</button>
+        </div>
+        <div class="sectile">
+          <h3>Comparar grupos (robusto)</h3>
+          <label class="lbl">Valor (numérico)</label><select id="testVal"></select>
+          <label class="lbl">Grupo (categórico)</label><select id="testGrp"></select>
+          <button class="btn sm" style="margin-top:8px;width:100%" onclick="runTest()">Comparar (não-paramétrico + efeito + IC)</button>
+          <div class="statusbox" id="testOut" style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:11px">—</div>
+        </div>
+        <div class="sectile">
+          <h3>Diversidade (índice de Shannon)</h3>
+          <p class="hint">Duas visões. <b>Grupos por região</b>: dentro de cada gate, a contagem de cada grupo e o Shannon dessa mistura (H≈0 = região pura). <b>Regiões por grupo</b> (relativo): para cada tratamento, a diversidade das regiões que ele ocupa — espalhado por muitas regiões → H alto, concentrado em poucas → H baixo. <b>H</b> em nats, <b>J</b> = Pielou (0–1). Resultado na tabela do gráfico.</p>
+          <label class="lbl">Grupo (categórico)</label><select id="shanGrp"></select>
+          <label class="lbl">Direção</label>
+          <select id="shanDir">
+            <option value="by_region">Grupos dentro de cada região</option>
+            <option value="by_group">Regiões ocupadas por cada grupo (relativo)</option>
+          </select>
+          <button class="btn sm" style="margin-top:8px;width:100%" onclick="runShannon()">Calcular Shannon</button>
+        </div>
+        <div class="sectile">
+          <h3>Melhores pares (separação de grupos)</h3>
+          <p class="hint">Testa <b>todas as colunas numéricas, par a par</b>, e ranqueia quais duas melhor dividem os grupos da coluna escolhida. Ordena por <b>Silhouette</b> (separação visual no scatter); a coluna <b>Acc. LDA</b> é a leitura de classificação. Resultado aparece na tabela do gráfico e exporta junto com a "Tabela descritiva".</p>
+          <label class="lbl">Dividir por (categórico)</label><select id="pairGrp"></select>
+          <button class="btn sm" style="margin-top:8px;width:100%" id="pairBtn" onclick="rankPairs()">Ranquear pares</button>
+        </div>
+        <div class="sectile">
+          <h3>Linhas de limiar &amp; regiões</h3>
+          <p class="hint">Linhas para dividir o gráfico. Escolha o tipo: <b>Horizontal</b> (informe Y), <b>Vertical</b> (informe X) ou <b>Inclinada</b> (X, Y e ângulo em graus na escala dos dados). Em "Editar regiões no gráfico" você também arrasta as linhas. Usa o X/Y/hue da aba Gráfico.</p>
+          <label class="lbl">Tipo de linha</label>
+          <select id="lnType" onchange="lineTypeUI()">
+            <option value="horizontal">Horizontal (informe Y)</option>
+            <option value="vertical">Vertical (informe X)</option>
+            <option value="inclinada">Inclinada (X, Y, ângulo)</option>
+          </select>
+          <div class="row3" style="margin-top:6px">
+            <input type="text" id="lnX" placeholder="X" disabled>
+            <input type="text" id="lnY" placeholder="Y">
+            <input type="text" id="lnAng" placeholder="ângulo°" value="30" disabled>
+          </div>
+          <div class="row2" style="margin-top:6px;align-items:center">
+            <input type="color" id="lnColor" value="#e23b3b" style="flex:0 0 auto">
+            <button class="btn sm" style="flex:1" onclick="addLine()">＋ Adicionar linha</button>
+          </div>
+          <button class="btn sm ghost" id="lnPickBtn" style="margin-top:4px;width:100%" onclick="toggleLinePick()">Clicar no gráfico p/ pegar X,Y</button>
+          <div id="lineList" class="statusbox" style="margin-top:6px">nenhuma linha</div>
+          <button class="btn sm ghost editModeBtn" style="margin-top:6px;width:100%" onclick="toggleGateMode()">Editar no gráfico (arrastar regiões/linhas)</button>
+          <button class="btn sm" style="margin-top:6px;width:100%" onclick="generateGatesFromLines()">⬇ Gerar regiões das retas (células do cruzamento)</button>
+          <button class="btn sm" style="margin-top:6px;width:100%" onclick="analyzeRegions()">Analisar regiões</button>
+        </div>
+        <div class="sectile">
+          <h3>Regiões nomeadas (gating)</h3>
+          <p class="hint">Desenhe regiões fechadas (polígonos de arestas retas, inclináveis), <b>nomeie</b> e <b>arraste no gráfico</b> para ajustar. Duplo-clique numa <b>aresta</b> insere um vértice; duplo-clique ou <b>botão-direito</b> num vértice o remove (mín. 3). Arraste o <b>nome</b> para reposicioná-lo. A contagem ao vivo por grupo aparece abaixo. "Criar coluna" gera uma coluna categórica com o nome da região de cada observação. Usa o X/Y/hue da aba Gráfico.</p>
+          <label class="check"><input type="checkbox" id="gateMagnet" checked> 🧲 Ímã: vértice gruda em vértices/arestas de outras regiões</label>
+          <div class="row2" style="align-items:center">
+            <input type="text" id="gateName" placeholder="nome (ex.: LR)" style="flex:1">
+            <input type="color" id="gateColor" value="#e23b3b" style="flex:0 0 auto">
+          </div>
+          <div class="row2" style="margin-top:6px">
+            <button class="btn sm" style="flex:1" onclick="addGate()">＋ Região</button>
+            <button class="btn sm ghost editModeBtn" style="flex:1" id="gateModeBtn" onclick="toggleGateMode()">Editar no gráfico (arrastar regiões/linhas)</button>
+          </div>
+          <p class="hint" style="margin-top:4px">No modo edição: arraste os vértices ou o interior; duplo-clique no corpo adiciona vértice, no vértice remove.</p>
+          <label class="check" style="margin-top:4px"><input type="checkbox" id="gatesLock" onchange="toggleGatesLock()"> Travar regiões (manter posição ao trocar X/Y)</label>
+          <p class="hint" style="margin-top:4px">Para <b>mesclar</b> regiões, dê o <b>mesmo nome</b> a elas (ex.: duas células viram "baixo") — passam a ser contadas juntas e recebem o mesmo rótulo na coluna criada.</p>
+          <div id="gateList" style="margin-top:6px"></div>
+          <button class="btn sm ghost" style="margin-top:6px;width:100%" onclick="countGates()">Atualizar contagem</button>
+          <button class="btn sm" style="margin-top:6px;width:100%" onclick="mergeGates()">⬡ Mesclar geometricamente (regiões de mesmo nome)</button>
+          <div class="row2" style="margin-top:8px;align-items:center">
+            <input type="text" id="gateColName" placeholder="nome da coluna" value="Região" style="flex:1">
+            <button class="btn sm" style="flex:0 0 auto" onclick="createRegionColumn()">Criar coluna</button>
+          </div>
+          <p class="hint" style="margin-top:8px">Salve regiões + linhas num arquivo para <b>reusar em outra planilha</b> (com os mesmos eixos). Avisa se você carregar em eixos diferentes.</p>
+          <div class="row2">
+            <button class="btn sm" style="flex:1" onclick="saveRegions()">💾 Salvar regiões</button>
+            <button class="btn sm ghost" style="flex:1" onclick="loadRegions()">📂 Carregar regiões</button>
+          </div>
+          <label class="check" style="margin-top:4px"><input type="checkbox" id="loadByFrac"> Carregar pela proporção do gráfico (fração) — para reusar em escalas diferentes</label>
+          <p class="hint" style="margin-top:10px"><b>Exportar gating</b> — cada célula é atribuída a <b>uma única</b> região (a que mais se enquadra: mais "para dentro" vence; sobre a linha vai à mais próxima). A coluna <b>Região</b> mostra qual. Mantém todas as colunas. Marque quais incluir.</p>
+          <div id="gateExportList" style="max-height:120px;overflow:auto;border:1px solid var(--panel3);border-radius:8px;padding:6px 8px"></div>
+          <div class="row2" style="align-items:center;margin-top:6px">
+            <select id="gateExportFmt" style="flex:0 0 auto;width:auto"><option value="csv">CSV</option><option value="xlsx">Excel</option></select>
+            <button class="btn sm" style="flex:1" onclick="exportGated()">⬇ Exportar marcadas</button>
+          </div>
+          <label class="check" style="margin-top:6px"><input type="checkbox" id="gateExportPer"> Exportar 1 arquivo por região (escolhe uma pasta)</label>
+          <button class="btn sm ghost" style="width:100%;margin-top:6px" onclick="exportGatedAll()">Exportar tudo (+ coluna Região)</button>
+        </div>
+      </section>
+
+      <!-- AVANÇADO -->
+      <section class="panel" id="p-x">
+        <div class="sectile">
+          <h3>Numérica → categórica</h3>
+          <p class="hint">Converte uma coluna numérica em texto, para usar como categoria/hue.</p>
+          <div class="row2">
+            <select id="toCatCol"></select>
+            <button class="btn sm" style="flex:0 0 auto" onclick="toCategory()">123→Abc</button>
+          </div>
+        </div>
+        <div class="sectile">
+          <h3>Painel multi-figura (A/B/C)</h3>
+          <p class="hint">Monte o gráfico na aba "Gráfico", depois adicione-o como um quadro do painel.</p>
+          <button class="btn sm" onclick="addPanelItem()">＋ Adicionar gráfico atual ao painel</button>
+          <div id="panelList" class="statusbox" style="margin-top:6px">painel vazio</div>
+          <label class="lbl">Colunas do painel</label>
+          <div class="slider"><input type="range" id="ncols" min="1" max="4" step="1" value="2" oninput="badge(this)"><span class="val">2</span></div>
+          <div class="row2" style="margin-top:6px">
+            <button class="btn sm" onclick="buildPanel()">Montar painel</button>
+            <button class="btn sm ghost" onclick="clearPanel()">Limpar</button>
+          </div>
+          <button class="btn sm" style="margin-top:4px;width:100%" onclick="exportPanel()">Exportar painel</button>
+        </div>
+        <div class="sectile">
+          <h3>Clustermap / Pairplot</h3>
+          <label class="lbl">Colunas numéricas</label>
+          <div class="scrollbox" id="advCols"><span style="color:var(--faint)">carregue um CSV</span></div>
+          <label class="check"><input type="checkbox" id="zscore" checked> z-score (clustermap)</label>
+          <label class="lbl">Hue (pairplot, opcional)</label>
+          <select id="advHue"></select>
+          <div class="row2" style="margin-top:6px">
+            <button class="btn sm" onclick="genAdvanced('clustermap')">Clustermap</button>
+            <button class="btn sm" onclick="genAdvanced('pairplot')">Pairplot</button>
+          </div>
+          <button class="btn sm" style="margin-top:4px;width:100%" onclick="exportAdvanced()">Exportar esta figura</button>
+        </div>
+        <div class="sectile">
+          <h3>Reformatar dados (long ⇄ wide)</h3>
+          <p class="hint">Wide→long (melt): junta várias colunas de medida numa só. Long→wide (pivot): espalha categorias em colunas.</p>
+          <label class="lbl">Manter (id_vars)</label>
+          <div class="scrollbox" id="meltId" style="max-height:90px"></div>
+          <label class="lbl">Derreter (value_vars)</label>
+          <div class="scrollbox" id="meltVal" style="max-height:90px"></div>
+          <button class="btn sm" style="margin-top:6px;width:100%" onclick="doMelt()">Wide → Long (melt)</button>
+          <label class="lbl" style="margin-top:8px">Pivot: índice / colunas / valores</label>
+          <select id="pvIndex"></select><select id="pvCols" style="margin-top:4px"></select><select id="pvVals" style="margin-top:4px"></select>
+          <button class="btn sm" style="margin-top:6px;width:100%" onclick="doPivot()">Long → Wide (pivot)</button>
+        </div>
+        <div class="sectile">
+          <h3>Tabela descritiva</h3>
+          <label class="lbl">Agrupar por (opcional)</label>
+          <select id="tblGrp"></select>
+          <div class="row2" style="margin-top:6px">
+            <button class="btn sm" onclick="genTable()">Gerar tabela</button>
+            <button class="btn sm ghost" onclick="exportTable()">Exportar CSV</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer">
+      <div class="dpirow">
+        <span>DPI da exportação</span>
+        <input type="number" id="dpi" value="300" min="300" max="1200" step="50"
+               onchange="if(+this.value<300)this.value=300">
+        <span class="muted">(mín. 300)</span>
+      </div>
+      <label class="check" style="margin:2px 0"><input type="checkbox" id="exportTransparent"> Fundo transparente (PNG/SVG/PDF)</label>
+      <button class="btn" onclick="exportFig()">⬇  Exportar figura (TIFF/PNG/PDF/SVG)</button>
+      <div class="row2">
+        <button class="btn sm" onclick="exportCode()">⬇ Código .py</button>
+        <button class="btn sm ghost" onclick="exportCsv()">CSV filtrado</button>
+      </div>
+      <div class="row2">
+        <button class="btn sm" onclick="saveProject()">💾 Salvar projeto</button>
+        <button class="btn sm" onclick="openProject()">📂 Abrir projeto</button>
+      </div>
+      <div class="row2">
+        <button class="btn sm ghost" onclick="savePreset()">Salvar preset</button>
+        <button class="btn sm ghost" onclick="applyPreset()">Aplicar preset</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- STAGE -->
+  <main class="stage">
+    <div class="topbar">
+      <div class="layers" id="hintTop">Carregue um CSV para começar.</div>
+      <div class="anntools">
+        <input type="text" id="annText" placeholder="texto da anotação" style="width:150px">
+        <button class="btn sm" onclick="setAnnot('text')" id="annTextBtn">Texto</button>
+        <button class="btn sm" onclick="setAnnot('arrow')" id="annArrowBtn">Seta</button>
+        <button class="btn sm" onclick="setAnnot('star')" id="annStarBtn">✱</button>
+        <button class="btn sm ghost" onclick="undoAnnot()">Desfazer</button>
+        <button class="btn sm ghost" onclick="clearAnnot()">Limpar</button>
+      </div>
+    </div>
+    <div class="previewcard" id="card">
+      <div class="empty" id="empty"><div class="big">📈</div>Sua figura aparece aqui</div>
+      <img id="plot" alt="figura">
+      <div id="legendBox"></div>
+      <svg id="gateLayer" style="position:absolute;left:0;top:0;display:none;pointer-events:none"></svg>
+    </div>
+    <div class="rowinfo" id="rowinfo"><div class="rowinfohead"><h4>Ponto selecionado</h4><button class="btn sm ghost" style="width:auto;padding:3px 10px" onclick="copyRowTable()">⧉ Copiar</button></div><table id="rowtable"></table></div>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<div id="dataModal" class="modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3>Digitar dados</h3>
+      <button class="btn sm ghost" onclick="closeDataEntry()">✕</button>
+    </div>
+    <div class="modal-tools">
+      <button class="btn sm" onclick="gridAddRow()">＋ linha</button>
+      <button class="btn sm" onclick="gridAddCol()">＋ coluna</button>
+      <button class="btn sm ghost" onclick="gridDelRow()">− linha</button>
+      <button class="btn sm ghost" onclick="gridDelCol()">− coluna</button>
+      <button class="btn sm" onclick="gridHeaderFromRow()">1ª linha → cabeçalho</button>
+      <label class="check" style="margin-left:auto"><input type="checkbox" id="gridComma"> vírgula = decimal</label>
+      <span class="muted">Cole (Ctrl+V) direto do Excel/Prism — tab vira coluna. Cabeçalho = nome da coluna.</span>
+    </div>
+    <div class="grid-wrap"><table id="dataGrid"></table></div>
+    <div class="modal-foot">
+      <button class="btn ghost" onclick="closeDataEntry()">Cancelar</button>
+      <button class="btn primary" onclick="applyData()">Usar estes dados</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let CATALOG=[], SPEC=null, STACK=[], LASTRENDER=null, rAF=null, busy=false;
+
+window.addEventListener('pywebviewready', async () => {
+  const b = await window.pywebview.api.boot();
+  CATALOG = b.catalog;
+  $('plotType').innerHTML = CATALOG.map(s=>`<option value="${s.key}">${s.label}</option>`).join('');
+  $('theme').innerHTML = b.themes.map(t=>`<option>${t}</option>`).join('');
+  buildConfig();
+});
+
+function tab(t){
+  document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('active',e.dataset.t===t));
+  document.querySelectorAll('.panel').forEach(e=>e.classList.remove('active'));
+  $('p-'+t).classList.add('active');
+}
+function badge(el){ el.parentElement.querySelector('.val').textContent =
+  (el.step<1? (+el.value).toFixed(2): el.value); }
+function toast(msg,kind=''){ const t=$('toast'); t.textContent=msg; t.className='toast show '+kind;
+  setTimeout(()=>t.className='toast',2600); }
+
+let COLS={numeric:[],category:[],kinds:{}};
+async function openCsv(){
+  const r = await window.pywebview.api.open_csv();
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  onData(r); toast('CSV carregado','good');
+}
+async function applyFilter(){
+  const r = await window.pywebview.api.set_filter($('filter').value);
+  if(!r) return; if(r.error) toast(r.error,'bad');
+  onData(r); dRender();
+}
+function onData(r){
+  COLS={numeric:r.numeric,category:r.category,kinds:r.kinds};
+  $('chip').classList.add('on');
+  $('chipText').textContent = (r.path? r.path.split(/[\\/]/).pop():'dados')+`  ·  ${r.n} linhas × ${r.cols.length} col`;
+  $('hintTop').textContent='Configure o gráfico e clique em Plotar.';
+  $('toCatCol').innerHTML = COLS.numeric.length
+    ? COLS.numeric.map(c=>`<option>${c}</option>`).join('')
+    : '<option value="">—</option>';
+  buildConfig(); buildNumCols(); fillTestSelects(); buildAdvanced(); renderGateList(); resetHistory();
+}
+async function toCategory(){
+  const col = $('toCatCol').value;
+  if(!col) return;
+  const r = await window.pywebview.api.to_category(col);
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  onData(r); toast(`"${col}" convertida em categoria — já pode usar como hue`,'good');
+}
+
+/* ----- config dinâmica a partir do schema ----- */
+function colOptions(accepts){
+  const all = Object.keys(COLS.kinds).filter(c=>accepts.includes(COLS.kinds[c]));
+  return '<option value="">—</option>'+all.map(c=>`<option>${c}</option>`).join('');
+}
+function buildConfig(){
+  SPEC = CATALOG.find(s=>s.key===$('plotType').value) || CATALOG[0];
+  if(!SPEC) return;
+  let h='';
+  for(const ch of SPEC.channels){
+    const handler = (ch.name==='x'||ch.name==='y') ? `onAxisChange('${ch.name}')` : 'dRender()';
+    h+=`<label class="lbl">${ch.label}${ch.required?' *':''}</label>
+        <select data-ch="${ch.name}" onchange="${handler}">${colOptions(ch.accepts)}</select>`;
+  }
+  for(const p of SPEC.params){
+    if(p.kind==='bool'){
+      h+=`<label class="check"><input type="checkbox" data-pp="${p.name}" ${p.default?'checked':''} onchange="dRender()"> ${p.label}</label>`;
+    }else if(p.kind==='choice'||p.kind==='palette'){
+      h+=`<label class="lbl">${p.label}</label><select data-pp="${p.name}" onchange="dRender()">`+
+         p.choices.map(c=>`<option ${c===p.default?'selected':''}>${c}</option>`).join('')+`</select>`;
+    }else{
+      const step = p.kind==='int'?1:0.05;
+      h+=`<label class="lbl">${p.label}</label><div class="slider">
+          <input type="range" data-pp="${p.name}" min="${p.lo}" max="${p.hi}" step="${step}" value="${p.default}"
+            oninput="badge(this);dRender()"><span class="val">${p.default}</span></div>`;
+    }
+  }
+  $('plotConfig').innerHTML=h;
+}
+function onAxisChange(which){
+  // travado: guarda a posição das regiões em FRAÇÃO do gráfico (limites atuais)
+  // para reposicioná-las após o novo render, mantendo o lugar na tela.
+  if(gatesLocked && GATES.length && LASTRENDER){
+    pendingGateFrac = GATES.map(g=>({name:g.name,color:g.color,points:g.points.map(p=>dataFrac(p[0],p[1])),
+      labelxy:(g.labelxy&&g.labelxy.length===2)?dataFrac(g.labelxy[0],g.labelxy[1]):null}));
+  }
+  if(which==='x') $('xlabel').value='';
+  if(which==='y') $('ylabel').value='';
+  $('title').value='';
+  dRender();
+}
+function readLayer(){
+  const mapping={}, params={};
+  $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>{ mapping[s.dataset.ch]= s.value||null; });
+  $('plotConfig').querySelectorAll('[data-pp]').forEach(w=>{
+    const p = SPEC.params.find(x=>x.name===w.dataset.pp);
+    params[p.name] = p.kind==='bool'? w.checked : (p.kind==='int'? parseInt(w.value):
+                     (p.kind==='float'? parseFloat(w.value): w.value));
+  });
+  return {spec_key:SPEC.key, mapping, params};
+}
+
+/* ----- estado + render ----- */
+const STYLE={fig_bg:null, ax_bg:null, colors:null};
+let ANNOT=[], annotMode=null;
+let LINES=[], linePick=false;   // linhas de limiar {x,y,angle,color}
+let GATES=[], gateMode=false, gateDrag=null;   // regiões poligonais {name,color,points:[[x,y]...]}
+let gatesLocked=false, pendingGateFrac=null;   // travar regiões: manter posição visual ao trocar X/Y
+function setOv(k,v){ STYLE[k]=v; dRender(); }
+function clearOv(){ STYLE.fig_bg=STYLE.ax_bg=null; dRender(); }
+const LEG={x:0.74,y:0.72};
+let LEGREL={};
+let ALIAS={};   // {nome_real: nome_de_exibição} — só rótulos da figura, não toca nos dados
+
+function gather(){
+  const card=$('card');
+  return {
+    width:Math.max(320,card.clientWidth-2), height:Math.max(240,card.clientHeight-2),
+    title:$('title').value, xlabel:$('xlabel').value, ylabel:$('ylabel').value,
+    layers: STACK.length? STACK : [],
+    style:{theme:$('theme').value, context:$('context').value, font_scale:parseFloat($('fontScale').value),
+           grid:$('grid').checked, fig_bg:STYLE.fig_bg, ax_bg:STYLE.ax_bg, colors:STYLE.colors,
+           logx:$('logx').checked, logy:$('logy').checked,
+           xmin:$('xmin').value, xmax:$('xmax').value, ymin:$('ymin').value, ymax:$('ymax').value,
+           despine:$('despine').checked, tick_size:parseFloat($('ticksize').value)||0,
+           fig_w_mm:$('figwmm').value, fig_h_mm:$('fighmm').value},
+    legend:{show:$('legShow').checked, pos:$('legPos').value, x:LEG.x, y:LEG.y,
+            fontsize:parseFloat($('legSize').value), ncol:parseInt($('legCol').value), frame:$('legFrame').checked,
+            fit:$('legFit').checked, title:$('legTitle').value, relabel:LEGREL},
+    ncols: parseInt($('ncols').value)||2,
+    export_dpi: Math.max(300, parseInt($('dpi').value)||300),
+    transparent: $('exportTransparent').checked,
+    annotations: ANNOT,
+    aliases: ALIAS,
+    threshold_lines: LINES,
+    gates: GATES
+  };
+}
+function dRender(){ if(rAF) clearTimeout(rAF); rAF=setTimeout(render,140); }
+
+async function render(){
+  if(!STACK.length || busy) return;
+  busy=true;
+  let r;
+  try{ r = await window.pywebview.api.render(gather()); }
+  catch(err){ console.error('render falhou:', err); toast('Erro ao renderizar','bad'); }
+  finally{ busy=false; }                         // garante que busy nunca trava em true
+  if(!r){ pendingGateFrac=null; maybeLive(); return; }
+  if(r.error){ pendingGateFrac=null; toast(r.error,'bad'); maybeLive(); return; }
+  LASTRENDER=r;
+  if(pendingGateFrac){                 // regiões travadas: recoloca na mesma fração do gráfico
+    const xl=r.xlim,yl=r.ylim;
+    GATES=pendingGateFrac.map(g=>({name:g.name,color:g.color,
+      points:g.points.map(f=>[+(xl[0]+f[0]*(xl[1]-xl[0])).toFixed(4),+(yl[0]+f[1]*(yl[1]-yl[0])).toFixed(4)]),
+      labelxy:g.labelxy?[+(xl[0]+g.labelxy[0]*(xl[1]-xl[0])).toFixed(4),+(yl[0]+g.labelxy[1]*(yl[1]-yl[0])).toFixed(4)]:undefined}));
+    pendingGateFrac=null; renderGateList();
+    render(); return;                  // re-renderiza com as regiões já reposicionadas
+  }
+  const img=$('plot'); img.src=r.img; img.style.display='block'; $('empty').style.display='none';
+  img.onload=()=>{ placeLegend(r); placeGates(r); };
+  maybeLive(); scheduleCommit();
+}
+// Render contínuo (slider): enquanto um render roda, marca que quer outro; ao terminar,
+// re-renderiza com o estado mais novo. Dá atualização ao vivo sem empilhar requisições.
+let _wantLive=false;
+function liveRender(){ if(busy){ _wantLive=true; } else { render(); } }
+function maybeLive(){ if(_wantLive){ _wantLive=false; render(); } }
+
+/* ===================== HISTÓRICO / DESFAZER (Ctrl-Z) ===================== */
+// Guarda no máximo 8 passos. Cada passo armazena SÓ os campos que mudaram (valores
+// antigos), comparando o estado atual com o anterior — não snapshots inteiros.
+let undoStack=[], lastSnap=null, undoing=false, _commitTimer=null;
+function snap(){ return JSON.parse(JSON.stringify(captureUI())); }   // cópia por valor
+function scheduleCommit(){ clearTimeout(_commitTimer); _commitTimer=setTimeout(commitHistory,350); }
+function commitHistory(){
+  if(undoing) return;
+  const cur=snap();
+  if(lastSnap===null){ lastSnap=cur; return; }     // baseline: nada a desfazer ainda
+  const d={}; let changed=false;
+  const keys=new Set([...Object.keys(lastSnap),...Object.keys(cur)]);
+  for(const k of keys){
+    if(JSON.stringify(lastSnap[k])!==JSON.stringify(cur[k])){ d[k]=lastSnap[k]; changed=true; }
+  }
+  if(changed){ undoStack.push(d); if(undoStack.length>8) undoStack.shift(); }
+  lastSnap=cur;
+}
+function doUndo(){
+  if(!undoStack.length){ toast('Nada para desfazer'); return; }
+  const d=undoStack.pop();
+  const restored={...snap(), ...d};                // reverte só os campos alterados
+  undoing=true;
+  applyUI(restored);                               // restaura tudo + re-renderiza
+  lastSnap=restored;
+  setTimeout(()=>{ undoing=false; },60);
+  toast('Desfeito ↶');
+}
+function resetHistory(){ undoStack=[]; lastSnap=null; }
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z') && !e.shiftKey){
+    const tag=document.activeElement && document.activeElement.tagName;
+    if(tag==='INPUT'||tag==='TEXTAREA') return;     // preserva o desfazer nativo em campos de texto
+    e.preventDefault(); doUndo();
+  }
+});
+
+function plotBase(){
+  if(!COLS.numeric.length && !COLS.category.length){ toast('Carregue um CSV primeiro','bad'); return; }
+  STACK=[readLayer()]; updLayers(); render();
+}
+function overlay(){
+  if(!STACK.length){ toast('Plote a camada base primeiro'); return; }
+  if(SPEC.level!=='axes'){ toast(`'${SPEC.label}' é figure-level e não sobrepõe`,'bad'); return; }
+  STACK.push(readLayer()); updLayers(); render();
+}
+function clearLayers(){ STACK=[]; updLayers(); }
+function updLayers(){
+  $('layersLbl').textContent='camadas: '+(STACK.length? STACK.map(l=>CATALOG.find(s=>s.key===l.spec_key).label).join(' + '):'—');
+}
+
+/* ----- legenda: posicionar overlay + arraste ----- */
+function placeLegend(r){
+  const box=$('legendBox'), img=$('plot');
+  if(!r.legend || !$('legShow').checked){ box.style.display='none'; return; }
+  const scale = img.clientWidth / r.imgW;
+  const ox = img.offsetLeft, oy = img.offsetTop;
+  const L=r.legend;
+  box.style.display='block';
+  box.style.left=(ox+L.left*scale)+'px'; box.style.top=(oy+L.top*scale)+'px';
+  box.style.width=((L.right-L.left)*scale)+'px'; box.style.height=((L.bottom-L.top)*scale)+'px';
+  box._meta={scale,ox,oy,r};
+}
+(function dragLegend(){
+  const box=$('legendBox'); let st=null;
+  box.addEventListener('pointerdown',e=>{
+    st={x:e.clientX,y:e.clientY,L:box.offsetLeft,T:box.offsetTop}; box.classList.add('drag');
+    box.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  box.addEventListener('pointermove',e=>{
+    if(!st)return; box.style.left=(st.L+e.clientX-st.x)+'px'; box.style.top=(st.T+e.clientY-st.y)+'px';
+  });
+  box.addEventListener('pointerup',e=>{
+    if(!st)return; box.classList.remove('drag');
+    const m=box._meta; if(m){
+      const sc=m.scale;
+      const leftNat=(box.offsetLeft-m.ox)/sc;
+      const bottomNat=(box.offsetTop-m.oy)/sc + (box.offsetHeight/sc);
+      // fração da FIGURA (origem inferior-esquerda); o backend abre espaço p/ a legenda
+      LEG.x = Math.max(0, Math.min(0.98, +(leftNat/m.r.imgW).toFixed(3)));
+      LEG.y = Math.max(0, Math.min(0.98, +((m.r.imgH-bottomNat)/m.r.imgH).toFixed(3)));
+      $('legPos').value='free';
+    }
+    st=null; render();
+  });
+})();
+
+/* ----- clique no ponto ----- */
+$('plot').addEventListener('click', async e=>{
+  if(!LASTRENDER) return;
+  const img=$('plot'); const scale=img.clientWidth/LASTRENDER.imgW;
+  const nx=e.offsetX/scale, ny=e.offsetY/scale;
+  if(linePick){                        // pegar X,Y tem prioridade, mesmo em modo de edição
+    const d=await window.pywebview.api.to_data(nx,ny);
+    if(d){ $('lnX').value=+d.x.toFixed(3); $('lnY').value=+d.y.toFixed(3); toast('X,Y capturados','good'); }
+    else toast('Renderize o gráfico primeiro','bad');
+    toggleLinePick(); return;
+  }
+  if(gateMode) return;             // em edição de regiões o clique restante é do overlay
+  if(annotMode){                       // colocar anotação (coordenada de eixo)
+    const ax=LASTRENDER.axes;
+    const fx=Math.max(0,Math.min(1,(nx-ax.left)/(ax.right-ax.left)));
+    const fy=Math.max(0,Math.min(1,(ax.bottom-ny)/(ax.bottom-ax.top)));
+    ANNOT.push({kind:annotMode, x:+fx.toFixed(3), y:+fy.toFixed(3), text:$('annText').value});
+    setAnnot(null); render(); return;
+  }
+  const row = await window.pywebview.api.pick(nx,ny);
+  if(!row) return;
+  $('rowinfo').style.display='block';
+  $('rowinfo').querySelector('h4').textContent='Ponto selecionado';
+  $('rowtable').innerHTML = Object.entries(row).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+});
+function setAnnot(mode){
+  annotMode = (annotMode===mode)? null : mode;
+  ['annTextBtn','annArrowBtn','annStarBtn'].forEach(id=>$(id).classList.remove('act'));
+  if(annotMode){ const m={text:'annTextBtn',arrow:'annArrowBtn',star:'annStarBtn'}[annotMode]; $(m).classList.add('act');
+    toast('Clique no gráfico para posicionar'); }
+}
+/* ---- copiar a tabela de resultados (abaixo do gráfico) como TSV p/ Excel/Sheets ---- */
+function copyRowTable(){
+  const rows=[...document.querySelectorAll('#rowtable tr')];
+  if(!rows.length){ toast('Nada para copiar','bad'); return; }
+  const clean=s=>(s||'').replace(/\t/g,' ').replace(/\r?\n/g,' ').trim();
+  const tsv=rows.map(tr=>[...tr.children].map(c=>clean(c.innerText)).join('\t')).join('\n');
+  copyText(tsv, rows.length+' linhas copiadas — cole no Excel/Sheets');
+}
+function copyText(txt, msg){
+  const ok=()=>toast(msg||'Copiado','good');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(ok).catch(()=>fallbackCopy(txt,ok));
+  } else fallbackCopy(txt,ok);
+}
+function fallbackCopy(txt,ok){
+  const ta=document.createElement('textarea');
+  ta.value=txt; ta.style.position='fixed'; ta.style.left='-9999px'; ta.style.opacity='0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try{ document.execCommand('copy'); ok(); }catch(e){ toast('Falha ao copiar','bad'); }
+  document.body.removeChild(ta);
+}
+function undoAnnot(){ ANNOT.pop(); render(); }
+function clearAnnot(){ ANNOT=[]; render(); }
+
+/* ---------- Excel ---------- */
+async function openExcel(){
+  const r=await window.pywebview.api.open_excel(); if(!r)return; if(r.error){toast(r.error,'bad');return;}
+  $('sheetSel').innerHTML=r.sheets.map(s=>`<option>${s}</option>`).join(''); $('sheetPick').style.display='block';
+}
+async function loadSheet(){
+  const r=await window.pywebview.api.choose_sheet($('sheetSel').value); if(!r)return;
+  if(r.error){toast(r.error,'bad');return;} onData(r); toast('Aba carregada','good');
+}
+
+/* ---------- reshape ---------- */
+function buildReshape(){
+  const cks=arr=>arr.map(c=>`<label class="check"><input type="checkbox" value="${c}"> ${c}</label>`).join('');
+  $('meltId').innerHTML=cks(Object.keys(COLS.kinds));
+  $('meltVal').innerHTML=cks(COLS.numeric);
+  const all=Object.keys(COLS.kinds).map(c=>`<option>${c}</option>`).join('');
+  $('pvIndex').innerHTML=all; $('pvCols').innerHTML=all; $('pvVals').innerHTML=all;
+}
+function checkedVals(id){ return [...$(id).querySelectorAll('input:checked')].map(i=>i.value); }
+async function doMelt(){
+  const r=await window.pywebview.api.reshape_melt(checkedVals('meltId'),checkedVals('meltVal'),'variável','valor');
+  if(!r)return; if(r.error){toast(r.error,'bad');return;} onData(r); toast('Convertido para formato longo','good');
+}
+async function doPivot(){
+  const r=await window.pywebview.api.reshape_pivot($('pvIndex').value,$('pvCols').value,$('pvVals').value);
+  if(!r)return; if(r.error){toast(r.error,'bad');return;} onData(r); toast('Convertido para formato largo','good');
+}
+
+/* ---------- projeto / preset / código ---------- */
+function setv(id,val,slider){ if(val===undefined||val===null)return; const el=$(id); if(!el)return; el.value=val; if(slider)badge(el); }
+function chk(id,val){ const el=$(id); if(el)el.checked=!!val; }
+function captureUI(){
+  const cfg={ch:{},pp:{}};
+  $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>cfg.ch[s.dataset.ch]=s.value);
+  $('plotConfig').querySelectorAll('[data-pp]').forEach(w=>cfg.pp[w.dataset.pp]=(w.type==='checkbox'?w.checked:w.value));
+  return {filter:$('filter').value, plotType:$('plotType').value, cfg,
+    title:$('title').value,xlabel:$('xlabel').value,ylabel:$('ylabel').value,
+    style:{theme:$('theme').value,context:$('context').value,fontScale:$('fontScale').value,grid:$('grid').checked,
+      logx:$('logx').checked,logy:$('logy').checked,xmin:$('xmin').value,xmax:$('xmax').value,ymin:$('ymin').value,ymax:$('ymax').value,
+      despine:$('despine').checked,ticksize:$('ticksize').value,figwmm:$('figwmm').value,fighmm:$('fighmm').value,
+      fig_bg:STYLE.fig_bg,ax_bg:STYLE.ax_bg,colors:STYLE.colors},
+    legend:{show:$('legShow').checked,pos:$('legPos').value,size:$('legSize').value,col:$('legCol').value,frame:$('legFrame').checked,x:LEG.x,y:LEG.y,fit:$('legFit').checked,title:$('legTitle').value,relabel:LEGREL},
+    stack:STACK,panel:PANEL,annot:ANNOT,ncols:$('ncols').value,dpi:$('dpi').value,transparent:$('exportTransparent').checked,aliases:ALIAS,lines:LINES,gates:GATES,gatesLocked:gatesLocked};
+}
+function applyUI(u){
+  if(!u)return;
+  $('filter').value=u.filter||''; $('plotType').value=u.plotType||$('plotType').value; buildConfig();
+  if(u.cfg){
+    for(const[k,v]of Object.entries(u.cfg.ch||{})){const el=$('plotConfig').querySelector(`[data-ch="${k}"]`); if(el)el.value=v;}
+    for(const[k,v]of Object.entries(u.cfg.pp||{})){const el=$('plotConfig').querySelector(`[data-pp="${k}"]`); if(el){ if(el.type==='checkbox')el.checked=v; else {el.value=v; if(el.type==='range')badge(el);} }}
+  }
+  $('title').value=u.title||''; $('xlabel').value=u.xlabel||''; $('ylabel').value=u.ylabel||'';
+  const s=u.style||{};
+  setv('theme',s.theme);setv('context',s.context);setv('fontScale',s.fontScale,true);chk('grid',s.grid);
+  chk('logx',s.logx);chk('logy',s.logy);setv('xmin',s.xmin);setv('xmax',s.xmax);setv('ymin',s.ymin);setv('ymax',s.ymax);
+  chk('despine',s.despine);setv('ticksize',s.ticksize,true);setv('figwmm',s.figwmm);setv('fighmm',s.fighmm);
+  STYLE.fig_bg=s.fig_bg||null; STYLE.ax_bg=s.ax_bg||null; STYLE.colors=s.colors||null;
+  renderGroupColorPickers();
+  const lg=u.legend||{}; chk('legShow',lg.show);setv('legPos',lg.pos);setv('legSize',lg.size,true);setv('legCol',lg.col,true);chk('legFrame',lg.frame);
+  chk('legFit',lg.fit!==undefined?lg.fit:true); setv('legTitle',lg.title); LEGREL=lg.relabel||{};
+  LEG.x=(lg.x!==undefined?lg.x:0.74); LEG.y=(lg.y!==undefined?lg.y:0.72);
+  STACK=u.stack||[]; PANEL=u.panel||[]; ANNOT=u.annot||[]; ALIAS=u.aliases||{}; LINES=u.lines||[]; GATES=u.gates||[]; gatesLocked=!!u.gatesLocked; if($('gatesLock'))$('gatesLock').checked=gatesLocked; renderLineList(); renderGateList(); setv('ncols',u.ncols,true); setv('dpi',u.dpi); chk('exportTransparent',u.transparent);
+  updLayers(); renderPanelList(); render();
+}
+async function saveProject(){ const r=await window.pywebview.api.save_project(captureUI()); if(r&&r.error)toast(r.error,'bad'); else if(r)toast('Projeto salvo','good'); }
+async function openProject(){
+  const r=await window.pywebview.api.open_project(); if(!r)return; if(r.error){toast(r.error,'bad');return;}
+  if(r.data){ if(r.data.error)toast(r.data.error,'bad'); else onData(r.data); }
+  resetHistory(); applyUI(r.ui); toast('Projeto aberto','good');
+}
+async function savePreset(){ const r=await window.pywebview.api.save_preset(gather()); if(r&&r.error)toast(r.error,'bad'); else if(r)toast('Preset salvo','good'); }
+async function applyPreset(){
+  const r=await window.pywebview.api.apply_preset(); if(!r)return; if(r.error){toast(r.error,'bad');return;}
+  const s=r.style||{}; setv('theme',s.theme);setv('context',s.context);setv('fontScale',s.font_scale,true);chk('grid',s.grid);
+  chk('logx',s.logx);chk('logy',s.logy);chk('despine',s.despine);setv('ticksize',s.tick_size,true);
+  STYLE.fig_bg=s.fig_bg||null;STYLE.ax_bg=s.ax_bg||null;STYLE.colors=s.colors||null;
+  renderGroupColorPickers();
+  const lg=r.legend||{}; chk('legShow',lg.show);setv('legPos',lg.pos);setv('legSize',lg.fontsize,true);setv('legCol',lg.ncol,true);chk('legFrame',lg.frame);
+  render(); toast('Preset aplicado','good');
+}
+async function exportCode(){ const r=await window.pywebview.api.export_code(gather()); if(r&&r.error)toast(r.error,'bad'); else if(r)toast('Código salvo: '+r,'good'); }
+
+/* ---------- renomear itens da legenda ---------- */
+async function loadLegendLabels(){
+  const hueSel=$('plotConfig').querySelector('[data-ch="hue"]');
+  const col=hueSel&&hueSel.value;
+  if(!col){ toast('Defina o canal hue primeiro','bad'); return; }
+  const cats=await window.pywebview.api.categories(col);
+  if(!cats.length){ toast('Sem categorias','bad'); return; }
+  $('legRelabel').innerHTML=cats.map(c=>{
+    const cur=LEGREL[c]||'';
+    return `<div class="row2" style="margin-bottom:4px"><span style="color:var(--mut);align-self:center;min-width:70px">${c}</span>
+      <input type="text" value="${cur}" placeholder="novo nome" oninput="setRelabel('${c.replace(/'/g,'')}',this.value)"></div>`;
+  }).join('');
+}
+function setRelabel(orig,val){ if(val) LEGREL[orig]=val; else delete LEGREL[orig]; dRender(); }
+
+/* ---------- renomear colunas (rótulos de eixo + título da legenda) ---------- */
+function loadColumnAliases(){
+  const cols=Object.keys(COLS.kinds||{});
+  if(!cols.length){ toast('Carregue um CSV primeiro','bad'); return; }
+  $('aliasList').innerHTML=cols.map(c=>{
+    const cur=(ALIAS[c]||'').replace(/"/g,'&quot;');
+    const safe=c.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<div class="row2" style="margin-bottom:4px"><span style="color:var(--mut);align-self:center;min-width:90px">${c}</span>
+      <input type="text" value="${cur}" placeholder="nome de exibição" oninput="setAlias('${safe}',this.value)"></div>`;
+  }).join('');
+}
+function setAlias(orig,val){ val=(val||'').trim(); if(val) ALIAS[orig]=val; else delete ALIAS[orig]; dRender(); }
+
+/* ---------- entrada manual de dados (estilo Prism) ---------- */
+let GRID={cols:['Grupo','Valor','Réplica'], data:[['','',''],['','',''],['','',''],['','',''],['','','']]};
+function openDataEntry(){ renderGrid(); $('dataModal').classList.add('show'); }
+function closeDataEntry(){ $('dataModal').classList.remove('show'); }
+function renderGrid(){
+  let h='<thead><tr>'+GRID.cols.map((c,j)=>`<th><input value="${c.replace(/"/g,'&quot;')}" oninput="GRID.cols[${j}]=this.value" onpaste="gridPaste(event,-1,${j})"></th>`).join('')+'</tr></thead><tbody>';
+  h+=GRID.data.map((row,i)=>'<tr>'+row.map((v,j)=>`<td><input value="${(v||'').toString().replace(/"/g,'&quot;')}" oninput="GRID.data[${i}][${j}]=this.value" onpaste="gridPaste(event,${i},${j})"></td>`).join('')+'</tr>').join('');
+  h+='</tbody>'; $('dataGrid').innerHTML=h;
+}
+// colar bloco do Excel/Prism (tab = colunas, quebra de linha = linhas), a partir da célula focada
+function gridPaste(e, r, c){
+  const txt=((e.clipboardData||window.clipboardData)||{}).getData?((e.clipboardData||window.clipboardData).getData('text')):'';
+  if(!txt) return;
+  const rows=txt.replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(l=>l.split('\t'));
+  if(rows.length===1 && rows[0].length===1) return;     // valor único -> deixa o paste normal
+  e.preventDefault();
+  const need=c+Math.max(...rows.map(rr=>rr.length));
+  while(GRID.cols.length<need){ GRID.cols.push('Coluna'+(GRID.cols.length+1)); GRID.data.forEach(rw=>rw.push('')); }
+  const writeBody=(body,startRow)=>body.forEach((rr,i)=>{
+    const ri=startRow+i; while(GRID.data.length<=ri) GRID.data.push(GRID.cols.map(()=>''));
+    rr.forEach((v,j)=>{ GRID.data[ri][c+j]=v.trim(); });
+  });
+  if(r===-1){                                           // colou na linha de cabeçalho
+    rows[0].forEach((v,j)=>{ if(c+j<GRID.cols.length) GRID.cols[c+j]=v.trim(); });
+    writeBody(rows.slice(1), 0);
+  } else writeBody(rows, r);
+  renderGrid();
+  toast(`Colado: ${rows.length}×${Math.max(...rows.map(rr=>rr.length))}`,'good');
+}
+function gridHeaderFromRow(){            // promove a 1ª linha de dados a nomes de coluna
+  if(!GRID.data.length){ toast('Sem linhas para usar','bad'); return; }
+  GRID.cols = GRID.data[0].map((v,j)=> (v||'').toString().trim() || ('Coluna'+(j+1)));
+  GRID.data.shift();
+  if(!GRID.data.length) GRID.data.push(GRID.cols.map(()=>''));
+  renderGrid();
+  toast('1ª linha virou cabeçalho','good');
+}
+function gridAddRow(){ GRID.data.push(GRID.cols.map(()=>'')); renderGrid(); }
+function gridDelRow(){ if(GRID.data.length>1){GRID.data.pop(); renderGrid();} }
+function gridAddCol(){ GRID.cols.push('Coluna'+(GRID.cols.length+1)); GRID.data.forEach(r=>r.push('')); renderGrid(); }
+function gridDelCol(){ if(GRID.cols.length>1){GRID.cols.pop(); GRID.data.forEach(r=>r.pop()); renderGrid();} }
+async function applyData(){
+  const r=await window.pywebview.api.set_manual_data(GRID.cols, GRID.data, $('gridComma').checked);
+  if(!r){ toast('Erro','bad'); return; }
+  if(r.error){ toast(r.error,'bad'); return; }
+  onData(r); closeDataEntry(); toast('Dados aplicados','good');
+}
+
+/* ----- análise ----- */
+function buildNumCols(){
+  $('numCols').innerHTML = COLS.numeric.length
+    ? COLS.numeric.map(c=>`<label class="check"><input type="checkbox" value="${c}"> ${c}</label>`).join('')
+    : '<span style="color:var(--faint)">sem colunas numéricas</span>';
+}
+function fillTestSelects(){
+  $('testVal').innerHTML=COLS.numeric.map(c=>`<option>${c}</option>`).join('');
+  $('testGrp').innerHTML=COLS.category.map(c=>`<option>${c}</option>`).join('');
+  $('pairGrp').innerHTML=COLS.category.map(c=>`<option>${c}</option>`).join('');
+  $('shanGrp').innerHTML=COLS.category.map(c=>`<option>${c}</option>`).join('');
+}
+async function runShannon(){
+  const grp=$('shanGrp').value;
+  if(!grp){ toast('Escolha a coluna de grupo','bad'); return; }
+  const dir=$('shanDir').value;
+  const m=_expAxes();
+  const useGates = GATES.length && m.x && m.y;
+  if(dir==='by_group' && !useGates){ toast('Desenhe regiões e configure X/Y na aba Gráfico','bad'); return; }
+  const r=await window.pywebview.api.shannon(grp, useGates?m.x:null, useGates?m.y:null, useGates?GATES:null, dir);
+  if(!r){ toast('Carregue um CSV','bad'); return; }
+  if(r.error){ toast(r.error,'bad'); return; }
+  $('rowinfo').style.display='block';
+  const title = dir==='by_group' ? ('Shannon relativo — regiões ocupadas por "'+grp+'"')
+                                  : ('Shannon — grupos de "'+grp+'"'+(useGates?' por região':''));
+  $('rowinfo').querySelector('h4').textContent=title;
+  let h='<tr>'+r.columns.map(c=>`<td style="color:var(--mut)"><b>${c}</b></td>`).join('')+'</tr>';
+  h+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${v}</td>`).join('')+'</tr>').join('');
+  $('rowtable').innerHTML=h;
+  toast('Shannon calculado','good');
+}
+async function runReduce(){
+  const cols=[...$('numCols').querySelectorAll('input:checked')].map(i=>i.value);
+  if(cols.length<2){ toast('Selecione ≥2 colunas','bad'); return; }
+  const btn=$('reduceBtn'); btn.textContent='Rodando…'; btn.disabled=true;
+  const r=await window.pywebview.api.reduce(cols,$('method').value);
+  btn.textContent='Rodar redução'; btn.disabled=false;
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  onData(r); toast('Novas colunas: '+r.new.join(', '),'good');
+}
+async function runTest(){
+  const out=await window.pywebview.api.compare_groups($('testVal').value,$('testGrp').value);
+  $('testOut').textContent=out||'—';
+}
+async function rankPairs(){
+  const grp=$('pairGrp').value;
+  if(!grp){ toast('Escolha a coluna de grupo','bad'); return; }
+  const btn=$('pairBtn'); btn.textContent='Calculando…'; btn.disabled=true;
+  const r=await window.pywebview.api.rank_pairs(grp);
+  btn.textContent='Ranquear pares'; btn.disabled=false;
+  if(!r){ toast('Carregue um CSV','bad'); return; }
+  if(r.error){ toast(r.error,'bad'); return; }
+  $('rowinfo').style.display='block';
+  $('rowinfo').querySelector('h4').textContent='Melhores pares — separação de "'+grp+'"';
+  let h='<tr>'+r.columns.map(c=>`<td style="color:var(--mut)"><b>${c}</b></td>`).join('')+'</tr>';
+  h+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${v}</td>`).join('')+'</tr>').join('');
+  $('rowtable').innerHTML=h;
+  toast('Pares ranqueados — melhor no topo','good');
+}
+
+/* ---------- cores por grupo (color picker exato) ---------- */
+function renderGroupColorPickers(){
+  const m=STYLE.colors||{}; const cats=Object.keys(m);
+  $('groupColors').innerHTML = cats.length ? cats.map(c=>{
+    const safe=c.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<div class="colorrow"><input type="color" value="${m[c]}" oninput="setGroupColor('${safe}',this.value)"><span style="color:var(--mut)">${c}</span></div>`;
+  }).join('') : '<span style="color:var(--faint);font-size:11px">Carregue os grupos para escolher cada cor.</span>';
+  $('clearColorsBtn').style.display = cats.length ? 'block' : 'none';
+}
+async function loadGroupColors(){
+  const hueSel=$('plotConfig').querySelector('[data-ch="hue"]');
+  const col=(hueSel&&hueSel.value)||($('plotConfig').querySelector('[data-ch="x"]')||{}).value;
+  if(!col){ toast('Defina X ou hue primeiro','bad'); return; }
+  const palSel=$('plotConfig').querySelector('[data-pp="palette"]');
+  const m=await window.pywebview.api.group_colors(col,(palSel&&palSel.value)||'viridis');
+  if(!m||!Object.keys(m).length){ toast('Sem categorias no grupo','bad'); return; }
+  STYLE.colors = STYLE.colors ? {...m, ...STYLE.colors} : m;   // pré-preenche mantendo escolhas manuais
+  renderGroupColorPickers(); dRender();
+}
+function setGroupColor(cat,hex){ (STYLE.colors=STYLE.colors||{})[cat]=hex; dRender(); }
+function clearColors(){ STYLE.colors=null; renderGroupColorPickers(); dRender(); }
+
+/* ---------- linhas de limiar & regiões ---------- */
+function lineDesc(l){
+  const a=((l.angle%180)+180)%180;
+  if(Math.abs(a-90)<1e-9) return `vertical x=${(+l.x).toFixed(3)}`;
+  if(a===0) return `horizontal y=${(+l.y).toFixed(3)}`;
+  return `(${(+l.x).toFixed(2)}, ${(+l.y).toFixed(2)}) @ ${Math.round(a)}°`;
+}
+function renderLineList(){
+  $('lineList').innerHTML = LINES.length ? LINES.map((l,i)=>{
+    const a=Math.round(((l.angle%180)+180)%180);
+    return `<div style="margin-bottom:8px">
+       <div class="row2" style="align-items:center;justify-content:space-between">
+         <span style="color:var(--mut)"><span style="color:${l.color}">●</span> L${i+1}: <span id="lnDesc${i}">${lineDesc(l)}</span></span>
+         <button class="btn sm ghost" style="width:auto;padding:3px 8px" onclick="removeLine(${i})">remover</button>
+       </div>
+       <div class="row2" style="align-items:center;gap:6px;margin-top:3px">
+         <span style="color:var(--faint);font-size:11px">ângulo</span>
+         <input type="range" min="0" max="179" step="1" value="${a}" oninput="setLineAngle(${i},this.value)" style="flex:1">
+         <span id="lnAngVal${i}" style="color:var(--mut);min-width:34px;text-align:right;font-size:11px">${a}°</span>
+       </div>
+     </div>`;
+  }).join('') : 'nenhuma linha';
+}
+function setLineAngle(i,v){
+  LINES[i].angle=+v;
+  const av=document.getElementById('lnAngVal'+i); if(av) av.textContent=Math.round(+v)+'°';
+  const dv=document.getElementById('lnDesc'+i); if(dv) dv.textContent=lineDesc(LINES[i]);
+  if(gateMode) drawGateSVG();          // overlay instantâneo
+  liveRender();                        // matplotlib ao vivo (coalescido), não só no soltar
+}
+function lineTypeUI(){
+  const t=$('lnType').value;
+  $('lnX').disabled = (t==='horizontal');
+  $('lnY').disabled = (t==='vertical');
+  $('lnAng').disabled = (t!=='inclinada');
+}
+function addLine(){
+  const t=$('lnType').value;
+  const x=parseFloat($('lnX').value), y=parseFloat($('lnY').value);
+  const xl=LASTRENDER?LASTRENDER.xlim:null, yl=LASTRENDER?LASTRENDER.ylim:null;
+  let a, ax, ay;
+  if(t==='vertical'){ a=90; if(isNaN(x)){ toast('Linha vertical precisa de X','bad'); return; }
+    ax=x; ay=yl?(yl[0]+yl[1])/2:0; }                       // âncora no meio do Y (pivô central)
+  else if(t==='horizontal'){ a=0; if(isNaN(y)){ toast('Linha horizontal precisa de Y','bad'); return; }
+    ax=xl?(xl[0]+xl[1])/2:0; ay=y; }                        // âncora no meio do X
+  else { a=parseFloat($('lnAng').value)||0; if(isNaN(x)||isNaN(y)){ toast('Linha inclinada precisa de X e Y','bad'); return; }
+    ax=x; ay=y; }
+  LINES.push({x:ax, y:ay, angle:a, color:$('lnColor').value});
+  renderLineList(); render();
+  if(!gateMode) toast('Linha adicionada — ajuste o ângulo no slider ou arraste no gráfico','good');
+}
+function removeLine(i){ LINES.splice(i,1); renderLineList(); dRender(); }
+function toggleLinePick(){
+  linePick=!linePick; $('lnPickBtn').classList.toggle('act',linePick);
+  if(linePick) toast('Clique no gráfico para pegar X,Y');
+}
+async function analyzeRegions(){
+  if(!LINES.length){ toast('Adicione ao menos uma linha','bad'); return; }
+  const m={}; $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>m[s.dataset.ch]=s.value||null);
+  if(!m.x||!m.y){ toast('Configure X e Y na aba Gráfico','bad'); return; }
+  const r=await window.pywebview.api.region_stats(m.x,m.y,m.hue,LINES);
+  if(!r){ toast('Carregue um CSV','bad'); return; }
+  if(r.error){ toast(r.error,'bad'); return; }
+  $('rowinfo').style.display='block';
+  $('rowinfo').querySelector('h4').textContent='Regiões — observações por área (Grupos ≥2 = sobreposição)';
+  let h='<tr>'+r.columns.map(c=>`<td style="color:var(--mut)"><b>${c}</b></td>`).join('')+'</tr>';
+  h+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${v}</td>`).join('')+'</tr>').join('');
+  $('rowtable').innerHTML=h;
+  toast('Regiões analisadas','good');
+}
+async function generateGatesFromLines(){
+  if(!LINES.length){ toast('Adicione retas primeiro','bad'); return; }
+  if(!LASTRENDER){ toast('Plote o gráfico primeiro','bad'); return; }
+  const r=await window.pywebview.api.gates_from_lines(LINES, LASTRENDER.xlim, LASTRENDER.ylim);
+  if(!r){ toast('Carregue um CSV','bad'); return; }
+  if(r.error){ toast(r.error,'bad'); return; }
+  GATES=r.gates; LINES=[]; renderGateList(); renderLineList(); enableGateMode(true); render(); countGates();
+  toast(GATES.length+' regiões geradas (as retas viraram as bordas) — renomeie iguais p/ mesclar','good');
+}
+async function mergeGates(){
+  if(GATES.length<2){ toast('Precisa de ao menos 2 regiões','bad'); return; }
+  const names=GATES.map(g=>g.name);
+  if(new Set(names).size===names.length){ toast('Dê o mesmo nome a 2+ regiões antes de mesclar','bad'); return; }
+  const r=await window.pywebview.api.merge_gates(GATES);
+  if(!r){ toast('Carregue um CSV','bad'); return; }
+  if(r.error){ toast(r.error,'bad'); return; }
+  GATES=r.gates; renderGateList(); render(); countGates();
+  toast('Regiões de mesmo nome unidas num polígono só','good');
+}
+
+/* ===================== REGIÕES POLIGONAIS (gates arrastáveis) ===================== */
+function gScale(){ return $('plot').clientWidth/LASTRENDER.imgW; }
+function dataToDisp(dx,dy){
+  const A=LASTRENDER.axes,xl=LASTRENDER.xlim,yl=LASTRENDER.ylim,s=gScale(),img=$('plot');
+  const px=A.left+(dx-xl[0])/(xl[1]-xl[0])*(A.right-A.left);
+  const py=A.top +(yl[1]-dy)/(yl[1]-yl[0])*(A.bottom-A.top);
+  return [img.offsetLeft+px*s, img.offsetTop+py*s];
+}
+function dispToData(ex,ey){
+  const A=LASTRENDER.axes,xl=LASTRENDER.xlim,yl=LASTRENDER.ylim,s=gScale(),img=$('plot');
+  const px=(ex-img.offsetLeft)/s, py=(ey-img.offsetTop)/s;
+  const dx=xl[0]+(px-A.left)/(A.right-A.left)*(xl[1]-xl[0]);
+  const dy=yl[1]-(py-A.top)/(A.bottom-A.top)*(yl[1]-yl[0]);
+  return [dx,dy];
+}
+function cardXY(e){ const rc=$('card').getBoundingClientRect(); return [e.clientX-rc.left, e.clientY-rc.top]; }
+function dataFrac(dx,dy){ const xl=LASTRENDER.xlim,yl=LASTRENDER.ylim; return [(dx-xl[0])/(xl[1]-xl[0]),(dy-yl[0])/(yl[1]-yl[0])]; }
+function toggleGatesLock(){
+  gatesLocked=$('gatesLock').checked;
+  toast(gatesLocked?'Regiões travadas: mantêm a posição ao trocar X/Y':'Regiões destravadas','good');
+}
+
+function placeGates(r){
+  const svg=$('gateLayer'), card=$('card');
+  if(!gateMode || !LASTRENDER){ svg.style.display='none'; return; }
+  svg.style.display='block';
+  svg.setAttribute('width', card.clientWidth); svg.setAttribute('height', card.clientHeight);
+  drawGateSVG();
+}
+function drawGateSVG(){
+  if(!LASTRENDER) return;
+  let h='';
+  GATES.forEach((g,gi)=>{
+    const pts=g.points.map(p=>dataToDisp(p[0],p[1]));
+    const ptsStr=pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+    h+=`<polygon points="${ptsStr}" fill="${g.color}22" stroke="${g.color}" stroke-width="1.6"
+          style="pointer-events:auto;cursor:move" onpointerdown="gateBodyDown(event,${gi})" ondblclick="gatePolyDbl(event,${gi})"/>`;
+    pts.forEach((p,vi)=>{
+      h+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="6" fill="#fff" stroke="${g.color}" stroke-width="2"
+            style="pointer-events:auto;cursor:grab" onpointerdown="gateVertDown(event,${gi},${vi})" ondblclick="gateVertDel(event,${gi},${vi})" oncontextmenu="gateVertDel(event,${gi},${vi})"/>`;
+    });
+    const lab = (g.labelxy && g.labelxy.length===2) ? dataToDisp(g.labelxy[0],g.labelxy[1])
+                                                     : [pts.reduce((a,p)=>a+p[0],0)/pts.length, pts.reduce((a,p)=>a+p[1],0)/pts.length];
+    if(g.name) h+=`<text x="${lab[0].toFixed(1)}" y="${lab[1].toFixed(1)}" fill="${g.color}" font-size="12" font-weight="bold" text-anchor="middle"
+          style="pointer-events:auto;cursor:move" onpointerdown="labelDown(event,${gi})">${g.name}</text>`;
+  });
+  LINES.forEach((l,li)=>{                       // linhas de limiar arrastáveis
+    const ep=lineEndpointsDisp(l); if(!ep) return;
+    h+=`<line x1="${ep[0][0].toFixed(1)}" y1="${ep[0][1].toFixed(1)}" x2="${ep[1][0].toFixed(1)}" y2="${ep[1][1].toFixed(1)}"
+          stroke="${l.color}" stroke-width="2.4" stroke-dasharray="7 4" opacity="0.9"
+          style="pointer-events:auto;cursor:move" onpointerdown="lineDown(event,${li})"/>`;
+    const hd=lineHandleDisp(l);
+    h+=`<circle cx="${hd[0].toFixed(1)}" cy="${hd[1].toFixed(1)}" r="6" fill="#fff" stroke="${l.color}" stroke-width="2"
+          style="pointer-events:auto;cursor:grab" onpointerdown="lineDown(event,${li})"/>`;
+  });
+  $('gateLayer').innerHTML=h;
+}
+function lineAng(l){ return (((l.angle%180)+180)%180); }
+function lineEndpointsDisp(l){
+  const xl=LASTRENDER.xlim, yl=LASTRENDER.ylim, aa=lineAng(l);
+  let pa, pb;
+  if(Math.abs(aa-90)<1e-9){ pa=[l.x,yl[0]]; pb=[l.x,yl[1]]; }     // vertical
+  else{
+    const m=Math.tan(aa*Math.PI/180);
+    let xa=xl[0], xb=xl[1], ya=l.y+m*(xa-l.x), yb=l.y+m*(xb-l.x);
+    if(m!==0){                                                      // recorta à caixa do eixo
+      if(ya<yl[0]){ ya=yl[0]; xa=l.x+(ya-l.y)/m; } else if(ya>yl[1]){ ya=yl[1]; xa=l.x+(ya-l.y)/m; }
+      if(yb<yl[0]){ yb=yl[0]; xb=l.x+(yb-l.y)/m; } else if(yb>yl[1]){ yb=yl[1]; xb=l.x+(yb-l.y)/m; }
+    }
+    pa=[xa,ya]; pb=[xb,yb];
+  }
+  return [dataToDisp(pa[0],pa[1]), dataToDisp(pb[0],pb[1])];
+}
+function lineHandleDisp(l){                       // alça num ponto pegável
+  const xl=LASTRENDER.xlim, yl=LASTRENDER.ylim, aa=lineAng(l);
+  if(Math.abs(aa-90)<1e-9) return dataToDisp(l.x, (yl[0]+yl[1])/2);   // vertical: meio do Y
+  if(aa===0) return dataToDisp((xl[0]+xl[1])/2, l.y);                 // horizontal: meio do X
+  return dataToDisp(l.x, l.y);                                        // inclinada: o anchor
+}
+function lineDown(e,li){ e.stopPropagation(); gateDrag={type:'line',li}; }
+function gateVertDown(e,gi,vi){ e.stopPropagation(); gateDrag={type:'vert',gi,vi}; }
+function gateBodyDown(e,gi){ const [dx,dy]=dispToData(...cardXY(e)); gateDrag={type:'body',gi,last:[dx,dy]}; }
+function labelDown(e,gi){ e.stopPropagation(); gateDrag={type:'label',gi}; }
+function snapToSpine(x,y){           // gruda na borda do eixo (spine) quando perto
+  const xl=LASTRENDER.xlim, yl=LASTRENDER.ylim;
+  const sx=Math.abs(xl[1]-xl[0])*0.03, sy=Math.abs(yl[1]-yl[0])*0.03;
+  if(Math.abs(x-xl[0])<sx) x=xl[0]; else if(Math.abs(x-xl[1])<sx) x=xl[1];
+  if(Math.abs(y-yl[0])<sy) y=yl[0]; else if(Math.abs(y-yl[1])<sy) y=yl[1];
+  return [x,y];
+}
+function _projSeg(px,py,a,b){        // ponto mais próximo no segmento a-b (em pixels)
+  const vx=b[0]-a[0], vy=b[1]-a[1], L2=vx*vx+vy*vy;
+  let t = L2 ? ((px-a[0])*vx+(py-a[1])*vy)/L2 : 0; t=Math.max(0,Math.min(1,t));
+  const x=a[0]+t*vx, y=a[1]+t*vy; return {x,y,d:Math.hypot(x-px,y-py)};
+}
+// ímã: gruda no vértice (prioridade) ou na aresta de OUTRA região, dentro de ~11px
+function magnetSnap(px,py,exclude){
+  const TH=11; let bestV=null, bd=TH;
+  GATES.forEach((g,gi)=>{ if(gi===exclude) return;
+    g.points.forEach(p=>{ const q=dataToDisp(p[0],p[1]); const d=Math.hypot(q[0]-px,q[1]-py);
+      if(d<bd){ bd=d; bestV=[p[0],p[1]]; } }); });
+  if(bestV) return bestV;                       // vértice exato -> ponto compartilhado
+  let bestE=null; bd=TH;
+  GATES.forEach((g,gi)=>{ if(gi===exclude) return;
+    const dp=g.points.map(p=>dataToDisp(p[0],p[1]));
+    for(let k=0;k<dp.length;k++){ const pr=_projSeg(px,py,dp[k],dp[(k+1)%dp.length]);
+      if(pr.d<bd){ bd=pr.d; bestE=[pr.x,pr.y]; } } });
+  if(bestE){ const d=dispToData(bestE[0],bestE[1]); return [d[0],d[1]]; }
+  return null;
+}
+document.addEventListener('pointermove',e=>{
+  if(!gateDrag||!LASTRENDER) return;
+  const cp=cardXY(e); const [dx,dy]=dispToData(cp[0],cp[1]);
+  if(gateDrag.type==='vert'){
+    let pt = ($('gateMagnet')&&$('gateMagnet').checked) ? magnetSnap(cp[0],cp[1],gateDrag.gi) : null;
+    if(!pt) pt = snapToSpine(dx,dy);            // sem ímã -> tenta grudar na spine
+    GATES[gateDrag.gi].points[gateDrag.vi]=[+pt[0].toFixed(4),+pt[1].toFixed(4)]; }
+  else if(gateDrag.type==='body'){ const g=GATES[gateDrag.gi], ddx=dx-gateDrag.last[0], ddy=dy-gateDrag.last[1];
+    g.points=g.points.map(p=>[+(p[0]+ddx).toFixed(4),+(p[1]+ddy).toFixed(4)]); gateDrag.last=[dx,dy]; }
+  else if(gateDrag.type==='label'){ GATES[gateDrag.gi].labelxy=[+dx.toFixed(4),+dy.toFixed(4)]; }
+  else if(gateDrag.type==='line'){ const l=LINES[gateDrag.li], aa=lineAng(l);
+    if(Math.abs(aa-90)<1e-9){ l.x=+dx.toFixed(4); }            // vertical: só move X
+    else if(aa===0){ l.y=+dy.toFixed(4); }                     // horizontal: só move Y
+    else { l.x=+dx.toFixed(4); l.y=+dy.toFixed(4); } }         // inclinada: move o anchor
+  drawGateSVG();
+});
+document.addEventListener('pointerup',()=>{ if(!gateDrag) return; const t=gateDrag.type; gateDrag=null; render(); if(t==='line') renderLineList(); else if(t!=='label') countGates(); });
+
+function gatePolyDbl(e,gi){                 // duplo-clique no corpo: insere vértice
+  e.stopPropagation(); const [dx,dy]=dispToData(...cardXY(e)); const g=GATES[gi];
+  let best=0,bd=Infinity; g.points.forEach((p,k)=>{const d=(p[0]-dx)**2+(p[1]-dy)**2; if(d<bd){bd=d;best=k;}});
+  g.points.splice(best+1,0,[+dx.toFixed(4),+dy.toFixed(4)]); drawGateSVG(); render(); countGates();
+}
+function gateVertDel(e,gi,vi){             // duplo-clique OU botão-direito no vértice: remove (mín. 3)
+  e.preventDefault(); e.stopPropagation();
+  if(GATES[gi].points.length>3){ GATES[gi].points.splice(vi,1); drawGateSVG(); render(); countGates(); }
+  else toast('Um polígono precisa de ao menos 3 vértices','bad');
+}
+function toggleGateMode(){ enableGateMode(!gateMode); }
+function enableGateMode(on){
+  gateMode=on;
+  document.querySelectorAll('.editModeBtn').forEach(b=>{
+    b.classList.toggle('act',on);
+    b.textContent = on?'Editando — arraste no gráfico (clique p/ sair)':'Editar no gráfico (arrastar regiões/linhas)';
+  });
+  placeGates(LASTRENDER);
+}
+function addGate(){
+  if(!LASTRENDER){ toast('Plote um gráfico primeiro','bad'); return; }
+  const xl=LASTRENDER.xlim,yl=LASTRENDER.ylim;
+  const gx0=xl[0]+(xl[1]-xl[0])*0.38, gx1=xl[0]+(xl[1]-xl[0])*0.62;
+  const gy0=yl[0]+(yl[1]-yl[0])*0.38, gy1=yl[0]+(yl[1]-yl[0])*0.62;
+  const name=$('gateName').value.trim()||('R'+(GATES.length+1));
+  GATES.push({name,color:$('gateColor').value,points:[[gx0,gy0],[gx1,gy0],[gx1,gy1],[gx0,gy1]]});
+  $('gateName').value=''; renderGateList(); enableGateMode(true); render(); countGates();
+}
+function renderGateList(){
+  $('gateList').innerHTML = GATES.length ? GATES.map((g,i)=>
+    `<div class="row2" style="align-items:center;gap:4px;margin-bottom:3px">
+       <span style="color:${g.color};font-size:14px">●</span>
+       <input type="text" value="${(g.name||'').replace(/"/g,'&quot;')}" oninput="renameGate(${i},this.value)" style="flex:1;padding:3px 6px">
+       <button class="btn sm ghost" style="width:auto;padding:3px 8px" onclick="removeGate(${i})">✕</button>
+     </div>`).join('') : '<span style="color:var(--faint);font-size:11px">nenhuma região — adicione e arraste no gráfico</span>';
+  refreshGateExportSel();
+}
+function refreshGateExportSel(){
+  const box=$('gateExportList'); if(!box) return;
+  const prev={}; box.querySelectorAll('input').forEach(c=>prev[c.value]=c.checked);   // preserva marcações
+  const names=[...new Set(GATES.map(g=>g.name).filter(Boolean))];
+  if(!names.length){ box.innerHTML='<span style="color:var(--faint);font-size:11px">nomeie as regiões para poder exportar por gating</span>'; return; }
+  box.innerHTML = names.map(n=>{
+    const v=n.replace(/"/g,'&quot;'), ck=(n in prev)?prev[n]:true;     // novas entram marcadas
+    return `<label class="check" style="margin:2px 0"><input type="checkbox" value="${v}" ${ck?'checked':''}> ${n.replace(/</g,'&lt;')}</label>`;
+  }).join('');
+}
+function _expAxes(){ const m={}; $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>m[s.dataset.ch]=s.value||null); return m; }
+async function exportGated(){
+  if(!GATES.length){ toast('Crie ao menos uma região','bad'); return; }
+  const sel=[...$('gateExportList').querySelectorAll('input:checked')].map(c=>c.value);
+  if(!sel.length){ toast('Marque ao menos uma região','bad'); return; }
+  const m=_expAxes(); if(!m.x||!m.y){ toast('Configure X e Y na aba Gráfico','bad'); return; }
+  const per=$('gateExportPer').checked;
+  const r=await window.pywebview.api.export_gated(m.x,m.y,GATES,sel,$('gateExportFmt').value,per);
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  if(r.per_region) toast(`${r.files.length} arquivos (${r.n} obs.) salvos em ${r.folder}`,'good');
+  else toast(`${r.n} de ${r.total} observações (${sel.length} região${sel.length>1?'es':''}) → ${r.path}`,'good');
+}
+async function exportGatedAll(){
+  if(!GATES.length){ toast('Crie ao menos uma região','bad'); return; }
+  const m=_expAxes(); if(!m.x||!m.y){ toast('Configure X e Y na aba Gráfico','bad'); return; }
+  const r=await window.pywebview.api.export_gated(m.x,m.y,GATES,'__ALL__',$('gateExportFmt').value);
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  toast(`${r.total} observações com coluna Região → ${r.path}`,'good');
+}
+function renameGate(i,v){ GATES[i].name=v; drawGateSVG(); dRender(); countGates(); refreshGateExportSel(); }
+function removeGate(i){ GATES.splice(i,1); renderGateList(); render(); countGates(); }
+async function countGates(){
+  if(!GATES.length){ return; }
+  const m={}; $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>m[s.dataset.ch]=s.value||null);
+  if(!m.x||!m.y) return;
+  const r=await window.pywebview.api.gate_stats(m.x,m.y,m.hue,GATES);
+  if(!r||r.error) return;
+  $('rowinfo').style.display='block';
+  $('rowinfo').querySelector('h4').textContent='Regiões — contagem ao vivo (Grupos ≥2 = sobreposição)';
+  let h='<tr>'+r.columns.map(c=>`<td style="color:var(--mut)"><b>${c}</b></td>`).join('')+'</tr>';
+  h+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${v}</td>`).join('')+'</tr>').join('');
+  $('rowtable').innerHTML=h;
+}
+function refreshColsKeepConfig(r){
+  const snap={};
+  $('plotConfig').querySelectorAll('[data-ch],[data-pp]').forEach(s=>{ snap[(s.dataset.ch?'c:'+s.dataset.ch:'p:'+s.dataset.pp)]=s.value; });
+  onData(r);
+  $('plotConfig').querySelectorAll('[data-ch],[data-pp]').forEach(s=>{ const k=(s.dataset.ch?'c:'+s.dataset.ch:'p:'+s.dataset.pp); if(snap[k]!==undefined) s.value=snap[k]; });
+}
+async function saveRegions(){
+  if(!GATES.length && !LINES.length){ toast('Nada para salvar — adicione regiões ou linhas','bad'); return; }
+  const m={}; $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>m[s.dataset.ch]=s.value||null);
+  const xlim=LASTRENDER?LASTRENDER.xlim:null, ylim=LASTRENDER?LASTRENDER.ylim:null;
+  const r=await window.pywebview.api.save_regions({gates:GATES, lines:LINES, x:m.x, y:m.y, xlim, ylim});
+  if(r) toast('Regiões salvas: '+r,'good');
+}
+async function loadRegions(){
+  const r=await window.pywebview.api.load_regions();
+  if(!r) return;
+  if(r.error){ toast(r.error,'bad'); return; }
+  let gates=r.gates||[], lines=r.lines||[];
+  if($('loadByFrac').checked){                    // reposiciona pela proporção do gráfico
+    if(!LASTRENDER){ toast('Plote um gráfico antes de carregar por fração','bad'); return; }
+    if(!r.xlim||!r.ylim){ toast('Arquivo sem escala de origem — carregado em coordenada de dado','bad'); }
+    else{
+      const [sx0,sx1]=r.xlim, [sy0,sy1]=r.ylim, [cx0,cx1]=LASTRENDER.xlim, [cy0,cy1]=LASTRENDER.ylim;
+      const FX=x=>+(cx0+((x-sx0)/(sx1-sx0))*(cx1-cx0)).toFixed(4);
+      const FY=y=>+(cy0+((y-sy0)/(sy1-sy0))*(cy1-cy0)).toFixed(4);
+      gates=gates.map(g=>({...g, points:g.points.map(p=>[FX(p[0]),FY(p[1])]),
+        labelxy:(g.labelxy&&g.labelxy.length===2)?[FX(g.labelxy[0]),FY(g.labelxy[1])]:undefined}));
+      lines=lines.map(l=>({...l, x:FX(l.x), y:FY(l.y)}));
+    }
+  }
+  GATES=gates; LINES=lines;
+  renderGateList(); renderLineList(); render(); countGates();
+  const m={}; $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>m[s.dataset.ch]=s.value||null);
+  if($('loadByFrac').checked) toast('Regiões carregadas pela proporção do gráfico','good');
+  else if((r.x&&m.x&&r.x!==m.x)||(r.y&&m.y&&r.y!==m.y))
+    toast(`Atenção: regiões feitas p/ X=${r.x}, Y=${r.y}; seu gráfico usa X=${m.x}, Y=${m.y}. Confira se os eixos batem.`,'bad');
+  else toast('Regiões carregadas','good');
+}
+async function createRegionColumn(){
+  if(!GATES.length){ toast('Adicione ao menos uma região','bad'); return; }
+  const m={}; $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>m[s.dataset.ch]=s.value||null);
+  if(!m.x||!m.y){ toast('Configure X e Y na aba Gráfico','bad'); return; }
+  const name=$('gateColName').value.trim()||'Região';
+  const r=await window.pywebview.api.make_region_column(m.x,m.y,GATES,name);
+  if(!r){ toast('Carregue um CSV','bad'); return; }
+  if(r.error){ toast(r.error,'bad'); return; }
+  refreshColsKeepConfig(r);
+  toast('Coluna "'+(r.created||name)+'" criada — já dá pra usar como hue/eixo','good');
+}
+
+/* ----- export ----- */
+async function exportFig(){
+  if(!STACK.length){ toast('Plote algo primeiro','bad'); return; }
+  const r=await window.pywebview.api.export_figure(gather());
+  if(r && r.error) toast(r.error,'bad'); else if(r) toast('Salvo: '+r,'good');
+}
+async function exportCsv(){
+  const r=await window.pywebview.api.export_csv();
+  if(r) toast('CSV salvo','good');
+}
+
+let rz=null; window.addEventListener('resize',()=>{ if(rz)clearTimeout(rz); rz=setTimeout(render,200); });
+
+/* ---------- aba avançado: setup ---------- */
+function buildAdvanced(){
+  $('advCols').innerHTML = COLS.numeric.length
+    ? COLS.numeric.map(c=>`<label class="check"><input type="checkbox" value="${c}"> ${c}</label>`).join('')
+    : '<span style="color:var(--faint)">sem colunas numéricas</span>';
+  $('advHue').innerHTML = '<option value="">—</option>'+COLS.category.map(c=>`<option>${c}</option>`).join('');
+  $('tblGrp').innerHTML = '<option value="">(sem grupo)</option>'+COLS.category.map(c=>`<option>${c}</option>`).join('');
+  buildReshape();
+}
+function advSelectedCols(){ return [...$('advCols').querySelectorAll('input:checked')].map(i=>i.value); }
+function showImage(dataUrl){
+  const img=$('plot'); img.src=dataUrl; img.style.display='block'; $('empty').style.display='none';
+  $('legendBox').style.display='none'; LASTRENDER=null;   // figuras avançadas não têm arraste/pick
+}
+
+/* ---------- painel multi-figura ---------- */
+let PANEL=[];
+function addPanelItem(){
+  if(!STACK.length){ toast('Monte um gráfico primeiro','bad'); return; }
+  const base=STACK[0];
+  PANEL.push({spec_key:base.spec_key, mapping:base.mapping, params:base.params,
+              title:'('+String.fromCharCode(65+PANEL.length)+') '+CATALOG.find(s=>s.key===base.spec_key).label});
+  renderPanelList();
+}
+function renderPanelList(){ $('panelList').textContent = PANEL.length? PANEL.map(p=>p.title).join('\n') : 'painel vazio'; }
+function clearPanel(){ PANEL=[]; renderPanelList(); }
+async function buildPanel(){
+  if(!PANEL.length){ toast('Adicione ao menos um quadro','bad'); return; }
+  const r=await window.pywebview.api.render_panel(PANEL, gather());
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  showImage(r.img);
+}
+async function exportPanel(){
+  if(!PANEL.length){ toast('Painel vazio','bad'); return; }
+  const r=await window.pywebview.api.export_panel(PANEL, gather());
+  if(r && r.error) toast(r.error,'bad'); else if(r) toast('Salvo: '+r,'good');
+}
+
+/* ---------- clustermap / pairplot ---------- */
+async function genAdvanced(kind){
+  const cols=advSelectedCols();
+  if(cols.length<2){ toast('Selecione ≥2 colunas','bad'); return; }
+  toast('Gerando '+kind+'…');
+  const r=await window.pywebview.api.render_advanced(kind, cols, $('advHue').value, $('zscore').checked);
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  showImage(r.img);
+}
+async function exportAdvanced(){
+  const r=await window.pywebview.api.export_advanced(gather());
+  if(r && r.error) toast(r.error,'bad'); else if(r) toast('Salvo: '+r,'good');
+}
+
+/* ---------- tabela descritiva ---------- */
+async function genTable(){
+  const r=await window.pywebview.api.describe_table($('tblGrp').value, advSelectedCols());
+  if(!r){ toast('Carregue um CSV','bad'); return; }
+  $('rowinfo').style.display='block';
+  $('rowinfo').querySelector('h4').textContent='Estatística descritiva';
+  let h='<tr>'+r.columns.map(c=>`<td style="color:var(--mut)"><b>${c}</b></td>`).join('')+'</tr>';
+  h+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${v}</td>`).join('')+'</tr>').join('');
+  $('rowtable').innerHTML=h;
+}
+async function exportTable(){
+  const r=await window.pywebview.api.export_table();
+  if(r) toast('Tabela salva','good');
+}
+</script>
+</body>
+</html>

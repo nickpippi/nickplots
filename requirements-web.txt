@@ -1,0 +1,10 @@
+pywebview>=5.0
+matplotlib>=3.8
+seaborn>=0.13
+pandas>=2.0
+scipy>=1.11
+scikit-learn>=1.3
+openpyxl>=3.1
+# Windows: pip install pywebview[cef] é opcional; por padrão usa o Edge WebView2 (já vem no Win10/11)
+# Linux: requer 'python3-gi gir1.2-webkit2-4.0' (ou pip install pywebview[gtk]/[qt])
+# Opcional: umap-learn>=0.5
