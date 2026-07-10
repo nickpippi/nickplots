@@ -74,8 +74,26 @@
   .dpirow .muted{color:var(--faint)}
   .sectile{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);
     padding:12px 13px;margin:12px 0}
-  .sectile h3{margin:0 0 4px;font-size:12.5px;font-weight:650}
+  .sectile h3{margin:0 0 4px;font-size:12.5px;font-weight:650;
+    display:flex;align-items:center;gap:6px;justify-content:space-between}
   .sectile p.hint{margin:2px 0 0;color:var(--faint);font-size:11px;line-height:1.45}
+  p.hint.tucked{display:none}                    /* moved into a "?" tooltip */
+
+  /* ---------- "?" help badge + hover tooltip ---------- */
+  .helpbtn{flex:0 0 auto;width:16px;height:16px;padding:0;border-radius:50%;
+    border:1px solid var(--line);background:var(--panel3);color:var(--mut);
+    font-family:inherit;font-size:10.5px;font-weight:700;line-height:1;
+    display:inline-flex;align-items:center;justify-content:center;
+    cursor:help;transition:.15s}
+  .helpbtn:hover,.helpbtn:focus{background:var(--accent);border-color:var(--accent);color:#fff;outline:none}
+  .helphead{display:flex;align-items:center;gap:7px;color:var(--mut);
+    font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  #helptip{position:fixed;z-index:60;max-width:330px;display:none;
+    background:var(--panel3);border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;color:var(--txt);font-size:11.5px;line-height:1.5;
+    box-shadow:0 14px 34px -12px #000;opacity:0;pointer-events:none;transition:opacity .12s}
+  #helptip.show{opacity:1}
+  #helptip hr{border:none;border-top:1px solid var(--line);margin:7px 0}
 
   /* slider */
   .slider{display:flex;align-items:center;gap:10px}
@@ -695,7 +713,7 @@ const PT = {
   "Pairs ranked — best on top":"Pares ranqueados — melhor no topo",
   "New columns: ":"Novas colunas: ",
   "Draw regions and set X/Y in the Plot tab":"Desenhe regiões e configure X/Y na aba Gráfico",
-  "Column created: ":"Coluna criada: ","rows copied":"linhas copiadas",
+  "Column created: ":"Coluna criada: ","rows copied":"linhas copiadas","Tip":"Dica",
   "Load the groups to pick each color.":"Carregue os grupos para escolher cada cor.",
 };
 
@@ -795,7 +813,13 @@ function fillThemes(){
 }
 function applyLang(){
   document.documentElement.lang = (LANG==='pt' ? 'pt-br' : 'en');
-  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const txt = t(el.dataset.i18n);
+    // Headings carry an appended "?" badge; textContent would delete it.
+    const firstText = [...el.childNodes].find(n=>n.nodeType===Node.TEXT_NODE);
+    if(el.children.length && firstText) firstText.nodeValue = txt;
+    else el.textContent = txt;
+  });
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.placeholder = t(el.dataset.i18nPh); });
   document.querySelectorAll('[data-i18n-html]').forEach(el=>{
     const h = HTML_HINTS[el.dataset.i18nHtml]; if(h) el.innerHTML = h[LANG] || h.en;
@@ -814,6 +838,61 @@ function setLang(l){
   applyLang();
 }
 
+/* ===================== help tooltips =====================
+   The hint paragraphs stay in the DOM (hidden) so applyLang keeps translating them;
+   each section grows a "?" badge that shows them on hover, after a short delay. */
+let tipTimer=null, helpReady=false;
+function showTip(badge){
+  const tip=$('helptip');
+  tip.innerHTML = badge._hints.map(h=>h.innerHTML).join('<hr>');
+  tip.style.display='block'; tip.style.left='0px'; tip.style.top='0px';   // measure first
+  const b=badge.getBoundingClientRect(), w=tip.offsetWidth, h=tip.offsetHeight;
+  let x=b.right+10, y=b.top-6;
+  if(x+w > innerWidth-8) x=b.left-w-10;          // flip to the left when it would overflow
+  if(x < 8) x=8;
+  if(y+h > innerHeight-8) y=innerHeight-h-8;
+  if(y < 8) y=8;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+  requestAnimationFrame(()=>tip.classList.add('show'));
+}
+function hideTip(){
+  clearTimeout(tipTimer);
+  const tip=$('helptip'); if(!tip) return;
+  tip.classList.remove('show');
+  setTimeout(()=>{ if(!tip.classList.contains('show')) tip.style.display='none'; },140);
+}
+function setupHelp(){
+  if(helpReady) return; helpReady=true;
+  const tip=document.createElement('div'); tip.id='helptip'; document.body.appendChild(tip);
+  document.querySelectorAll('.sectile').forEach(tile=>{
+    const hints=[...tile.children].filter(el=>el.matches('p.hint'));
+    if(!hints.length) return;
+    hints.forEach(h=>h.classList.add('tucked'));
+    const badge=document.createElement('button');
+    badge.type='button'; badge.className='helpbtn'; badge.textContent='?';
+    badge.setAttribute('aria-label','help'); badge._hints=hints;
+    const h3=[...tile.children].find(el=>el.tagName==='H3');
+    if(h3){ h3.appendChild(badge); }
+    else{                                        // a tile that is nothing but a hint
+      const head=document.createElement('div'); head.className='helphead';
+      const cap=document.createElement('span'); cap.dataset.i18n='Tip'; cap.textContent='Tip';
+      head.appendChild(cap); head.appendChild(badge);
+      tile.insertBefore(head, tile.firstChild);
+    }
+    badge.addEventListener('mouseenter',()=>{ clearTimeout(tipTimer); tipTimer=setTimeout(()=>showTip(badge),450); });
+    badge.addEventListener('mouseleave',hideTip);
+    badge.addEventListener('focus',()=>showTip(badge));
+    badge.addEventListener('blur',hideTip);
+    badge.addEventListener('click',e=>{ e.preventDefault();
+      const tip=$('helptip');
+      if(tip.classList.contains('show')) hideTip(); else { clearTimeout(tipTimer); showTip(badge); }
+    });
+  });
+  // a moved tooltip would point at nothing once the panel scrolls
+  document.querySelector('.panels').addEventListener('scroll',hideTip,{passive:true});
+  window.addEventListener('resize',hideTip);
+}
+
 window.addEventListener('pywebviewready', async () => {
   const b = await window.pywebview.api.boot();
   CATALOG = b.catalog; THEMES_RAW = b.themes;
@@ -822,6 +901,7 @@ window.addEventListener('pywebviewready', async () => {
   LANG = (saved==='pt' ? 'pt' : 'en');
   $('lang').value = LANG;
   fillPlotTypes(); fillThemes(); buildConfig();
+  setupHelp();                 // must run before applyLang: it adds the "Tip" caption
   applyLang();
 });
 
