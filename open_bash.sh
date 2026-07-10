@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Garante que o script está rodando no diretório onde o arquivo está localizado
+# Make sure the script runs from the directory the file lives in
 cd "$(dirname "$0")" || exit
 
-# Se o ambiente virtual existir, ativa-o antes de rodar o programa
+# If the virtual environment exists, activate it before running the program
 if [ -d "venv" ]; then
     source venv/bin/activate
 fi
 
-# Executa o programa
+# Run the program
 python3 main_web.py

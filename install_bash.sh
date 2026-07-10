@@ -1,45 +1,45 @@
 #!/bin/bash
 
 echo ""
-echo "  Plot Lab - Instalação"
-echo "  ====================="
+echo "  Nickplots - Installation"
+echo "  ========================"
 echo ""
-echo "  Instalando dependencias... pode demorar alguns minutos." [cite: 2]
+echo "  Installing dependencies... this may take a few minutes."
 echo ""
-read -p "Pressione [Enter] para continuar..."
+read -p "Press [Enter] to continue..."
 
-# Verifica se o Python 3 está instalado (macOS utiliza python3 por padrão)
+# Check that Python 3 is installed (macOS uses python3 by default)
 if ! command -v python3 &> /dev/null; then
     echo ""
-    echo "  ERRO: Python 3 não encontrado no PATH."
-    echo "  Instale o Python em https://python.org ou via Homebrew (brew install python)."
+    echo "  ERROR: Python 3 not found on PATH."
+    echo "  Install Python from https://python.org or via Homebrew (brew install python)."
     echo ""
     exit 1
 fi
 
-# Cria o diretório base como referência segura
+# Work from the script's own directory
 cd "$(dirname "$0")" || exit
 
-# Arquitetura Robusta: Criação de um Virtual Environment (venv)
-# Isso previne o erro "externally-managed-environment" comum em macOS recentes
-echo "  Configurando ambiente virtual isolado (venv)..."
+# Use a virtual environment: this avoids the "externally-managed-environment"
+# error that recent macOS/Linux Python installs raise on a global pip install.
+echo "  Setting up an isolated virtual environment (venv)..."
 python3 -m venv venv
 source venv/bin/activate
 
-# Atualiza o pip e instala as dependências no ambiente virtual
+# Upgrade pip and install the dependencies inside the virtual environment
 python3 -m pip install --upgrade pip --quiet
 python3 -m pip install customtkinter matplotlib seaborn pandas scipy scikit-learn openpyxl shapely pywebview --quiet
 
 if [ $? -ne 0 ]; then
     echo ""
-    echo "  Erro na instalacao. Verifique sua conexao com a internet ou permissoes do diretorio." [cite: 3]
+    echo "  Installation failed. Check your internet connection or the directory permissions."
     echo ""
     exit 1
 fi
 
 echo ""
-echo "  Instalacao concluida! Abrindo o Plot Lab..." [cite: 4]
+echo "  Installation complete! Starting Nickplots..."
 echo ""
 
-# Executa o programa principal
+# Run the main program
 python3 main_web.py

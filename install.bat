@@ -1,20 +1,20 @@
 @echo off
-title Plot Lab - Instalacao
+title Nickplots - Installation
 
 echo.
-echo  Plot Lab - Instalacao
-echo  =====================
+echo  Nickplots - Installation
+echo  ========================
 echo.
-echo  Instalando dependencias... pode demorar alguns minutos.
+echo  Installing dependencies... this may take a few minutes.
 echo.
 pause
 
 python --version >nul 2>&1
 if errorlevel 1 (
     echo.
-    echo  ERRO: Python nao encontrado no PATH.
-    echo  Instale o Python em https://python.org
-    echo  e marque "Add Python to PATH" durante a instalacao.
+    echo  ERROR: Python not found on PATH.
+    echo  Install Python from https://python.org
+    echo  and tick "Add Python to PATH" during the installation.
     echo.
     pause
     exit /b 1
@@ -26,15 +26,15 @@ python -m pip install customtkinter matplotlib seaborn pandas scipy scikit-learn
 
 if errorlevel 1 (
     echo.
-    echo  Erro na instalacao. Tente clicar com botao direito
-    echo  em instalar.bat e escolher "Executar como administrador".
+    echo  Installation failed. Try right-clicking install.bat
+    echo  and choosing "Run as administrator".
     echo.
     pause
     exit /b 1
 )
 
 echo.
-echo  Instalacao concluida! Abrindo o Plot Lab...
+echo  Installation complete! Starting Nickplots...
 echo.
 
 cd /d "%~dp0"
