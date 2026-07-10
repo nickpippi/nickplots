@@ -1,5 +1,5 @@
-"""UI desktop (CustomTkinter) — abas, preview ao vivo, legenda arrastável,
-figura que acompanha o tamanho do preview, temas claro/escuro coerentes."""
+"""Desktop UI (CustomTkinter) — tabs, live preview, draggable legend,
+figure that follows the preview size, coherent light/dark themes."""
 from __future__ import annotations
 import customtkinter as ctk
 from tkinter import filedialog, messagebox, colorchooser
@@ -18,16 +18,16 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
 
 LEGEND_POS = {
-    "Automático (sup. dir.)": "upper right", "Superior esquerda": "upper left",
-    "Inferior direita": "lower right", "Inferior esquerda": "lower left",
-    "Centro": "center", "Fora (direita)": "outside", "Livre (arraste)": "free",
+    "Automatic (upper right)": "upper right", "Upper left": "upper left",
+    "Lower right": "lower right", "Lower left": "lower left",
+    "Center": "center", "Outside (right)": "outside", "Free (drag)": "free",
 }
 
 
 class App(ctk.CTk):
     def __init__(self):
         super().__init__()
-        self.title("Plot Lab")
+        self.title("Nickplots")
         self.geometry("1380x860")
         self.minsize(1160, 720)
         self.df = self.view = self.fig = self.canvas = None
@@ -54,30 +54,30 @@ class App(ctk.CTk):
 
         head = ctk.CTkFrame(side, fg_color="transparent")
         head.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 4))
-        ctk.CTkLabel(head, text="Plot Lab", font=("", 20, "bold")).pack(side="left")
+        ctk.CTkLabel(head, text="Nickplots", font=("", 20, "bold")).pack(side="left")
         ctk.CTkSegmentedButton(head, values=["Dark", "Light"],
                                command=lambda v: ctk.set_appearance_mode(v.lower()),
                                width=120).pack(side="right")
 
         topbtn = ctk.CTkFrame(side, fg_color="transparent")
         topbtn.grid(row=1, column=0, sticky="ew", padx=12)
-        ctk.CTkButton(topbtn, text="Carregar CSV", command=self.on_load).pack(fill="x")
-        self.lbl_file = ctk.CTkLabel(topbtn, text="(nenhum arquivo)", text_color="gray60", wraplength=350)
+        ctk.CTkButton(topbtn, text="Load CSV", command=self.on_load).pack(fill="x")
+        self.lbl_file = ctk.CTkLabel(topbtn, text="(no file)", text_color="gray60", wraplength=350)
         self.lbl_file.pack(fill="x", pady=(2, 6))
 
         self.tabs = ctk.CTkTabview(side, corner_radius=10)
         self.tabs.grid(row=2, column=0, sticky="nsew", padx=8)
-        for name in ("Gráfico", "Estilo", "Legenda", "Análise"):
+        for name in ("Plot", "Style", "Legend", "Analysis"):
             self.tabs.add(name)
-        self._tab_grafico()
-        self._tab_estilo()
-        self._tab_legenda()
-        self._tab_analise()
+        self._tab_plot()
+        self._tab_style()
+        self._tab_legend()
+        self._tab_analysis()
 
         foot = ctk.CTkFrame(side, fg_color="transparent")
         foot.grid(row=3, column=0, sticky="ew", padx=12, pady=8)
-        ctk.CTkButton(foot, text="Exportar figura…", command=self.on_export).pack(fill="x", pady=2)
-        ctk.CTkButton(foot, text="Exportar CSV filtrado…", fg_color="gray30",
+        ctk.CTkButton(foot, text="Export figure…", command=self.on_export).pack(fill="x", pady=2)
+        ctk.CTkButton(foot, text="Export filtered CSV…", fg_color="gray30",
                       command=self.on_export_csv).pack(fill="x", pady=2)
 
     def _scroll(self, tab):
@@ -85,86 +85,86 @@ class App(ctk.CTk):
         f.pack(fill="both", expand=True)
         return f
 
-    def _tab_grafico(self):
-        f = self._scroll("Gráfico")
-        ctk.CTkLabel(f, text="Filtro (pandas query)").pack(anchor="w")
-        self.ent_filter = ctk.CTkEntry(f, placeholder_text="dose > 5 and grupo == 'alta'")
+    def _tab_plot(self):
+        f = self._scroll("Plot")
+        ctk.CTkLabel(f, text="Filter (pandas query)").pack(anchor="w")
+        self.ent_filter = ctk.CTkEntry(f, placeholder_text="dose > 5 and group == 'high'")
         self.ent_filter.pack(fill="x")
-        ctk.CTkButton(f, text="Aplicar filtro", command=self.on_filter).pack(fill="x", pady=3)
+        ctk.CTkButton(f, text="Apply filter", command=self.on_filter).pack(fill="x", pady=3)
 
-        ctk.CTkLabel(f, text="Tipo", font=("", 13, "bold")).pack(anchor="w", pady=(8, 0))
+        ctk.CTkLabel(f, text="Type", font=("", 13, "bold")).pack(anchor="w", pady=(8, 0))
         self.opt_plot = ctk.CTkOptionMenu(f, values=[s.label for s in REGISTRY.values()],
                                           command=lambda *_: self.rebuild_config())
         self.opt_plot.pack(fill="x")
         self.cfg = ctk.CTkFrame(f, fg_color="transparent")
         self.cfg.pack(fill="x", pady=4)
 
-        for txt, attr in [("Título", "title"), ("Rótulo X", "xlabel"), ("Rótulo Y", "ylabel")]:
+        for txt, attr in [("Title", "title"), ("X label", "xlabel"), ("Y label", "ylabel")]:
             ctk.CTkLabel(f, text=txt).pack(anchor="w")
             e = ctk.CTkEntry(f); e.pack(fill="x")
             e.bind("<KeyRelease>", lambda *_: self.schedule())
             setattr(self, f"ent_{attr}", e)
 
-        ctk.CTkButton(f, text="▶  Plotar (camada base)", command=self.on_plot).pack(fill="x", pady=(8, 2))
-        ctk.CTkButton(f, text="＋ Sobrepor esta camada", command=self.on_overlay).pack(fill="x", pady=2)
-        ctk.CTkButton(f, text="Limpar camadas", fg_color="gray30", command=self.on_clear).pack(fill="x", pady=2)
-        self.lbl_stack = ctk.CTkLabel(f, text="camadas: —", text_color="gray60", wraplength=330, justify="left")
+        ctk.CTkButton(f, text="▶  Plot (base layer)", command=self.on_plot).pack(fill="x", pady=(8, 2))
+        ctk.CTkButton(f, text="＋ Overlay this layer", command=self.on_overlay).pack(fill="x", pady=2)
+        ctk.CTkButton(f, text="Clear layers", fg_color="gray30", command=self.on_clear).pack(fill="x", pady=2)
+        self.lbl_stack = ctk.CTkLabel(f, text="layers: —", text_color="gray60", wraplength=330, justify="left")
         self.lbl_stack.pack(fill="x")
 
-    def _tab_estilo(self):
-        f = self._scroll("Estilo")
-        ctk.CTkLabel(f, text="Tema do gráfico").pack(anchor="w")
+    def _tab_style(self):
+        f = self._scroll("Style")
+        ctk.CTkLabel(f, text="Plot theme").pack(anchor="w")
         self.opt_theme = ctk.CTkOptionMenu(f, values=list(THEMES.keys()), command=lambda *_: self.apply_style())
         self.opt_theme.set(self.style.theme); self.opt_theme.pack(fill="x")
-        ctk.CTkLabel(f, text="Contexto (escala dos elementos)").pack(anchor="w", pady=(6, 0))
+        ctk.CTkLabel(f, text="Context (element scale)").pack(anchor="w", pady=(6, 0))
         self.opt_ctx = ctk.CTkOptionMenu(f, values=["paper", "notebook", "talk", "poster"],
                                          command=lambda *_: self.apply_style())
         self.opt_ctx.set("notebook"); self.opt_ctx.pack(fill="x")
-        ctk.CTkLabel(f, text="Escala da fonte").pack(anchor="w", pady=(6, 0))
+        ctk.CTkLabel(f, text="Font scale").pack(anchor="w", pady=(6, 0))
         self.sld_font = ctk.CTkSlider(f, from_=0.7, to=1.8, command=lambda *_: self.apply_style())
         self.sld_font.set(1.0); self.sld_font.pack(fill="x")
-        self.chk_grid = ctk.CTkCheckBox(f, text="Grade", command=self.apply_style)
+        self.chk_grid = ctk.CTkCheckBox(f, text="Grid", command=self.apply_style)
         self.chk_grid.select(); self.chk_grid.pack(anchor="w", pady=6)
-        ctk.CTkButton(f, text="Override: fundo da figura", command=lambda: self._pick_color("fig_bg")).pack(fill="x", pady=2)
-        ctk.CTkButton(f, text="Override: fundo do eixo", command=lambda: self._pick_color("ax_bg")).pack(fill="x", pady=2)
-        ctk.CTkButton(f, text="Limpar overrides (voltar ao tema)", fg_color="gray30",
+        ctk.CTkButton(f, text="Override: figure background", command=lambda: self._pick_color("fig_bg")).pack(fill="x", pady=2)
+        ctk.CTkButton(f, text="Override: axes background", command=lambda: self._pick_color("ax_bg")).pack(fill="x", pady=2)
+        ctk.CTkButton(f, text="Clear overrides (back to theme)", fg_color="gray30",
                       command=self._clear_overrides).pack(fill="x", pady=2)
 
-    def _tab_legenda(self):
-        f = self._scroll("Legenda")
-        self.chk_leg = ctk.CTkCheckBox(f, text="Mostrar legenda", command=self.apply_legend)
+    def _tab_legend(self):
+        f = self._scroll("Legend")
+        self.chk_leg = ctk.CTkCheckBox(f, text="Show legend", command=self.apply_legend)
         self.chk_leg.select(); self.chk_leg.pack(anchor="w", pady=4)
-        ctk.CTkLabel(f, text="Posição").pack(anchor="w")
+        ctk.CTkLabel(f, text="Position").pack(anchor="w")
         self.opt_legpos = ctk.CTkOptionMenu(f, values=list(LEGEND_POS.keys()), command=lambda *_: self.apply_legend())
         self.opt_legpos.pack(fill="x")
-        ctk.CTkLabel(f, text="Tamanho da fonte").pack(anchor="w", pady=(6, 0))
+        ctk.CTkLabel(f, text="Font size").pack(anchor="w", pady=(6, 0))
         self.sld_legsize = ctk.CTkSlider(f, from_=6, to=20, command=lambda *_: self.apply_legend())
         self.sld_legsize.set(9); self.sld_legsize.pack(fill="x")
-        ctk.CTkLabel(f, text="Colunas").pack(anchor="w", pady=(6, 0))
+        ctk.CTkLabel(f, text="Columns").pack(anchor="w", pady=(6, 0))
         self.sld_legcol = ctk.CTkSlider(f, from_=1, to=4, number_of_steps=3, command=lambda *_: self.apply_legend())
         self.sld_legcol.set(1); self.sld_legcol.pack(fill="x")
-        self.chk_legframe = ctk.CTkCheckBox(f, text="Moldura", command=self.apply_legend)
+        self.chk_legframe = ctk.CTkCheckBox(f, text="Frame", command=self.apply_legend)
         self.chk_legframe.select(); self.chk_legframe.pack(anchor="w", pady=6)
-        ctk.CTkLabel(f, text="Posição livre — X / Y (modo 'Livre' ou arraste no gráfico)",
+        ctk.CTkLabel(f, text="Free position — X / Y ('Free' mode or drag on the plot)",
                      wraplength=330, text_color="gray60").pack(anchor="w")
         self.sld_legx = ctk.CTkSlider(f, from_=-0.1, to=1.3, command=lambda *_: self.apply_legend())
         self.sld_legx.set(1.0); self.sld_legx.pack(fill="x")
         self.sld_legy = ctk.CTkSlider(f, from_=-0.1, to=1.3, command=lambda *_: self.apply_legend())
         self.sld_legy.set(1.0); self.sld_legy.pack(fill="x")
 
-    def _tab_analise(self):
-        f = self._scroll("Análise")
-        ctk.CTkLabel(f, text="Redução de dimensionalidade", font=("", 13, "bold")).pack(anchor="w")
-        ctk.CTkLabel(f, text="Colunas numéricas:").pack(anchor="w")
+    def _tab_analysis(self):
+        f = self._scroll("Analysis")
+        ctk.CTkLabel(f, text="Dimensionality reduction", font=("", 13, "bold")).pack(anchor="w")
+        ctk.CTkLabel(f, text="Numeric columns:").pack(anchor="w")
         self.num_box = ctk.CTkScrollableFrame(f, height=120); self.num_box.pack(fill="x")
         self.num_checks = {}
         self.opt_method = ctk.CTkOptionMenu(f, values=["PCA", "t-SNE", "UMAP"]); self.opt_method.pack(fill="x", pady=2)
-        self.btn_reduce = ctk.CTkButton(f, text="Rodar redução", command=self.on_reduce)
+        self.btn_reduce = ctk.CTkButton(f, text="Run reduction", command=self.on_reduce)
         self.btn_reduce.pack(fill="x", pady=2)
-        ctk.CTkLabel(f, text="Teste de grupo (valor × grupo)", font=("", 13, "bold")).pack(anchor="w", pady=(10, 0))
+        ctk.CTkLabel(f, text="Group test (value × group)", font=("", 13, "bold")).pack(anchor="w", pady=(10, 0))
         self.opt_val = ctk.CTkOptionMenu(f, values=[""]); self.opt_val.pack(fill="x")
         self.opt_grp = ctk.CTkOptionMenu(f, values=[""]); self.opt_grp.pack(fill="x")
-        ctk.CTkButton(f, text="Rodar t-test / ANOVA", command=self.on_test).pack(fill="x", pady=2)
+        ctk.CTkButton(f, text="Run t-test / ANOVA", command=self.on_test).pack(fill="x", pady=2)
         self.txt_stats = ctk.CTkTextbox(f, height=90); self.txt_stats.pack(fill="x")
 
     # ============================ main area ============================ #
@@ -176,20 +176,20 @@ class App(ctk.CTk):
         self.plot_frame.grid(row=0, column=0, sticky="nsew")
         self.plot_frame.grid_rowconfigure(0, weight=1); self.plot_frame.grid_columnconfigure(0, weight=1)
 
-        # canvas criado UMA vez; redesenhos reaproveitam a mesma figura (sem recriar widget)
+        # canvas created ONCE; redraws reuse the same figure (no widget recreation)
         self.fig = Figure(figsize=(7, 5), dpi=110)
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.plot_frame)
         cw = self.canvas.get_tk_widget()
         cw.grid(row=0, column=0, sticky="nsew")
         self.canvas.mpl_connect("button_press_event", self.on_press)
         self.canvas.mpl_connect("motion_notify_event", self.on_motion)
-        cw.bind("<ButtonRelease-1>", self._end_drag)      # Tk garante o release mesmo fora do canvas
+        cw.bind("<ButtonRelease-1>", self._end_drag)      # Tk guarantees the release even outside the canvas
         cw.bind("<Configure>", self._on_resize)
 
         self.info = ctk.CTkTextbox(m, height=120)
         self.info.grid(row=1, column=0, sticky="ew", pady=(6, 0))
-        self.info.insert("1.0", "Clique num ponto (scatter/volcano) para ver a linha. "
-                                "Clique e arraste a legenda para reposicioná-la.")
+        self.info.insert("1.0", "Click a point (scatter/volcano) to see its row. "
+                                "Click and drag the legend to reposition it.")
 
     # ============================ helpers ============================ #
     def _spec(self):
@@ -266,16 +266,16 @@ class App(ctk.CTk):
                      xlabel=self.ent_xlabel.get(), ylabel=self.ent_ylabel.get(),
                      style=self.style, legend=self.legend)
         except PlotConfigError as e:
-            return messagebox.showwarning("Configuração", str(e))
+            return messagebox.showwarning("Configuration", str(e))
         except Exception as e:
-            return messagebox.showerror("Erro ao plotar", str(e))
+            return messagebox.showerror("Plotting error", str(e))
         base = REGISTRY[self.stack[0]["spec_key"]]; m = self.stack[0]["mapping"]
         self._pick = (m.get("x"), m.get("y")) if base.pickable else None
         self.canvas.draw_idle()
-        self.lbl_stack.configure(text="camadas: " + " + ".join(REGISTRY[l["spec_key"]].label for l in self.stack))
+        self.lbl_stack.configure(text="layers: " + " + ".join(REGISTRY[l["spec_key"]].label for l in self.stack))
 
     def _refresh_legend_only(self):
-        """Reaplica só a legenda no eixo atual, sem recriar a figura/canvas."""
+        """Reapply only the legend on the current axes, without recreating the figure/canvas."""
         if not self.fig.axes:
             return
         ax = self.fig.axes[0]; theme = THEMES[self.style.theme]
@@ -314,7 +314,7 @@ class App(ctk.CTk):
         try:
             self.df = DL.load_csv(path)
         except Exception as e:
-            return messagebox.showerror("Erro ao carregar", str(e))
+            return messagebox.showerror("Loading error", str(e))
         self.view = self.df
         self.lbl_file.configure(text=f"{path.split('/')[-1]}  ({len(self.df)}×{self.df.shape[1]})")
         self.rebuild_config(); self.refresh_columns()
@@ -324,23 +324,23 @@ class App(ctk.CTk):
             return
         self.view, err = DL.apply_filter(self.df, self.ent_filter.get())
         if err:
-            messagebox.showwarning("Filtro", err)
+            messagebox.showwarning("Filter", err)
         self.rebuild_config(); self.refresh_columns(); self.schedule()
 
     def on_plot(self):
         if self.view is None:
-            return messagebox.showwarning("Sem dados", "Carregue um CSV primeiro.")
+            return messagebox.showwarning("No data", "Load a CSV first.")
         self.stack = [self._layer()]; self._draw()
 
     def on_overlay(self):
         if not self.stack:
-            return messagebox.showinfo("Camadas", "Plote a camada base primeiro.")
+            return messagebox.showinfo("Layers", "Plot the base layer first.")
         if not self._spec().layerable:
-            return messagebox.showwarning("Camadas", f"'{self._spec().label}' é figure-level e não pode ser sobreposto.")
+            return messagebox.showwarning("Layers", f"'{self._spec().label}' is figure-level and cannot be overlaid.")
         self.stack.append(self._layer()); self._draw()
 
     def on_clear(self):
-        self.stack = []; self.lbl_stack.configure(text="camadas: —")
+        self.stack = []; self.lbl_stack.configure(text="layers: —")
 
     def apply_style(self):
         self.style.theme = self.opt_theme.get()
@@ -368,22 +368,22 @@ class App(ctk.CTk):
         self.style.fig_bg = self.style.ax_bg = None; self.schedule()
 
     def on_press(self, event):
-        # 1) começou em cima da legenda? inicia arraste manual
+        # 1) started on top of the legend? begin a manual drag
         hit = self._legend_hit(event)
         if hit and self.legend.show:
             leg, bb = hit
             ax = self.fig.axes[0]
             a0 = ax.transAxes.transform((0, 0)); a1 = ax.transAxes.transform((1, 1))
             wpx, hpx = (a1[0] - a0[0]) or 1, (a1[1] - a0[1]) or 1
-            if self.legend.pos != "free":   # converte p/ livre no mesmo lugar (sem recriar canvas)
+            if self.legend.pos != "free":   # convert to free in place (without recreating the canvas)
                 self.legend.x = round((bb.x0 - a0[0]) / wpx, 3)
                 self.legend.y = round((bb.y0 - a0[1]) / hpx, 3)
-                self.legend.pos = "free"; self.opt_legpos.set("Livre (arraste)")
+                self.legend.pos = "free"; self.opt_legpos.set("Free (drag)")
                 self._refresh_legend_only()
             self._drag = dict(sx=event.x, sy=event.y, wpx=wpx, hpx=hpx,
                               x0=self.legend.x, y0=self.legend.y)
             return
-        # 2) senão: clique-no-ponto (scatter/volcano)
+        # 2) otherwise: click-on-point (scatter/volcano)
         self._pick_point(event)
 
     def on_motion(self, event):
@@ -398,7 +398,7 @@ class App(ctk.CTk):
             self.canvas.draw_idle()
 
     def _end_drag(self, event=None):
-        # disparado pelo Tk (<ButtonRelease-1>) — pega o soltar mesmo fora do canvas
+        # fired by Tk (<ButtonRelease-1>) — catches the release even outside the canvas
         if self._drag:
             self.sld_legx.set(self.legend.x); self.sld_legy.set(self.legend.y)
             self._drag = None
@@ -421,21 +421,21 @@ class App(ctk.CTk):
     def on_reduce(self):
         cols = [c for c, v in self.num_checks.items() if v.get()]
         if len(cols) < 2:
-            return messagebox.showwarning("Redução", "Selecione ao menos 2 colunas numéricas.")
-        self.btn_reduce.configure(state="disabled", text="Rodando…")
+            return messagebox.showwarning("Reduction", "Select at least 2 numeric columns.")
+        self.btn_reduce.configure(state="disabled", text="Running…")
 
         def done(res):
             df2, names = res
             def ui():
                 self.view = df2
-                self.btn_reduce.configure(state="normal", text="Rodar redução")
+                self.btn_reduce.configure(state="normal", text="Run reduction")
                 self.rebuild_config(); self.refresh_columns()
-                messagebox.showinfo("Redução", f"Pronto. Novas colunas: {', '.join(names)}")
+                messagebox.showinfo("Reduction", f"Done. New columns: {', '.join(names)}")
             self.after(0, ui)
 
         def err(e):
-            self.after(0, lambda: (self.btn_reduce.configure(state="normal", text="Rodar redução"),
-                                   messagebox.showerror("Redução", str(e))))
+            self.after(0, lambda: (self.btn_reduce.configure(state="normal", text="Run reduction"),
+                                   messagebox.showerror("Reduction", str(e))))
         S.run_async(lambda: S.compute_embedding(self.view, cols, self.opt_method.get()), done, err)
 
     def on_test(self):
@@ -446,11 +446,11 @@ class App(ctk.CTk):
 
     def on_export(self):
         if self.fig is None:
-            return messagebox.showinfo("Exportar", "Plote algo primeiro.")
+            return messagebox.showinfo("Export", "Plot something first.")
         path = filedialog.asksaveasfilename(defaultextension=".tiff",
             filetypes=[("TIFF", "*.tiff"), ("PNG", "*.png"), ("PDF", "*.pdf"), ("SVG", "*.svg")])
         if path:
-            E.export(self.fig, path, dpi=300); messagebox.showinfo("Exportar", f"Salvo: {path}")
+            E.export(self.fig, path, dpi=300); messagebox.showinfo("Export", f"Saved: {path}")
 
     def on_export_csv(self):
         if self.view is None:

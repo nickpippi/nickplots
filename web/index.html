@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Plot Lab</title>
+<title>Nickplots</title>
 <style>
   :root{
     --bg:#0e1015; --panel:#161922; --panel2:#1d212c; --panel3:#232834;
@@ -173,290 +173,300 @@
   <aside class="sidebar">
     <div class="brand">
       <div class="logo"></div>
-      <div><h1>Plot Lab</h1><p>Figuras de publicação · Python</p></div>
+      <div style="flex:1"><h1>Nickplots</h1><p data-i18n="Publication figures · Python">Publication figures · Python</p></div>
+      <select id="lang" onchange="setLang(this.value)" style="width:auto;flex:0 0 auto;padding:5px 7px;font-size:11.5px">
+        <option value="en">EN</option>
+        <option value="pt">PT</option>
+      </select>
     </div>
     <div class="pad row2">
       <button class="btn primary" onclick="openCsv()">⬆ CSV</button>
       <button class="btn" onclick="openExcel()">⬆ Excel</button>
     </div>
-    <div class="pad" style="margin-top:6px"><button class="btn ghost" onclick="openDataEntry()">⌨ Digitar dados (estilo Prism)</button></div>
+    <div class="pad" style="margin-top:6px"><button class="btn ghost" onclick="openDataEntry()"><span data-i18n="⌨ Type data (Prism style)">⌨ Type data (Prism style)</span></button></div>
     <div id="sheetPick" class="pad" style="display:none;margin-top:6px">
-      <div class="row2"><select id="sheetSel"></select><button class="btn sm" style="flex:0 0 auto" onclick="loadSheet()">Abrir aba</button></div>
+      <div class="row2"><select id="sheetSel"></select><button class="btn sm" style="flex:0 0 auto" onclick="loadSheet()" data-i18n="Open sheet">Open sheet</button></div>
     </div>
-    <div id="chip" class="chip"><span class="dot"></span><span id="chipText">nenhum arquivo</span></div>
+    <div id="chip" class="chip"><span class="dot"></span><span id="chipText" data-i18n="no file">no file</span></div>
 
     <div class="tabs">
-      <div class="tab active" data-t="g" onclick="tab('g')">Gráfico</div>
-      <div class="tab" data-t="s" onclick="tab('s')">Estilo</div>
-      <div class="tab" data-t="l" onclick="tab('l')">Legenda</div>
-      <div class="tab" data-t="a" onclick="tab('a')">Análise</div>
-      <div class="tab" data-t="x" onclick="tab('x')">Avançado</div>
+      <div class="tab active" data-t="g" onclick="tab('g')" data-i18n="Plot">Plot</div>
+      <div class="tab" data-t="s" onclick="tab('s')" data-i18n="Style">Style</div>
+      <div class="tab" data-t="l" onclick="tab('l')" data-i18n="Legend">Legend</div>
+      <div class="tab" data-t="a" onclick="tab('a')" data-i18n="Analysis">Analysis</div>
+      <div class="tab" data-t="x" onclick="tab('x')" data-i18n="Advanced">Advanced</div>
     </div>
 
     <div class="panels">
-      <!-- GRAFICO -->
+      <!-- PLOT -->
       <section class="panel active" id="p-g">
-        <label class="lbl">Filtro (pandas query)</label>
+        <label class="lbl" data-i18n="Filter (pandas query)">Filter (pandas query)</label>
         <div class="row2">
-          <input type="text" id="filter" placeholder="dose > 5 and grupo == 'alta'">
-          <button class="btn sm" style="flex:0 0 auto" onclick="applyFilter()">Aplicar</button>
+          <input type="text" id="filter" placeholder="dose > 5 and group == 'high'" data-i18n-ph="dose > 5 and group == 'high'">
+          <button class="btn sm" style="flex:0 0 auto" onclick="applyFilter()" data-i18n="Apply">Apply</button>
         </div>
-        <label class="lbl">Tipo de gráfico</label>
+        <label class="lbl" data-i18n="Plot type">Plot type</label>
         <select id="plotType" onchange="buildConfig()"></select>
         <div id="plotConfig"></div>
-        <label class="lbl">Rótulos</label>
-        <div class="field"><input type="text" id="title" placeholder="Título" oninput="dRender()"></div>
+        <label class="lbl" data-i18n="Labels">Labels</label>
+        <div class="field"><input type="text" id="title" placeholder="Title" data-i18n-ph="Title" oninput="dRender()"></div>
         <div class="row2">
-          <input type="text" id="xlabel" placeholder="Rótulo X" oninput="dRender()">
-          <input type="text" id="ylabel" placeholder="Rótulo Y" oninput="dRender()">
+          <input type="text" id="xlabel" placeholder="X label" data-i18n-ph="X label" oninput="dRender()">
+          <input type="text" id="ylabel" placeholder="Y label" data-i18n-ph="Y label" oninput="dRender()">
         </div>
         <div style="margin-top:12px">
-          <button class="btn primary" onclick="plotBase()">▶  Plotar</button>
+          <button class="btn primary" onclick="plotBase()" data-i18n="▶  Plot">▶  Plot</button>
           <div class="row2" style="margin-top:7px">
-            <button class="btn sm" onclick="overlay()">＋ Sobrepor</button>
-            <button class="btn sm ghost" onclick="clearLayers()">Limpar</button>
+            <button class="btn sm" onclick="overlay()" data-i18n="＋ Overlay">＋ Overlay</button>
+            <button class="btn sm ghost" onclick="clearLayers()" data-i18n="Clear">Clear</button>
           </div>
-          <div class="layers" id="layersLbl" style="margin-top:8px">camadas: —</div>
+          <div class="layers" id="layersLbl" style="margin-top:8px">layers: —</div>
         </div>
       </section>
 
-      <!-- ESTILO -->
+      <!-- STYLE -->
       <section class="panel" id="p-s">
-        <label class="lbl">Tema</label>
+        <label class="lbl" data-i18n="Theme">Theme</label>
         <select id="theme" onchange="dRender()"></select>
-        <label class="lbl">Contexto (escala)</label>
+        <label class="lbl" data-i18n="Context (scale)">Context (scale)</label>
         <select id="context" onchange="dRender()">
           <option>paper</option><option selected>notebook</option><option>talk</option><option>poster</option>
         </select>
-        <label class="lbl">Escala da fonte</label>
+        <label class="lbl" data-i18n="Font scale">Font scale</label>
         <div class="slider"><input type="range" id="fontScale" min="0.7" max="1.8" step="0.05" value="1"
              oninput="badge(this);dRender()"><span class="val">1.00</span></div>
-        <label class="check"><input type="checkbox" id="grid" checked onchange="dRender()"> Grade</label>
+        <label class="check"><input type="checkbox" id="grid" checked onchange="dRender()"> <span data-i18n="Grid">Grid</span></label>
         <div class="sectile">
-          <h3>Override de cor</h3>
-          <p class="hint">Sobrepõe o fundo do tema. Limpe para voltar ao tema.</p>
-          <div class="colorrow"><input type="color" id="figbg" value="#161922" onchange="setOv('fig_bg',this.value)"><span style="color:var(--mut)">Fundo da figura</span></div>
-          <div class="colorrow"><input type="color" id="axbg" value="#161922" onchange="setOv('ax_bg',this.value)"><span style="color:var(--mut)">Fundo do eixo</span></div>
-          <button class="btn sm ghost" style="margin-top:6px" onclick="clearOv()">Limpar overrides</button>
+          <h3 data-i18n="Color override">Color override</h3>
+          <p class="hint" data-i18n="Overrides the theme background. Clear to go back to the theme.">Overrides the theme background. Clear to go back to the theme.</p>
+          <div class="colorrow"><input type="color" id="figbg" value="#161922" onchange="setOv('fig_bg',this.value)"><span style="color:var(--mut)" data-i18n="Figure background">Figure background</span></div>
+          <div class="colorrow"><input type="color" id="axbg" value="#161922" onchange="setOv('ax_bg',this.value)"><span style="color:var(--mut)" data-i18n="Axes background">Axes background</span></div>
+          <button class="btn sm ghost" style="margin-top:6px" onclick="clearOv()" data-i18n="Clear overrides">Clear overrides</button>
         </div>
         <div class="sectile">
-          <h3>Cores por grupo (color picker)</h3>
-          <p class="hint">Escolha a cor <b>exata</b> de cada categoria do hue (ou X). Sobrepõe a paleta e não se embaralha ao trocar os eixos ou filtrar (cada categoria mantém a cor).</p>
-          <button class="btn sm" style="width:100%" onclick="loadGroupColors()">Carregar grupos do hue/X atual</button>
+          <h3 data-i18n="Per-group colors (color picker)">Per-group colors (color picker)</h3>
+          <p class="hint" data-i18n-html="style.groupColorsHint">Pick the <b>exact</b> color of each hue (or X) category. Overrides the palette and does not reshuffle when you swap axes or filter (each category keeps its color).</p>
+          <button class="btn sm" style="width:100%" onclick="loadGroupColors()" data-i18n="Load groups from current hue/X">Load groups from current hue/X</button>
           <div id="groupColors" style="margin-top:6px"></div>
-          <button class="btn sm ghost" id="clearColorsBtn" style="display:none;margin-top:4px" onclick="clearColors()">Limpar cores</button>
+          <button class="btn sm ghost" id="clearColorsBtn" style="display:none;margin-top:4px" onclick="clearColors()" data-i18n="Clear colors">Clear colors</button>
         </div>
         <div class="sectile">
-          <h3>Eixos</h3>
+          <h3 data-i18n="Axes">Axes</h3>
           <div class="row2">
-            <label class="check"><input type="checkbox" id="logx" onchange="dRender()"> Log X</label>
-            <label class="check"><input type="checkbox" id="logy" onchange="dRender()"> Log Y</label>
+            <label class="check"><input type="checkbox" id="logx" onchange="dRender()"> <span data-i18n="Log X">Log X</span></label>
+            <label class="check"><input type="checkbox" id="logy" onchange="dRender()"> <span data-i18n="Log Y">Log Y</span></label>
           </div>
-          <label class="lbl">Limites X (min / max)</label>
-          <div class="row2"><input type="text" id="xmin" placeholder="auto" oninput="dRender()"><input type="text" id="xmax" placeholder="auto" oninput="dRender()"></div>
-          <label class="lbl">Limites Y (min / max)</label>
-          <div class="row2"><input type="text" id="ymin" placeholder="auto" oninput="dRender()"><input type="text" id="ymax" placeholder="auto" oninput="dRender()"></div>
-          <label class="check"><input type="checkbox" id="despine" onchange="dRender()"> Esconder bordas topo/direita (despine)</label>
-          <label class="lbl">Tamanho dos ticks (0 = padrão)</label>
+          <label class="lbl" data-i18n="X limits (min / max)">X limits (min / max)</label>
+          <div class="row2"><input type="text" id="xmin" placeholder="auto" data-i18n-ph="auto" oninput="dRender()"><input type="text" id="xmax" placeholder="auto" data-i18n-ph="auto" oninput="dRender()"></div>
+          <label class="lbl" data-i18n="Y limits (min / max)">Y limits (min / max)</label>
+          <div class="row2"><input type="text" id="ymin" placeholder="auto" data-i18n-ph="auto" oninput="dRender()"><input type="text" id="ymax" placeholder="auto" data-i18n-ph="auto" oninput="dRender()"></div>
+          <label class="check"><input type="checkbox" id="despine" onchange="dRender()"> <span data-i18n="Hide top/right spines (despine)">Hide top/right spines (despine)</span></label>
+          <label class="lbl" data-i18n="Tick size (0 = default)">Tick size (0 = default)</label>
           <div class="slider"><input type="range" id="ticksize" min="0" max="18" step="1" value="0" oninput="badge(this);dRender()"><span class="val">0</span></div>
         </div>
         <div class="sectile">
-          <h3>Tamanho / forma do gráfico</h3>
-          <p class="hint">Largura × altura em mm controla a <b>forma</b> do gráfico (ex.: 180×70 = achatado, 80×160 = alto/comprido) e vale tanto no preview quanto na exportação. Vazio = tamanho padrão fixo (o preview acompanha a janela, mas o arquivo exportado é sempre igual).</p>
-          <div class="row2"><input type="text" id="figwmm" placeholder="larg. mm" oninput="dRender()"><input type="text" id="fighmm" placeholder="alt. mm" oninput="dRender()"></div>
+          <h3 data-i18n="Plot size / shape">Plot size / shape</h3>
+          <p class="hint" data-i18n-html="style.sizeHint">Width × height in mm controls the <b>shape</b> of the plot (e.g. 180×70 = flat, 80×160 = tall) and applies to the preview, the export and the multi-figure panel. The legend never gets clipped: the plot shrinks to make room. Empty = fixed default size.</p>
+          <div class="row2"><input type="text" id="figwmm" placeholder="width mm" data-i18n-ph="width mm" oninput="dRender()"><input type="text" id="fighmm" placeholder="height mm" data-i18n-ph="height mm" oninput="dRender()"></div>
         </div>
       </section>
 
-      <!-- LEGENDA -->
+      <!-- LEGEND -->
       <section class="panel" id="p-l">
-        <label class="check"><input type="checkbox" id="legShow" checked onchange="dRender()"> Mostrar legenda</label>
-        <label class="lbl">Posição</label>
+        <label class="check"><input type="checkbox" id="legShow" checked onchange="dRender()"> <span data-i18n="Show legend">Show legend</span></label>
+        <label class="lbl" data-i18n="Position">Position</label>
         <select id="legPos" onchange="dRender()">
-          <option value="upper right">Superior direita</option>
-          <option value="upper left">Superior esquerda</option>
-          <option value="lower right">Inferior direita</option>
-          <option value="lower left">Inferior esquerda</option>
-          <option value="center">Centro</option>
-          <option value="outside">Fora (direita)</option>
-          <option value="free">Livre (arraste no gráfico)</option>
+          <option value="upper right" data-i18n="Upper right">Upper right</option>
+          <option value="upper left" data-i18n="Upper left">Upper left</option>
+          <option value="lower right" data-i18n="Lower right">Lower right</option>
+          <option value="lower left" data-i18n="Lower left">Lower left</option>
+          <option value="center" data-i18n="Center">Center</option>
+          <option value="outside" data-i18n="Outside (right)">Outside (right)</option>
+          <option value="free" data-i18n="Free (drag on the plot)">Free (drag on the plot)</option>
         </select>
-        <label class="lbl">Tamanho da fonte</label>
+        <label class="lbl" data-i18n="Font size">Font size</label>
         <div class="slider"><input type="range" id="legSize" min="6" max="20" step="0.5" value="9"
              oninput="badge(this);dRender()"><span class="val">9</span></div>
-        <label class="lbl">Colunas</label>
+        <label class="lbl" data-i18n="Columns">Columns</label>
         <div class="slider"><input type="range" id="legCol" min="1" max="4" step="1" value="1"
              oninput="badge(this);dRender()"><span class="val">1</span></div>
-        <label class="check"><input type="checkbox" id="legFrame" checked onchange="dRender()"> Moldura</label>
-        <label class="check"><input type="checkbox" id="legFit" checked onchange="dRender()"> Abrir espaço (legenda fora). Desligue para arrastá-la para dentro do gráfico.</label>
-        <label class="lbl">Título da legenda</label>
-        <input type="text" id="legTitle" placeholder="(padrão = nome do grupo)" oninput="dRender()">
+        <label class="check"><input type="checkbox" id="legFrame" checked onchange="dRender()"> <span data-i18n="Frame">Frame</span></label>
+        <label class="check"><input type="checkbox" id="legFit" checked onchange="dRender()"> <span data-i18n="Open space (legend outside). Turn off to drag it inside the plot.">Open space (legend outside). Turn off to drag it inside the plot.</span></label>
+        <label class="lbl" data-i18n="Legend title">Legend title</label>
+        <input type="text" id="legTitle" placeholder="(default = group name)" data-i18n-ph="(default = group name)" oninput="dRender()">
         <div class="sectile">
-          <h3>Renomear itens</h3>
-          <p class="hint">Troca os nomes que aparecem na legenda (não altera os dados).</p>
-          <button class="btn sm" onclick="loadLegendLabels()">Carregar itens do grupo atual</button>
+          <h3 data-i18n="Rename items">Rename items</h3>
+          <p class="hint" data-i18n="Changes the names shown in the legend (does not alter the data).">Changes the names shown in the legend (does not alter the data).</p>
+          <button class="btn sm" onclick="loadLegendLabels()" data-i18n="Load items from current group">Load items from current group</button>
           <div id="legRelabel" style="margin-top:6px"></div>
         </div>
         <div class="sectile">
-          <h3>Renomear colunas (rótulos)</h3>
-          <p class="hint">Nome bonito da coluna nos eixos e no título/sub-títulos da legenda — ex.: <b>gene_exp_2 → Gene Expression</b>. Só visual: não altera os dados, o filtro nem o código exportado.</p>
-          <button class="btn sm" onclick="loadColumnAliases()">Carregar colunas atuais</button>
+          <h3 data-i18n="Rename columns (labels)">Rename columns (labels)</h3>
+          <p class="hint" data-i18n-html="legend.renameColsHint">Pretty column name on the axes and in the legend title/sub-titles — e.g. <b>gene_exp_2 → Gene Expression</b>. Visual only: does not alter the data, the filter or the exported code.</p>
+          <button class="btn sm" onclick="loadColumnAliases()" data-i18n="Load current columns">Load current columns</button>
           <div id="aliasList" style="margin-top:6px"></div>
         </div>
-        <div class="sectile"><p class="hint">Dica: você pode <b>clicar e arrastar a legenda</b> direto no gráfico — ela passa para o modo "Livre" e fica onde você soltar.</p></div>
+        <div class="sectile"><p class="hint" data-i18n-html="legend.tip">Tip: you can <b>click and drag the legend</b> directly on the plot — it switches to "Free" mode and stays where you drop it.</p></div>
       </section>
 
-      <!-- ANALISE -->
+      <!-- ANALYSIS -->
       <section class="panel" id="p-a">
         <div class="sectile">
-          <h3>Redução de dimensionalidade</h3>
-          <label class="lbl">Colunas numéricas</label>
-          <div class="scrollbox" id="numCols"><span style="color:var(--faint)">carregue um CSV</span></div>
-          <label class="lbl">Método</label>
+          <h3 data-i18n="Dimensionality reduction">Dimensionality reduction</h3>
+          <label class="lbl" data-i18n="Numeric columns">Numeric columns</label>
+          <div class="row2" style="margin-bottom:5px">
+            <button class="btn sm" onclick="selectAllNumCols(true)" data-i18n="Select all">Select all</button>
+            <button class="btn sm ghost" onclick="selectAllNumCols(false)" data-i18n="Select none">Select none</button>
+          </div>
+          <div class="scrollbox" id="numCols"><span style="color:var(--faint)" data-i18n="load a CSV">load a CSV</span></div>
+          <label class="lbl" data-i18n="Method">Method</label>
           <select id="method"><option>PCA</option><option>t-SNE</option><option>UMAP</option></select>
-          <button class="btn sm" style="margin-top:8px;width:100%" id="reduceBtn" onclick="runReduce()">Rodar redução</button>
+          <button class="btn sm" style="margin-top:8px;width:100%" id="reduceBtn" onclick="runReduce()" data-i18n="Run reduction">Run reduction</button>
         </div>
         <div class="sectile">
-          <h3>Comparar grupos (robusto)</h3>
-          <label class="lbl">Valor (numérico)</label><select id="testVal"></select>
-          <label class="lbl">Grupo (categórico)</label><select id="testGrp"></select>
-          <button class="btn sm" style="margin-top:8px;width:100%" onclick="runTest()">Comparar (não-paramétrico + efeito + IC)</button>
+          <h3 data-i18n="Compare groups (robust)">Compare groups (robust)</h3>
+          <label class="lbl" data-i18n="Value (numeric)">Value (numeric)</label><select id="testVal"></select>
+          <label class="lbl" data-i18n="Group (categorical)">Group (categorical)</label><select id="testGrp"></select>
+          <button class="btn sm" style="margin-top:8px;width:100%" onclick="runTest()" data-i18n="Compare (non-parametric + effect + CI)">Compare (non-parametric + effect + CI)</button>
           <div class="statusbox" id="testOut" style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:11px">—</div>
         </div>
         <div class="sectile">
-          <h3>Diversidade (índice de Shannon)</h3>
-          <p class="hint">Duas visões. <b>Grupos por região</b>: dentro de cada gate, a contagem de cada grupo e o Shannon dessa mistura (H≈0 = região pura). <b>Regiões por grupo</b> (relativo): para cada tratamento, a diversidade das regiões que ele ocupa — espalhado por muitas regiões → H alto, concentrado em poucas → H baixo. <b>H</b> em nats, <b>J</b> = Pielou (0–1). Resultado na tabela do gráfico.</p>
-          <label class="lbl">Grupo (categórico)</label><select id="shanGrp"></select>
-          <label class="lbl">Direção</label>
+          <h3 data-i18n="Diversity (Shannon index)">Diversity (Shannon index)</h3>
+          <p class="hint" data-i18n-html="analysis.diversityHint">Two views. <b>Groups per region</b>: inside each gate, the count of each group and the Shannon of that mixture (H≈0 = pure region). <b>Regions per group</b> (relative): for each treatment, the diversity of the regions it occupies — spread over many regions → high H, concentrated in few → low H. <b>H</b> in nats, <b>J</b> = Pielou (0–1). Result in the plot table.</p>
+          <label class="lbl" data-i18n="Group (categorical)">Group (categorical)</label><select id="shanGrp"></select>
+          <label class="lbl" data-i18n="Direction">Direction</label>
           <select id="shanDir">
-            <option value="by_region">Grupos dentro de cada região</option>
-            <option value="by_group">Regiões ocupadas por cada grupo (relativo)</option>
+            <option value="by_region" data-i18n="Groups inside each region">Groups inside each region</option>
+            <option value="by_group" data-i18n="Regions occupied by each group (relative)">Regions occupied by each group (relative)</option>
           </select>
-          <button class="btn sm" style="margin-top:8px;width:100%" onclick="runShannon()">Calcular Shannon</button>
+          <button class="btn sm" style="margin-top:8px;width:100%" onclick="runShannon()" data-i18n="Compute Shannon">Compute Shannon</button>
         </div>
         <div class="sectile">
-          <h3>Melhores pares (separação de grupos)</h3>
-          <p class="hint">Testa <b>todas as colunas numéricas, par a par</b>, e ranqueia quais duas melhor dividem os grupos da coluna escolhida. Ordena por <b>Silhouette</b> (separação visual no scatter); a coluna <b>Acc. LDA</b> é a leitura de classificação. Resultado aparece na tabela do gráfico e exporta junto com a "Tabela descritiva".</p>
-          <label class="lbl">Dividir por (categórico)</label><select id="pairGrp"></select>
-          <button class="btn sm" style="margin-top:8px;width:100%" id="pairBtn" onclick="rankPairs()">Ranquear pares</button>
+          <h3 data-i18n="Best pairs (group separation)">Best pairs (group separation)</h3>
+          <p class="hint" data-i18n-html="analysis.bestPairsHint">Tests <b>all numeric columns, pairwise</b>, and ranks which two best split the groups of the chosen column. Sorts by <b>Silhouette</b> (visual separation in the scatter); the <b>LDA acc.</b> column is the classification reading. The result appears in the plot table and exports together with the "Descriptive table".</p>
+          <label class="lbl" data-i18n="Split by (categorical)">Split by (categorical)</label><select id="pairGrp"></select>
+          <button class="btn sm" style="margin-top:8px;width:100%" id="pairBtn" onclick="rankPairs()" data-i18n="Rank pairs">Rank pairs</button>
         </div>
         <div class="sectile">
-          <h3>Linhas de limiar &amp; regiões</h3>
-          <p class="hint">Linhas para dividir o gráfico. Escolha o tipo: <b>Horizontal</b> (informe Y), <b>Vertical</b> (informe X) ou <b>Inclinada</b> (X, Y e ângulo em graus na escala dos dados). Em "Editar regiões no gráfico" você também arrasta as linhas. Usa o X/Y/hue da aba Gráfico.</p>
-          <label class="lbl">Tipo de linha</label>
+          <h3 data-i18n="Threshold lines &amp; regions">Threshold lines &amp; regions</h3>
+          <p class="hint" data-i18n-html="analysis.linesHint">Lines to split the plot. Choose the type: <b>Horizontal</b> (give Y), <b>Vertical</b> (give X) or <b>Slanted</b> (X, Y and angle in degrees on the data scale). In "Edit on the plot" you can also drag the lines. Uses the X/Y/hue from the Plot tab.</p>
+          <label class="lbl" data-i18n="Line type">Line type</label>
           <select id="lnType" onchange="lineTypeUI()">
-            <option value="horizontal">Horizontal (informe Y)</option>
-            <option value="vertical">Vertical (informe X)</option>
-            <option value="inclinada">Inclinada (X, Y, ângulo)</option>
+            <option value="horizontal" data-i18n="Horizontal (give Y)">Horizontal (give Y)</option>
+            <option value="vertical" data-i18n="Vertical (give X)">Vertical (give X)</option>
+            <option value="slanted" data-i18n="Slanted (X, Y, angle)">Slanted (X, Y, angle)</option>
           </select>
           <div class="row3" style="margin-top:6px">
             <input type="text" id="lnX" placeholder="X" disabled>
             <input type="text" id="lnY" placeholder="Y">
-            <input type="text" id="lnAng" placeholder="ângulo°" value="30" disabled>
+            <input type="text" id="lnAng" placeholder="angle°" data-i18n-ph="angle°" value="30" disabled>
           </div>
           <div class="row2" style="margin-top:6px;align-items:center">
             <input type="color" id="lnColor" value="#e23b3b" style="flex:0 0 auto">
-            <button class="btn sm" style="flex:1" onclick="addLine()">＋ Adicionar linha</button>
+            <button class="btn sm" style="flex:1" onclick="addLine()" data-i18n="＋ Add line">＋ Add line</button>
           </div>
-          <button class="btn sm ghost" id="lnPickBtn" style="margin-top:4px;width:100%" onclick="toggleLinePick()">Clicar no gráfico p/ pegar X,Y</button>
-          <div id="lineList" class="statusbox" style="margin-top:6px">nenhuma linha</div>
-          <button class="btn sm ghost editModeBtn" style="margin-top:6px;width:100%" onclick="toggleGateMode()">Editar no gráfico (arrastar regiões/linhas)</button>
-          <button class="btn sm" style="margin-top:6px;width:100%" onclick="generateGatesFromLines()">⬇ Gerar regiões das retas (células do cruzamento)</button>
-          <button class="btn sm" style="margin-top:6px;width:100%" onclick="analyzeRegions()">Analisar regiões</button>
+          <button class="btn sm ghost" id="lnPickBtn" style="margin-top:4px;width:100%" onclick="toggleLinePick()" data-i18n="Click the plot to pick X,Y">Click the plot to pick X,Y</button>
+          <div id="lineList" class="statusbox" style="margin-top:6px" data-i18n="no lines">no lines</div>
+          <button class="btn sm ghost editModeBtn" style="margin-top:6px;width:100%" onclick="toggleGateMode()" data-i18n="Edit on the plot (drag regions/lines)">Edit on the plot (drag regions/lines)</button>
+          <button class="btn sm" style="margin-top:6px;width:100%" onclick="generateGatesFromLines()" data-i18n="⬇ Build regions from the lines (intersection cells)">⬇ Build regions from the lines (intersection cells)</button>
+          <button class="btn sm" style="margin-top:6px;width:100%" onclick="analyzeRegions()" data-i18n="Analyze regions">Analyze regions</button>
         </div>
         <div class="sectile">
-          <h3>Regiões nomeadas (gating)</h3>
-          <p class="hint">Desenhe regiões fechadas (polígonos de arestas retas, inclináveis), <b>nomeie</b> e <b>arraste no gráfico</b> para ajustar. Duplo-clique numa <b>aresta</b> insere um vértice; duplo-clique ou <b>botão-direito</b> num vértice o remove (mín. 3). Arraste o <b>nome</b> para reposicioná-lo. A contagem ao vivo por grupo aparece abaixo. "Criar coluna" gera uma coluna categórica com o nome da região de cada observação. Usa o X/Y/hue da aba Gráfico.</p>
-          <label class="check"><input type="checkbox" id="gateMagnet" checked> 🧲 Ímã: vértice gruda em vértices/arestas de outras regiões</label>
+          <h3 data-i18n="Named regions (gating)">Named regions (gating)</h3>
+          <p class="hint" data-i18n-html="analysis.gatingHint">Draw closed regions (straight-edged, tiltable polygons), <b>name</b> them and <b>drag them on the plot</b> to adjust. Double-click an <b>edge</b> to insert a vertex; double-click or <b>right-click</b> a vertex to remove it (min. 3). Drag the <b>name</b> to reposition it. The live per-group count appears below. "Create column" generates a categorical column with each observation's region name. Uses the X/Y/hue from the Plot tab.</p>
+          <label class="check"><input type="checkbox" id="showGates" checked onchange="toggleShowGates()"> <span data-i18n="👁 Show regions on the plot (turn off to preview without them)">👁 Show regions on the plot (turn off to preview without them)</span></label>
+          <label class="check"><input type="checkbox" id="gateMagnet" checked> <span data-i18n="🧲 Magnet: vertex snaps to vertices/edges of other regions">🧲 Magnet: vertex snaps to vertices/edges of other regions</span></label>
           <div class="row2" style="align-items:center">
-            <input type="text" id="gateName" placeholder="nome (ex.: LR)" style="flex:1">
+            <input type="text" id="gateName" placeholder="name (e.g. LR)" data-i18n-ph="name (e.g. LR)" style="flex:1">
             <input type="color" id="gateColor" value="#e23b3b" style="flex:0 0 auto">
           </div>
           <div class="row2" style="margin-top:6px">
-            <button class="btn sm" style="flex:1" onclick="addGate()">＋ Região</button>
-            <button class="btn sm ghost editModeBtn" style="flex:1" id="gateModeBtn" onclick="toggleGateMode()">Editar no gráfico (arrastar regiões/linhas)</button>
+            <button class="btn sm" style="flex:1" onclick="addGate()" data-i18n="＋ Region">＋ Region</button>
+            <button class="btn sm ghost editModeBtn" style="flex:1" id="gateModeBtn" onclick="toggleGateMode()" data-i18n="Edit on the plot (drag regions/lines)">Edit on the plot (drag regions/lines)</button>
           </div>
-          <p class="hint" style="margin-top:4px">No modo edição: arraste os vértices ou o interior; duplo-clique no corpo adiciona vértice, no vértice remove.</p>
-          <label class="check" style="margin-top:4px"><input type="checkbox" id="gatesLock" onchange="toggleGatesLock()"> Travar regiões (manter posição ao trocar X/Y)</label>
-          <p class="hint" style="margin-top:4px">Para <b>mesclar</b> regiões, dê o <b>mesmo nome</b> a elas (ex.: duas células viram "baixo") — passam a ser contadas juntas e recebem o mesmo rótulo na coluna criada.</p>
+          <p class="hint" style="margin-top:4px" data-i18n="In edit mode: drag the vertices or the interior; double-click the body adds a vertex, on a vertex removes it.">In edit mode: drag the vertices or the interior; double-click the body adds a vertex, on a vertex removes it.</p>
+          <label class="check" style="margin-top:4px"><input type="checkbox" id="gatesLock" onchange="toggleGatesLock()"> <span data-i18n="Lock regions (keep position when swapping X/Y)">Lock regions (keep position when swapping X/Y)</span></label>
+          <p class="hint" style="margin-top:4px" data-i18n-html="analysis.mergeHint">To <b>merge</b> regions, give them the <b>same name</b> (e.g. two cells both become "low") — they are counted together and get the same label in the created column.</p>
           <div id="gateList" style="margin-top:6px"></div>
-          <button class="btn sm ghost" style="margin-top:6px;width:100%" onclick="countGates()">Atualizar contagem</button>
-          <button class="btn sm" style="margin-top:6px;width:100%" onclick="mergeGates()">⬡ Mesclar geometricamente (regiões de mesmo nome)</button>
+          <button class="btn sm ghost" style="margin-top:6px;width:100%" onclick="countGates()" data-i18n="Refresh count">Refresh count</button>
+          <button class="btn sm" style="margin-top:6px;width:100%" onclick="mergeGates()" data-i18n="⬡ Merge geometrically (same-named regions)">⬡ Merge geometrically (same-named regions)</button>
           <div class="row2" style="margin-top:8px;align-items:center">
-            <input type="text" id="gateColName" placeholder="nome da coluna" value="Região" style="flex:1">
-            <button class="btn sm" style="flex:0 0 auto" onclick="createRegionColumn()">Criar coluna</button>
+            <input type="text" id="gateColName" placeholder="column name" data-i18n-ph="column name" value="Region" style="flex:1">
+            <button class="btn sm" style="flex:0 0 auto" onclick="createRegionColumn()" data-i18n="Create column">Create column</button>
           </div>
-          <p class="hint" style="margin-top:8px">Salve regiões + linhas num arquivo para <b>reusar em outra planilha</b> (com os mesmos eixos). Avisa se você carregar em eixos diferentes.</p>
+          <p class="hint" style="margin-top:8px" data-i18n-html="analysis.saveLoadHint">Save regions + lines to a file to <b>reuse on another sheet</b> (with the same axes). It warns if you load them on different axes.</p>
           <div class="row2">
-            <button class="btn sm" style="flex:1" onclick="saveRegions()">💾 Salvar regiões</button>
-            <button class="btn sm ghost" style="flex:1" onclick="loadRegions()">📂 Carregar regiões</button>
+            <button class="btn sm" style="flex:1" onclick="saveRegions()" data-i18n="💾 Save regions">💾 Save regions</button>
+            <button class="btn sm ghost" style="flex:1" onclick="loadRegions()" data-i18n="📂 Load regions">📂 Load regions</button>
           </div>
-          <label class="check" style="margin-top:4px"><input type="checkbox" id="loadByFrac"> Carregar pela proporção do gráfico (fração) — para reusar em escalas diferentes</label>
-          <p class="hint" style="margin-top:10px"><b>Exportar gating</b> — cada célula é atribuída a <b>uma única</b> região (a que mais se enquadra: mais "para dentro" vence; sobre a linha vai à mais próxima). A coluna <b>Região</b> mostra qual. Mantém todas as colunas. Marque quais incluir.</p>
+          <label class="check" style="margin-top:4px"><input type="checkbox" id="loadByFrac"> <span data-i18n="Load by plot proportion (fraction) — to reuse at different scales">Load by plot proportion (fraction) — to reuse at different scales</span></label>
+          <p class="hint" style="margin-top:10px" data-i18n-html="analysis.exportGatingHint"><b>Export gating</b> — each cell is assigned to <b>a single</b> region (the one it fits best: deeper "inside" wins; on the line goes to the nearest). The <b>Region</b> column shows which. Keeps all columns. Check which ones to include.</p>
           <div id="gateExportList" style="max-height:120px;overflow:auto;border:1px solid var(--panel3);border-radius:8px;padding:6px 8px"></div>
           <div class="row2" style="align-items:center;margin-top:6px">
             <select id="gateExportFmt" style="flex:0 0 auto;width:auto"><option value="csv">CSV</option><option value="xlsx">Excel</option></select>
-            <button class="btn sm" style="flex:1" onclick="exportGated()">⬇ Exportar marcadas</button>
+            <button class="btn sm" style="flex:1" onclick="exportGated()" data-i18n="⬇ Export checked">⬇ Export checked</button>
           </div>
-          <label class="check" style="margin-top:6px"><input type="checkbox" id="gateExportPer"> Exportar 1 arquivo por região (escolhe uma pasta)</label>
-          <button class="btn sm ghost" style="width:100%;margin-top:6px" onclick="exportGatedAll()">Exportar tudo (+ coluna Região)</button>
+          <label class="check" style="margin-top:6px"><input type="checkbox" id="gateExportPer"> <span data-i18n="Export 1 file per region (pick a folder)">Export 1 file per region (pick a folder)</span></label>
+          <button class="btn sm ghost" style="width:100%;margin-top:6px" onclick="exportGatedAll()" data-i18n="Export everything (+ Region column)">Export everything (+ Region column)</button>
         </div>
       </section>
 
-      <!-- AVANÇADO -->
+      <!-- ADVANCED -->
       <section class="panel" id="p-x">
         <div class="sectile">
-          <h3>Numérica → categórica</h3>
-          <p class="hint">Converte uma coluna numérica em texto, para usar como categoria/hue.</p>
+          <h3 data-i18n="Numeric → categorical">Numeric → categorical</h3>
+          <p class="hint" data-i18n="Converts a numeric column to text so it can be used as a category/hue.">Converts a numeric column to text so it can be used as a category/hue.</p>
           <div class="row2">
             <select id="toCatCol"></select>
             <button class="btn sm" style="flex:0 0 auto" onclick="toCategory()">123→Abc</button>
           </div>
         </div>
         <div class="sectile">
-          <h3>Painel multi-figura (A/B/C)</h3>
-          <p class="hint">Monte o gráfico na aba "Gráfico", depois adicione-o como um quadro do painel.</p>
-          <button class="btn sm" onclick="addPanelItem()">＋ Adicionar gráfico atual ao painel</button>
-          <div id="panelList" class="statusbox" style="margin-top:6px">painel vazio</div>
-          <label class="lbl">Colunas do painel</label>
-          <div class="slider"><input type="range" id="ncols" min="1" max="4" step="1" value="2" oninput="badge(this)"><span class="val">2</span></div>
+          <h3 data-i18n="Multi-figure panel (A/B/C)">Multi-figure panel (A/B/C)</h3>
+          <p class="hint" data-i18n-html="adv.panelHint">Build the plot in the "Plot" tab, then add it as a panel frame. Each frame keeps the <b>title and axis labels</b> you typed for it. After building, <b>drag the dividers on the panel</b> to resize the plots; the mm size in the Style tab applies to the panel too.</p>
+          <button class="btn sm" onclick="addPanelItem()" data-i18n="＋ Add current plot to the panel">＋ Add current plot to the panel</button>
+          <div id="panelList" class="statusbox" style="margin-top:6px" data-i18n="empty panel">empty panel</div>
+          <label class="lbl" data-i18n="Panel columns">Panel columns</label>
+          <div class="slider"><input type="range" id="ncols" min="1" max="4" step="1" value="2" oninput="badge(this);onPanelGridChange()"><span class="val">2</span></div>
           <div class="row2" style="margin-top:6px">
-            <button class="btn sm" onclick="buildPanel()">Montar painel</button>
-            <button class="btn sm ghost" onclick="clearPanel()">Limpar</button>
+            <button class="btn sm" onclick="buildPanel()" data-i18n="Build panel">Build panel</button>
+            <button class="btn sm ghost" onclick="clearPanel()" data-i18n="Clear">Clear</button>
           </div>
-          <button class="btn sm" style="margin-top:4px;width:100%" onclick="exportPanel()">Exportar painel</button>
+          <button class="btn sm ghost" style="margin-top:4px;width:100%" onclick="resetPanelSizes()" data-i18n="Reset plot sizes">Reset plot sizes</button>
+          <button class="btn sm" style="margin-top:4px;width:100%" onclick="exportPanel()" data-i18n="Export panel">Export panel</button>
         </div>
         <div class="sectile">
           <h3>Clustermap / Pairplot</h3>
-          <label class="lbl">Colunas numéricas</label>
-          <div class="scrollbox" id="advCols"><span style="color:var(--faint)">carregue um CSV</span></div>
-          <label class="check"><input type="checkbox" id="zscore" checked> z-score (clustermap)</label>
-          <label class="lbl">Hue (pairplot, opcional)</label>
+          <label class="lbl" data-i18n="Numeric columns">Numeric columns</label>
+          <div class="scrollbox" id="advCols"><span style="color:var(--faint)" data-i18n="load a CSV">load a CSV</span></div>
+          <label class="check"><input type="checkbox" id="zscore" checked> <span data-i18n="z-score (clustermap)">z-score (clustermap)</span></label>
+          <label class="lbl" data-i18n="Hue (pairplot, optional)">Hue (pairplot, optional)</label>
           <select id="advHue"></select>
           <div class="row2" style="margin-top:6px">
             <button class="btn sm" onclick="genAdvanced('clustermap')">Clustermap</button>
             <button class="btn sm" onclick="genAdvanced('pairplot')">Pairplot</button>
           </div>
-          <button class="btn sm" style="margin-top:4px;width:100%" onclick="exportAdvanced()">Exportar esta figura</button>
+          <button class="btn sm" style="margin-top:4px;width:100%" onclick="exportAdvanced()" data-i18n="Export this figure">Export this figure</button>
         </div>
         <div class="sectile">
-          <h3>Reformatar dados (long ⇄ wide)</h3>
-          <p class="hint">Wide→long (melt): junta várias colunas de medida numa só. Long→wide (pivot): espalha categorias em colunas.</p>
-          <label class="lbl">Manter (id_vars)</label>
+          <h3 data-i18n="Reshape data (long ⇄ wide)">Reshape data (long ⇄ wide)</h3>
+          <p class="hint" data-i18n="Wide→long (melt): collapses several measure columns into one. Long→wide (pivot): spreads categories into columns.">Wide→long (melt): collapses several measure columns into one. Long→wide (pivot): spreads categories into columns.</p>
+          <label class="lbl" data-i18n="Keep (id_vars)">Keep (id_vars)</label>
           <div class="scrollbox" id="meltId" style="max-height:90px"></div>
-          <label class="lbl">Derreter (value_vars)</label>
+          <label class="lbl" data-i18n="Melt (value_vars)">Melt (value_vars)</label>
           <div class="scrollbox" id="meltVal" style="max-height:90px"></div>
           <button class="btn sm" style="margin-top:6px;width:100%" onclick="doMelt()">Wide → Long (melt)</button>
-          <label class="lbl" style="margin-top:8px">Pivot: índice / colunas / valores</label>
+          <label class="lbl" style="margin-top:8px" data-i18n="Pivot: index / columns / values">Pivot: index / columns / values</label>
           <select id="pvIndex"></select><select id="pvCols" style="margin-top:4px"></select><select id="pvVals" style="margin-top:4px"></select>
           <button class="btn sm" style="margin-top:6px;width:100%" onclick="doPivot()">Long → Wide (pivot)</button>
         </div>
         <div class="sectile">
-          <h3>Tabela descritiva</h3>
-          <label class="lbl">Agrupar por (opcional)</label>
+          <h3 data-i18n="Descriptive table">Descriptive table</h3>
+          <label class="lbl" data-i18n="Group by (optional)">Group by (optional)</label>
           <select id="tblGrp"></select>
           <div class="row2" style="margin-top:6px">
-            <button class="btn sm" onclick="genTable()">Gerar tabela</button>
-            <button class="btn sm ghost" onclick="exportTable()">Exportar CSV</button>
+            <button class="btn sm" onclick="genTable()" data-i18n="Generate table">Generate table</button>
+            <button class="btn sm ghost" onclick="exportTable()" data-i18n="Export CSV">Export CSV</button>
           </div>
         </div>
       </section>
@@ -464,24 +474,24 @@
 
     <div class="footer">
       <div class="dpirow">
-        <span>DPI da exportação</span>
+        <span data-i18n="Export DPI">Export DPI</span>
         <input type="number" id="dpi" value="300" min="300" max="1200" step="50"
                onchange="if(+this.value<300)this.value=300">
-        <span class="muted">(mín. 300)</span>
+        <span class="muted" data-i18n="(min. 300)">(min. 300)</span>
       </div>
-      <label class="check" style="margin:2px 0"><input type="checkbox" id="exportTransparent"> Fundo transparente (PNG/SVG/PDF)</label>
-      <button class="btn" onclick="exportFig()">⬇  Exportar figura (TIFF/PNG/PDF/SVG)</button>
+      <label class="check" style="margin:2px 0"><input type="checkbox" id="exportTransparent"> <span data-i18n="Transparent background (keeps ticks, labels and title)">Transparent background (keeps ticks, labels and title)</span></label>
+      <button class="btn" onclick="exportFig()" data-i18n="⬇  Export figure (TIFF/PNG/PDF/SVG)">⬇  Export figure (TIFF/PNG/PDF/SVG)</button>
       <div class="row2">
-        <button class="btn sm" onclick="exportCode()">⬇ Código .py</button>
-        <button class="btn sm ghost" onclick="exportCsv()">CSV filtrado</button>
-      </div>
-      <div class="row2">
-        <button class="btn sm" onclick="saveProject()">💾 Salvar projeto</button>
-        <button class="btn sm" onclick="openProject()">📂 Abrir projeto</button>
+        <button class="btn sm" onclick="exportCode()" data-i18n="⬇ Python code">⬇ Python code</button>
+        <button class="btn sm ghost" onclick="exportCsv()" data-i18n="Filtered CSV">Filtered CSV</button>
       </div>
       <div class="row2">
-        <button class="btn sm ghost" onclick="savePreset()">Salvar preset</button>
-        <button class="btn sm ghost" onclick="applyPreset()">Aplicar preset</button>
+        <button class="btn sm" onclick="saveProject()" data-i18n="💾 Save project">💾 Save project</button>
+        <button class="btn sm" onclick="openProject()" data-i18n="📂 Open project">📂 Open project</button>
+      </div>
+      <div class="row2">
+        <button class="btn sm ghost" onclick="savePreset()" data-i18n="Save preset">Save preset</button>
+        <button class="btn sm ghost" onclick="applyPreset()" data-i18n="Apply preset">Apply preset</button>
       </div>
     </div>
   </aside>
@@ -489,23 +499,24 @@
   <!-- STAGE -->
   <main class="stage">
     <div class="topbar">
-      <div class="layers" id="hintTop">Carregue um CSV para começar.</div>
+      <div class="layers" id="hintTop" data-i18n="Load a CSV to start.">Load a CSV to start.</div>
       <div class="anntools">
-        <input type="text" id="annText" placeholder="texto da anotação" style="width:150px">
-        <button class="btn sm" onclick="setAnnot('text')" id="annTextBtn">Texto</button>
-        <button class="btn sm" onclick="setAnnot('arrow')" id="annArrowBtn">Seta</button>
+        <input type="text" id="annText" placeholder="annotation text" data-i18n-ph="annotation text" style="width:150px">
+        <button class="btn sm" onclick="setAnnot('text')" id="annTextBtn" data-i18n="Text">Text</button>
+        <button class="btn sm" onclick="setAnnot('arrow')" id="annArrowBtn" data-i18n="Arrow">Arrow</button>
         <button class="btn sm" onclick="setAnnot('star')" id="annStarBtn">✱</button>
-        <button class="btn sm ghost" onclick="undoAnnot()">Desfazer</button>
-        <button class="btn sm ghost" onclick="clearAnnot()">Limpar</button>
+        <button class="btn sm ghost" onclick="undoAnnot()" data-i18n="Undo">Undo</button>
+        <button class="btn sm ghost" onclick="clearAnnot()" data-i18n="Clear">Clear</button>
       </div>
     </div>
     <div class="previewcard" id="card">
-      <div class="empty" id="empty"><div class="big">📈</div>Sua figura aparece aqui</div>
-      <img id="plot" alt="figura">
+      <div class="empty" id="empty"><div class="big">📈</div><span data-i18n="Your figure appears here">Your figure appears here</span></div>
+      <img id="plot" alt="figure">
       <div id="legendBox"></div>
       <svg id="gateLayer" style="position:absolute;left:0;top:0;display:none;pointer-events:none"></svg>
+      <svg id="panelLayer" style="position:absolute;left:0;top:0;display:none;pointer-events:none"></svg>
     </div>
-    <div class="rowinfo" id="rowinfo"><div class="rowinfohead"><h4>Ponto selecionado</h4><button class="btn sm ghost" style="width:auto;padding:3px 10px" onclick="copyRowTable()">⧉ Copiar</button></div><table id="rowtable"></table></div>
+    <div class="rowinfo" id="rowinfo"><div class="rowinfohead"><h4 data-i18n="Selected point">Selected point</h4><button class="btn sm ghost" style="width:auto;padding:3px 10px" onclick="copyRowTable()" data-i18n="⧉ Copy">⧉ Copy</button></div><table id="rowtable"></table></div>
   </main>
 </div>
 <div class="toast" id="toast"></div>
@@ -513,22 +524,22 @@
 <div id="dataModal" class="modal">
   <div class="modal-card">
     <div class="modal-head">
-      <h3>Digitar dados</h3>
+      <h3 data-i18n="Type data">Type data</h3>
       <button class="btn sm ghost" onclick="closeDataEntry()">✕</button>
     </div>
     <div class="modal-tools">
-      <button class="btn sm" onclick="gridAddRow()">＋ linha</button>
-      <button class="btn sm" onclick="gridAddCol()">＋ coluna</button>
-      <button class="btn sm ghost" onclick="gridDelRow()">− linha</button>
-      <button class="btn sm ghost" onclick="gridDelCol()">− coluna</button>
-      <button class="btn sm" onclick="gridHeaderFromRow()">1ª linha → cabeçalho</button>
-      <label class="check" style="margin-left:auto"><input type="checkbox" id="gridComma"> vírgula = decimal</label>
-      <span class="muted">Cole (Ctrl+V) direto do Excel/Prism — tab vira coluna. Cabeçalho = nome da coluna.</span>
+      <button class="btn sm" onclick="gridAddRow()" data-i18n="＋ row">＋ row</button>
+      <button class="btn sm" onclick="gridAddCol()" data-i18n="＋ column">＋ column</button>
+      <button class="btn sm ghost" onclick="gridDelRow()" data-i18n="− row">− row</button>
+      <button class="btn sm ghost" onclick="gridDelCol()" data-i18n="− column">− column</button>
+      <button class="btn sm" onclick="gridHeaderFromRow()" data-i18n="1st row → header">1st row → header</button>
+      <label class="check" style="margin-left:auto"><input type="checkbox" id="gridComma"> <span data-i18n="comma = decimal">comma = decimal</span></label>
+      <span class="muted" data-i18n="Paste (Ctrl+V) straight from Excel/Prism — tab becomes a column. Header = column name.">Paste (Ctrl+V) straight from Excel/Prism — tab becomes a column. Header = column name.</span>
     </div>
     <div class="grid-wrap"><table id="dataGrid"></table></div>
     <div class="modal-foot">
-      <button class="btn ghost" onclick="closeDataEntry()">Cancelar</button>
-      <button class="btn primary" onclick="applyData()">Usar estes dados</button>
+      <button class="btn ghost" onclick="closeDataEntry()" data-i18n="Cancel">Cancel</button>
+      <button class="btn primary" onclick="applyData()" data-i18n="Use this data">Use this data</button>
     </div>
   </div>
 </div>
@@ -537,12 +548,281 @@
 const $ = id => document.getElementById(id);
 let CATALOG=[], SPEC=null, STACK=[], LASTRENDER=null, rAF=null, busy=false;
 
+/* ===================== i18n =====================
+   Only the interface is translated. Everything stored (projects, presets, exported
+   code, JSON) stays in the canonical English values, so a file saved in one language
+   opens in the other. */
+let LANG = 'en';
+
+// Portuguese for every plain UI string; the English text is the key and the fallback.
+const PT = {
+  "Publication figures · Python":"Figuras de publicação · Python",
+  "⌨ Type data (Prism style)":"⌨ Digitar dados (estilo Prism)",
+  "Open sheet":"Abrir aba", "no file":"nenhum arquivo",
+  "Plot":"Gráfico","Style":"Estilo","Legend":"Legenda","Analysis":"Análise","Advanced":"Avançado",
+  "Filter (pandas query)":"Filtro (consulta pandas)",
+  "dose > 5 and group == 'high'":"dose > 5 and grupo == 'alta'",
+  "Apply":"Aplicar","Plot type":"Tipo de gráfico","Labels":"Rótulos",
+  "Title":"Título","X label":"Rótulo X","Y label":"Rótulo Y",
+  "▶  Plot":"▶  Plotar","＋ Overlay":"＋ Sobrepor","Clear":"Limpar","layers":"camadas",
+  "Theme":"Tema","Context (scale)":"Contexto (escala)","Font scale":"Escala da fonte","Grid":"Grade",
+  "Color override":"Sobrescrever cor",
+  "Overrides the theme background. Clear to go back to the theme.":"Sobrepõe o fundo do tema. Limpe para voltar ao tema.",
+  "Figure background":"Fundo da figura","Axes background":"Fundo do eixo","Clear overrides":"Limpar sobrescritas",
+  "Per-group colors (color picker)":"Cores por grupo (seletor de cor)",
+  "Load groups from current hue/X":"Carregar grupos do hue/X atual","Clear colors":"Limpar cores",
+  "Load the groups to pick each color.":"Carregue os grupos para escolher cada cor.",
+  "Axes":"Eixos","Log X":"Log X","Log Y":"Log Y",
+  "X limits (min / max)":"Limites X (mín / máx)","Y limits (min / max)":"Limites Y (mín / máx)","auto":"auto",
+  "Hide top/right spines (despine)":"Esconder bordas topo/direita","Tick size (0 = default)":"Tamanho dos ticks (0 = padrão)",
+  "Plot size / shape":"Tamanho / forma do gráfico","width mm":"larg. mm","height mm":"alt. mm",
+  "Show legend":"Mostrar legenda","Position":"Posição",
+  "Upper right":"Superior direita","Upper left":"Superior esquerda","Lower right":"Inferior direita",
+  "Lower left":"Inferior esquerda","Center":"Centro","Outside (right)":"Fora (direita)","Free (drag on the plot)":"Livre (arraste no gráfico)",
+  "Font size":"Tamanho da fonte","Columns":"Colunas","Frame":"Moldura",
+  "Open space (legend outside). Turn off to drag it inside the plot.":"Abrir espaço (legenda fora). Desligue para arrastá-la para dentro do gráfico.",
+  "Legend title":"Título da legenda","(default = group name)":"(padrão = nome do grupo)",
+  "Rename items":"Renomear itens",
+  "Changes the names shown in the legend (does not alter the data).":"Troca os nomes que aparecem na legenda (não altera os dados).",
+  "Load items from current group":"Carregar itens do grupo atual","new name":"novo nome",
+  "Rename columns (labels)":"Renomear colunas (rótulos)","Load current columns":"Carregar colunas atuais","display name":"nome de exibição",
+  "Dimensionality reduction":"Redução de dimensionalidade","Numeric columns":"Colunas numéricas",
+  "Select all":"Selecionar todas","Select none":"Limpar seleção",
+  "load a CSV":"carregue um CSV","no numeric columns":"sem colunas numéricas",
+  "Method":"Método","Run reduction":"Rodar redução","Running…":"Rodando…",
+  "Compare groups (robust)":"Comparar grupos (robusto)","Value (numeric)":"Valor (numérico)","Group (categorical)":"Grupo (categórico)",
+  "Compare (non-parametric + effect + CI)":"Comparar (não-paramétrico + efeito + IC)",
+  "Diversity (Shannon index)":"Diversidade (índice de Shannon)","Direction":"Direção",
+  "Groups inside each region":"Grupos dentro de cada região",
+  "Regions occupied by each group (relative)":"Regiões ocupadas por cada grupo (relativo)",
+  "Compute Shannon":"Calcular Shannon","Shannon computed":"Shannon calculado",
+  "Best pairs (group separation)":"Melhores pares (separação de grupos)","Split by (categorical)":"Dividir por (categórico)",
+  "Rank pairs":"Ranquear pares","Computing…":"Calculando…",
+  "Threshold lines & regions":"Linhas de limiar e regiões","Line type":"Tipo de linha",
+  "Horizontal (give Y)":"Horizontal (informe Y)","Vertical (give X)":"Vertical (informe X)","Slanted (X, Y, angle)":"Inclinada (X, Y, ângulo)",
+  "angle°":"ângulo°","＋ Add line":"＋ Adicionar linha","Click the plot to pick X,Y":"Clique no gráfico para pegar X,Y",
+  "no lines":"nenhuma linha","remove":"remover","angle":"ângulo",
+  "Edit on the plot (drag regions/lines)":"Editar no gráfico (arrastar regiões/linhas)",
+  "Editing — drag on the plot (click to exit)":"Editando — arraste no gráfico (clique p/ sair)",
+  "⬇ Build regions from the lines (intersection cells)":"⬇ Gerar regiões das retas (células do cruzamento)",
+  "Analyze regions":"Analisar regiões","Regions analyzed":"Regiões analisadas",
+  "Named regions (gating)":"Regiões nomeadas (gating)",
+  "👁 Show regions on the plot (turn off to preview without them)":"👁 Mostrar regiões no gráfico (desligue para ver sem elas)",
+  "🧲 Magnet: vertex snaps to vertices/edges of other regions":"🧲 Ímã: vértice gruda em vértices/arestas de outras regiões",
+  "name (e.g. LR)":"nome (ex.: LR)","＋ Region":"＋ Região",
+  "In edit mode: drag the vertices or the interior; double-click the body adds a vertex, on a vertex removes it.":"No modo edição: arraste os vértices ou o interior; duplo-clique no corpo adiciona vértice, no vértice remove.",
+  "Lock regions (keep position when swapping X/Y)":"Travar regiões (manter posição ao trocar X/Y)",
+  "Refresh count":"Atualizar contagem","⬡ Merge geometrically (same-named regions)":"⬡ Mesclar geometricamente (regiões de mesmo nome)",
+  "column name":"nome da coluna","Create column":"Criar coluna",
+  "💾 Save regions":"💾 Salvar regiões","📂 Load regions":"📂 Carregar regiões",
+  "Load by plot proportion (fraction) — to reuse at different scales":"Carregar pela proporção do gráfico (fração) — para reusar em escalas diferentes",
+  "⬇ Export checked":"⬇ Exportar marcadas","Export 1 file per region (pick a folder)":"Exportar 1 arquivo por região (escolhe uma pasta)",
+  "Export everything (+ Region column)":"Exportar tudo (+ coluna Região)",
+  "no regions — add one and drag it on the plot":"nenhuma região — adicione e arraste no gráfico",
+  "name the regions to export by gating":"nomeie as regiões para poder exportar por gating",
+  "Numeric → categorical":"Numérica → categórica",
+  "Converts a numeric column to text so it can be used as a category/hue.":"Converte uma coluna numérica em texto, para usar como categoria/hue.",
+  "Multi-figure panel (A/B/C)":"Painel multi-figura (A/B/C)",
+  "＋ Add current plot to the panel":"＋ Adicionar gráfico atual ao painel","empty panel":"painel vazio",
+  "Panel columns":"Colunas do painel","Build panel":"Montar painel","Export panel":"Exportar painel",
+  "Reset plot sizes":"Redefinir tamanhos dos gráficos",
+  "z-score (clustermap)":"z-score (clustermap)","Hue (pairplot, optional)":"Hue (pairplot, opcional)",
+  "Export this figure":"Exportar esta figura",
+  "Reshape data (long ⇄ wide)":"Reformatar dados (longo ⇄ largo)",
+  "Wide→long (melt): collapses several measure columns into one. Long→wide (pivot): spreads categories into columns.":"Largo→longo (melt): junta várias colunas de medida numa só. Longo→largo (pivot): espalha categorias em colunas.",
+  "Keep (id_vars)":"Manter (id_vars)","Melt (value_vars)":"Derreter (value_vars)",
+  "Pivot: index / columns / values":"Pivot: índice / colunas / valores",
+  "Descriptive table":"Tabela descritiva","Group by (optional)":"Agrupar por (opcional)",
+  "Generate table":"Gerar tabela","Export CSV":"Exportar CSV","(no group)":"(sem grupo)",
+  "Descriptive statistics":"Estatística descritiva","Table saved":"Tabela salva",
+  "Export DPI":"DPI da exportação","(min. 300)":"(mín. 300)",
+  "Transparent background (keeps ticks, labels and title)":"Fundo transparente (mantém ticks, rótulos e título)",
+  "⬇  Export figure (TIFF/PNG/PDF/SVG)":"⬇  Exportar figura (TIFF/PNG/PDF/SVG)",
+  "⬇ Python code":"⬇ Código .py","Filtered CSV":"CSV filtrado",
+  "💾 Save project":"💾 Salvar projeto","📂 Open project":"📂 Abrir projeto",
+  "Save preset":"Salvar preset","Apply preset":"Aplicar preset",
+  "Load a CSV to start.":"Carregue um CSV para começar.",
+  "Configure the plot and click Plot.":"Configure o gráfico e clique em Plotar.",
+  "annotation text":"texto da anotação","Text":"Texto","Arrow":"Seta","Undo":"Desfazer",
+  "Your figure appears here":"Sua figura aparece aqui","Selected point":"Ponto selecionado","⧉ Copy":"⧉ Copiar",
+  "Type data":"Digitar dados","＋ row":"＋ linha","＋ column":"＋ coluna","− row":"− linha","− column":"− coluna",
+  "1st row → header":"1ª linha → cabeçalho","comma = decimal":"vírgula = decimal",
+  "Paste (Ctrl+V) straight from Excel/Prism — tab becomes a column. Header = column name.":"Cole (Ctrl+V) direto do Excel/Prism — tab vira coluna. Cabeçalho = nome da coluna.",
+  "Cancel":"Cancelar","Use this data":"Usar estes dados",
+  // toasts / dynamic
+  "CSV loaded":"CSV carregado","Sheet loaded":"Aba carregada","Data applied":"Dados aplicados","Error":"Erro",
+  "Load a CSV":"Carregue um CSV","Load a CSV first":"Carregue um CSV primeiro","Load data first":"Carregue os dados primeiro",
+  "Render error":"Erro ao renderizar","Nothing to undo":"Nada para desfazer","Undone ↶":"Desfeito ↶",
+  "Plot the base layer first":"Plote a camada base primeiro","Plot something first":"Plote algo primeiro",
+  "Plot a figure first":"Plote um gráfico primeiro","Plot the figure first":"Plote o gráfico primeiro",
+  "Build a plot first":"Monte um gráfico primeiro","Saved: ":"Salvo: ","CSV saved":"CSV salvo","Code saved: ":"Código salvo: ",
+  "Project saved":"Projeto salvo","Project opened":"Projeto aberto","Preset saved":"Preset salvo","Preset applied":"Preset aplicado",
+  "Set the hue channel first":"Defina o canal hue primeiro","No categories":"Sem categorias",
+  "Set X or hue first":"Defina X ou hue primeiro","No categories in the group":"Sem categorias no grupo",
+  "Choose the group column":"Escolha a coluna de grupo","Select ≥2 columns":"Selecione ≥2 colunas",
+  "Copied":"Copiado","Copy failed":"Falha ao copiar","Nothing to copy":"Nada para copiar",
+  "Converted to long format":"Convertido para formato longo","Converted to wide format":"Convertido para formato largo",
+  "Add at least one line":"Adicione ao menos uma linha","Add lines first":"Adicione retas primeiro",
+  "Set X and Y in the Plot tab":"Configure X e Y na aba Gráfico",
+  "A vertical line needs X":"Linha vertical precisa de X","A horizontal line needs Y":"Linha horizontal precisa de Y",
+  "A slanted line needs X and Y":"Linha inclinada precisa de X e Y",
+  "Line added — adjust the angle on the slider or drag it on the plot":"Linha adicionada — ajuste o ângulo no slider ou arraste no gráfico",
+  "X,Y captured":"X,Y capturados","Render the plot first":"Renderize o gráfico primeiro",
+  "Click the plot to position it":"Clique no gráfico para posicionar",
+  "Need at least 2 regions":"Precisa de ao menos 2 regiões",
+  "Give the same name to 2+ regions before merging":"Dê o mesmo nome a 2+ regiões antes de mesclar",
+  "Same-named regions merged into a single polygon":"Regiões de mesmo nome unidas num polígono só",
+  "A polygon needs at least 3 vertices":"Um polígono precisa de ao menos 3 vértices",
+  "Turn \"Show regions\" back on to edit them":"Religue \"Mostrar regiões\" para editá-las",
+  "Regions locked: they keep their position when swapping X/Y":"Regiões travadas: mantêm a posição ao trocar X/Y",
+  "Regions unlocked":"Regiões destravadas",
+  "Create at least one region":"Crie ao menos uma região","Check at least one region":"Marque ao menos uma região",
+  "Add at least one region":"Adicione ao menos uma região",
+  "Nothing to save — add regions or lines":"Nada para salvar — adicione regiões ou linhas",
+  "Regions saved: ":"Regiões salvas: ","Regions loaded":"Regiões carregadas",
+  "Regions loaded by the plot proportion":"Regiões carregadas pela proporção do gráfico",
+  "Plot a figure before loading by fraction":"Plote um gráfico antes de carregar por fração",
+  "File without a source scale — loaded in data coordinates":"Arquivo sem escala de origem — carregado em coordenada de dado",
+  "Regions — live count (Groups ≥2 = overlap)":"Regiões — contagem ao vivo (Grupos ≥2 = sobreposição)",
+  "Regions — observations per area (Groups ≥2 = overlap)":"Regiões — observações por área (Grupos ≥2 = sobreposição)",
+  "Add at least one frame":"Adicione ao menos um quadro","Empty panel":"Painel vazio",
+  "Panel sizes reset":"Tamanhos do painel redefinidos",
+  "Drag the dividers to resize the plots":"Arraste os divisores para redimensionar os gráficos",
+  "Generating ":"Gerando ",
+  "Nothing to use":"Sem linhas para usar","No rows to use":"Sem linhas para usar",
+  "1st row became the header":"1ª linha virou cabeçalho","Pasted":"Colado",
+  "Best pairs — separation of ":"Melhores pares — separação de ",
+  "Pairs ranked — best on top":"Pares ranqueados — melhor no topo",
+  "New columns: ":"Novas colunas: ",
+  "Draw regions and set X/Y in the Plot tab":"Desenhe regiões e configure X/Y na aba Gráfico",
+  "Column created: ":"Coluna criada: ","rows copied":"linhas copiadas",
+  "Load the groups to pick each color.":"Carregue os grupos para escolher cada cor.",
+};
+
+// Rich hints (contain markup), keyed by id.
+const HTML_HINTS = {
+  "style.groupColorsHint":{
+    en:'Pick the <b>exact</b> color of each hue (or X) category. Overrides the palette and does not reshuffle when you swap axes or filter (each category keeps its color).',
+    pt:'Escolha a cor <b>exata</b> de cada categoria do hue (ou X). Sobrepõe a paleta e não se embaralha ao trocar os eixos ou filtrar (cada categoria mantém a cor).'},
+  "style.sizeHint":{
+    en:'Width × height in mm controls the <b>shape</b> of the plot (e.g. 180×70 = flat, 80×160 = tall) and applies to the preview, the export and the multi-figure panel. The legend never gets clipped: the plot shrinks to make room. Empty = fixed default size.',
+    pt:'Largura × altura em mm controla a <b>forma</b> do gráfico (ex.: 180×70 = achatado, 80×160 = alto) e vale no preview, na exportação e no painel multi-figura. A legenda nunca é cortada: o gráfico encolhe para abrir espaço. Vazio = tamanho padrão fixo.'},
+  "legend.renameColsHint":{
+    en:'Pretty column name on the axes and in the legend title/sub-titles — e.g. <b>gene_exp_2 → Gene Expression</b>. Visual only: does not alter the data, the filter or the exported code.',
+    pt:'Nome bonito da coluna nos eixos e no título/sub-títulos da legenda — ex.: <b>gene_exp_2 → Gene Expression</b>. Só visual: não altera os dados, o filtro nem o código exportado.'},
+  "legend.tip":{
+    en:'Tip: you can <b>click and drag the legend</b> directly on the plot — it switches to "Free" mode and stays where you drop it.',
+    pt:'Dica: você pode <b>clicar e arrastar a legenda</b> direto no gráfico — ela passa para o modo "Livre" e fica onde você soltar.'},
+  "analysis.diversityHint":{
+    en:'Two views. <b>Groups per region</b>: inside each gate, the count of each group and the Shannon of that mixture (H≈0 = pure region). <b>Regions per group</b> (relative): for each treatment, the diversity of the regions it occupies. <b>H</b> in nats, <b>J</b> = Pielou (0–1). Result in the plot table.',
+    pt:'Duas visões. <b>Grupos por região</b>: dentro de cada gate, a contagem de cada grupo e o Shannon dessa mistura (H≈0 = região pura). <b>Regiões por grupo</b> (relativo): para cada tratamento, a diversidade das regiões que ele ocupa. <b>H</b> em nats, <b>J</b> = Pielou (0–1). Resultado na tabela do gráfico.'},
+  "analysis.bestPairsHint":{
+    en:'Tests <b>all numeric columns, pairwise</b>, and ranks which two best split the groups of the chosen column. Sorts by <b>Silhouette</b> (visual separation in the scatter); the <b>LDA acc.</b> column is the classification reading.',
+    pt:'Testa <b>todas as colunas numéricas, par a par</b>, e ranqueia quais duas melhor dividem os grupos da coluna escolhida. Ordena por <b>Silhouette</b> (separação visual no scatter); a coluna <b>Acc. LDA</b> é a leitura de classificação.'},
+  "analysis.linesHint":{
+    en:'Lines to split the plot. Choose the type: <b>Horizontal</b> (give Y), <b>Vertical</b> (give X) or <b>Slanted</b> (X, Y and angle in degrees on the data scale). In "Edit on the plot" you can also drag the lines. Uses the X/Y/hue from the Plot tab.',
+    pt:'Linhas para dividir o gráfico. Escolha o tipo: <b>Horizontal</b> (informe Y), <b>Vertical</b> (informe X) ou <b>Inclinada</b> (X, Y e ângulo em graus na escala dos dados). Em "Editar no gráfico" você também arrasta as linhas. Usa o X/Y/hue da aba Gráfico.'},
+  "analysis.gatingHint":{
+    en:'Draw closed regions (straight-edged, tiltable polygons), <b>name</b> them and <b>drag them on the plot</b> to adjust. Double-click an <b>edge</b> to insert a vertex; double-click or <b>right-click</b> a vertex to remove it (min. 3). Drag the <b>name</b> to reposition it. "Create column" generates a categorical column with each observation\'s region name.',
+    pt:'Desenhe regiões fechadas (polígonos de arestas retas, inclináveis), <b>nomeie</b> e <b>arraste no gráfico</b> para ajustar. Duplo-clique numa <b>aresta</b> insere um vértice; duplo-clique ou <b>botão-direito</b> num vértice o remove (mín. 3). Arraste o <b>nome</b> para reposicioná-lo. "Criar coluna" gera uma coluna categórica com o nome da região de cada observação.'},
+  "analysis.mergeHint":{
+    en:'To <b>merge</b> regions, give them the <b>same name</b> (e.g. two cells both become "low") — they are counted together and get the same label in the created column.',
+    pt:'Para <b>mesclar</b> regiões, dê o <b>mesmo nome</b> a elas (ex.: duas células viram "baixo") — passam a ser contadas juntas e recebem o mesmo rótulo na coluna criada.'},
+  "analysis.saveLoadHint":{
+    en:'Save regions + lines to a file to <b>reuse on another sheet</b> (with the same axes). It warns if you load them on different axes.',
+    pt:'Salve regiões + linhas num arquivo para <b>reusar em outra planilha</b> (com os mesmos eixos). Avisa se você carregar em eixos diferentes.'},
+  "analysis.exportGatingHint":{
+    en:'<b>Export gating</b> — each cell is assigned to <b>a single</b> region (the one it fits best: deeper "inside" wins; on the line goes to the nearest). The <b>Region</b> column shows which. Keeps all columns.',
+    pt:'<b>Exportar gating</b> — cada célula é atribuída a <b>uma única</b> região (a que mais se enquadra: mais "para dentro" vence; sobre a linha vai à mais próxima). A coluna <b>Region</b> mostra qual. Mantém todas as colunas.'},
+  "adv.panelHint":{
+    en:'Build the plot in the "Plot" tab, then add it as a panel frame. Each frame keeps the <b>title and axis labels</b> you typed for it. After building, <b>drag the dividers on the panel</b> to resize the plots; the mm size in the Style tab applies to the panel too.',
+    pt:'Monte o gráfico na aba "Gráfico", depois adicione-o como um quadro do painel. Cada quadro mantém o <b>título e os rótulos dos eixos</b> que você digitou. Depois de montar, <b>arraste os divisores no painel</b> para redimensionar os gráficos; o tamanho em mm da aba Estilo também vale para o painel.'},
+};
+
+// Backend catalog labels (canonical English) -> Portuguese, for display only.
+const PT_SPEC = {
+  scatter:"Dispersão (scatter)", line:"Linha", bar:"Barra", box:"Boxplot", violin:"Violino",
+  strip:"Stripplot", box_points:"Box + pontos", violin_points:"Violino + pontos",
+  scatter_density:"Scatter + fundo de grupo", dose4pl:"Dose-resposta (4PL + IC50)",
+  bar_err:"Barra/ponto ± erro", heatmap_matrix:"Heatmap de matriz",
+  ecdf:"ECDF (distribuição acumulada)", regband:"Regressão + banda de IC",
+  paired:"Pareado (antes-depois)", hist:"Histograma", kde:"KDE",
+  ridge:"Ridgeline (distribuição por grupo)", heatmap:"Heatmap (correlação)", volcano:"Volcano Plot",
+};
+const PT_PARAM = {
+  alpha:"alpha", palette:"paleta", bins:"bins", kde:"kde", fill:"preencher",
+  "Regression + R²":"Regressão + R²", "point size":"tamanho do ponto", jitter:"dispersão (jitter)",
+  "background intensity":"intensidade do fundo", "resolution (solid mode)":"resolução (modo sólido)",
+  "contour background (KDE waves)":"fundo em contorno (ondas KDE)",
+  "number of waves (contour mode)":"nº de ondas (modo contorno)",
+  "log X axis":"eixo X log", "show points":"mostrar pontos",
+  "significance bars (no hue)":"barras de significância (sem hue)",
+  "z-score per column":"z-score por coluna", annot:"anotar", "CI (%)":"IC (%)",
+  overlap:"sobreposição", linewidth:"espessura da linha",
+  "|log2FC| threshold":"limiar |log2FC|", "p threshold":"limiar p",
+  kind:"tipo", center:"centro", error:"erro", psize:"tamanho do ponto", sig:"significância",
+  levels:"níveis", grid:"grade", contour:"contorno", size:"tamanho", regression:"regressão",
+  ci:"IC", log_x:"eixo X log", points:"pontos", zscore:"z-score", fc_thr:"limiar log2FC", p_thr:"limiar p",
+};
+const PT_CHOICE = { bar:"barra", point:"ponto", mean:"média", median:"mediana",
+                    SD:"DP", SEM:"EPM", CI95:"IC95" };
+const PT_CHANNEL = { x:"X", y:"Y", hue:"Hue", size:"Tamanho", style:"Estilo",
+                     dose:"dose", response:"resposta", "sample (id)":"amostra (id)",
+                     "p-value":"p-valor", log2FC:"log2FC" };
+const PT_THEME = {
+  "Light · grid":"Claro · grade", "Light · ticks":"Claro · ticks", "Light · clean":"Claro · limpo",
+  "Dark · grid":"Escuro · grade", "Dark · plain":"Escuro · liso", "Slate":"Ardósia",
+};
+
+function t(s){ return (LANG==='pt' && PT[s]) ? PT[s] : s; }
+function tSpec(sp){ return LANG==='pt' ? (PT_SPEC[sp.key] || sp.label) : sp.label; }
+function tParam(l){ return LANG==='pt' ? (PT_PARAM[l] || l) : l; }
+function tChoice(c){ return LANG==='pt' ? (PT_CHOICE[c] || c) : c; }
+function tChannel(l){ return LANG==='pt' ? (PT_CHANNEL[l] || PT_CHANNEL[l.toLowerCase()] || l) : l; }
+function tTheme(n){ return LANG==='pt' ? (PT_THEME[n] || n) : n; }
+
+let THEMES_RAW = [], HINT_KEY = "Load a CSV to start.", CHIP_RAW = null;
+
+function fillPlotTypes(){
+  const cur = $('plotType').value;
+  $('plotType').innerHTML = CATALOG.map(s=>`<option value="${s.key}">${tSpec(s)}</option>`).join('');
+  if(cur) $('plotType').value = cur;
+}
+function fillThemes(){
+  const cur = $('theme').value;
+  $('theme').innerHTML = THEMES_RAW.map(n=>`<option value="${n}">${tTheme(n)}</option>`).join('');
+  if(cur) $('theme').value = cur;
+}
+function applyLang(){
+  document.documentElement.lang = (LANG==='pt' ? 'pt-br' : 'en');
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.placeholder = t(el.dataset.i18nPh); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{
+    const h = HTML_HINTS[el.dataset.i18nHtml]; if(h) el.innerHTML = h[LANG] || h.en;
+  });
+  fillPlotTypes(); fillThemes();
+  if(CATALOG.length) buildConfig();          // channel/param labels + choice options
+  $('hintTop').textContent = t(HINT_KEY);
+  if(CHIP_RAW) $('chipText').textContent = CHIP_RAW;
+  updLayers(); renderPanelList(); renderLineList(); renderGateList(); renderGroupColorPickers();
+  if(!COLS.numeric.length && !COLS.category.length){ buildNumCols(); buildAdvanced(); }
+}
+function setLang(l){
+  LANG = (l==='pt' ? 'pt' : 'en');
+  try{ localStorage.setItem('nickplots.lang', LANG); }catch(e){}
+  $('lang').value = LANG;
+  applyLang();
+}
+
 window.addEventListener('pywebviewready', async () => {
   const b = await window.pywebview.api.boot();
-  CATALOG = b.catalog;
-  $('plotType').innerHTML = CATALOG.map(s=>`<option value="${s.key}">${s.label}</option>`).join('');
-  $('theme').innerHTML = b.themes.map(t=>`<option>${t}</option>`).join('');
-  buildConfig();
+  CATALOG = b.catalog; THEMES_RAW = b.themes;
+  let saved = 'en';
+  try{ saved = localStorage.getItem('nickplots.lang') || 'en'; }catch(e){}
+  LANG = (saved==='pt' ? 'pt' : 'en');
+  $('lang').value = LANG;
+  fillPlotTypes(); fillThemes(); buildConfig();
+  applyLang();
 });
 
 function tab(t){
@@ -559,7 +839,7 @@ let COLS={numeric:[],category:[],kinds:{}};
 async function openCsv(){
   const r = await window.pywebview.api.open_csv();
   if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
-  onData(r); toast('CSV carregado','good');
+  onData(r); toast(t('CSV loaded'),'good');
 }
 async function applyFilter(){
   const r = await window.pywebview.api.set_filter($('filter').value);
@@ -569,8 +849,10 @@ async function applyFilter(){
 function onData(r){
   COLS={numeric:r.numeric,category:r.category,kinds:r.kinds};
   $('chip').classList.add('on');
-  $('chipText').textContent = (r.path? r.path.split(/[\\/]/).pop():'dados')+`  ·  ${r.n} linhas × ${r.cols.length} col`;
-  $('hintTop').textContent='Configure o gráfico e clique em Plotar.';
+  CHIP_RAW = (r.path? r.path.split(/[\\/]/).pop():'data')+`  ·  ${r.n} × ${r.cols.length}`;
+  $('chipText').textContent = CHIP_RAW;
+  HINT_KEY = 'Configure the plot and click Plot.';
+  $('hintTop').textContent = t(HINT_KEY);
   $('toCatCol').innerHTML = COLS.numeric.length
     ? COLS.numeric.map(c=>`<option>${c}</option>`).join('')
     : '<option value="">—</option>';
@@ -581,10 +863,10 @@ async function toCategory(){
   if(!col) return;
   const r = await window.pywebview.api.to_category(col);
   if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
-  onData(r); toast(`"${col}" convertida em categoria — já pode usar como hue`,'good');
+  onData(r); toast(`"${col}" converted to a category — you can now use it as hue`,'good');
 }
 
-/* ----- config dinâmica a partir do schema ----- */
+/* ----- dynamic config from the schema ----- */
 function colOptions(accepts){
   const all = Object.keys(COLS.kinds).filter(c=>accepts.includes(COLS.kinds[c]));
   return '<option value="">—</option>'+all.map(c=>`<option>${c}</option>`).join('');
@@ -592,30 +874,43 @@ function colOptions(accepts){
 function buildConfig(){
   SPEC = CATALOG.find(s=>s.key===$('plotType').value) || CATALOG[0];
   if(!SPEC) return;
+  const prev = {}; // keep the current selection when only the language changed
+  $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>prev['c:'+s.dataset.ch]=s.value);
+  $('plotConfig').querySelectorAll('[data-pp]').forEach(w=>prev['p:'+w.dataset.pp]=(w.type==='checkbox'?w.checked:w.value));
   let h='';
   for(const ch of SPEC.channels){
     const handler = (ch.name==='x'||ch.name==='y') ? `onAxisChange('${ch.name}')` : 'dRender()';
-    h+=`<label class="lbl">${ch.label}${ch.required?' *':''}</label>
+    h+=`<label class="lbl">${tChannel(ch.label)}${ch.required?' *':''}</label>
         <select data-ch="${ch.name}" onchange="${handler}">${colOptions(ch.accepts)}</select>`;
   }
   for(const p of SPEC.params){
     if(p.kind==='bool'){
-      h+=`<label class="check"><input type="checkbox" data-pp="${p.name}" ${p.default?'checked':''} onchange="dRender()"> ${p.label}</label>`;
+      h+=`<label class="check"><input type="checkbox" data-pp="${p.name}" ${p.default?'checked':''} onchange="dRender()"> ${tParam(p.label)}</label>`;
     }else if(p.kind==='choice'||p.kind==='palette'){
-      h+=`<label class="lbl">${p.label}</label><select data-pp="${p.name}" onchange="dRender()">`+
-         p.choices.map(c=>`<option ${c===p.default?'selected':''}>${c}</option>`).join('')+`</select>`;
+      // value stays canonical (English); only the shown text is translated
+      h+=`<label class="lbl">${tParam(p.label)}</label><select data-pp="${p.name}" onchange="dRender()">`+
+         p.choices.map(c=>`<option value="${c}" ${c===p.default?'selected':''}>${p.kind==='palette'?c:tChoice(c)}</option>`).join('')+`</select>`;
     }else{
       const step = p.kind==='int'?1:0.05;
-      h+=`<label class="lbl">${p.label}</label><div class="slider">
+      h+=`<label class="lbl">${tParam(p.label)}</label><div class="slider">
           <input type="range" data-pp="${p.name}" min="${p.lo}" max="${p.hi}" step="${step}" value="${p.default}"
             oninput="badge(this);dRender()"><span class="val">${p.default}</span></div>`;
     }
   }
   $('plotConfig').innerHTML=h;
+  const hasOpt=(sel,v)=>[...sel.options].some(o=>o.value===v);
+  $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>{ const v=prev['c:'+s.dataset.ch];
+    if(v!==undefined && hasOpt(s,v)) s.value=v; });
+  $('plotConfig').querySelectorAll('[data-pp]').forEach(w=>{ const v=prev['p:'+w.dataset.pp];
+    if(v===undefined) return;
+    if(w.type==='checkbox') w.checked=v;
+    else if(w.tagName==='SELECT'){ if(hasOpt(w,v)) w.value=v; }   // never blank a select
+    else { w.value=v; if(w.type==='range') badge(w); }
+  });
 }
 function onAxisChange(which){
-  // travado: guarda a posição das regiões em FRAÇÃO do gráfico (limites atuais)
-  // para reposicioná-las após o novo render, mantendo o lugar na tela.
+  // locked: store the regions' position as a FRACTION of the plot (current limits)
+  // so they can be repositioned after the new render, keeping their place on screen.
   if(gatesLocked && GATES.length && LASTRENDER){
     pendingGateFrac = GATES.map(g=>({name:g.name,color:g.color,points:g.points.map(p=>dataFrac(p[0],p[1])),
       labelxy:(g.labelxy&&g.labelxy.length===2)?dataFrac(g.labelxy[0],g.labelxy[1]):null}));
@@ -636,17 +931,26 @@ function readLayer(){
   return {spec_key:SPEC.key, mapping, params};
 }
 
-/* ----- estado + render ----- */
+/* ----- state + render ----- */
 const STYLE={fig_bg:null, ax_bg:null, colors:null};
 let ANNOT=[], annotMode=null;
-let LINES=[], linePick=false;   // linhas de limiar {x,y,angle,color}
-let GATES=[], gateMode=false, gateDrag=null;   // regiões poligonais {name,color,points:[[x,y]...]}
-let gatesLocked=false, pendingGateFrac=null;   // travar regiões: manter posição visual ao trocar X/Y
+let LINES=[], linePick=false;   // threshold lines {x,y,angle,color}
+let GATES=[], gateMode=false, gateDrag=null;   // polygonal regions {name,color,points:[[x,y]...]}
+let gatesLocked=false, pendingGateFrac=null;   // lock regions: keep visual position when swapping X/Y
 function setOv(k,v){ STYLE[k]=v; dRender(); }
 function clearOv(){ STYLE.fig_bg=STYLE.ax_bg=null; dRender(); }
 const LEG={x:0.74,y:0.72};
 let LEGREL={};
-let ALIAS={};   // {nome_real: nome_de_exibição} — só rótulos da figura, não toca nos dados
+let ALIAS={};   // {real_name: display_name} — figure labels only, never touches the data
+
+// Regions on/off: hides them from the plot without deleting them, so you can compare
+// the figure with and without. GATES stays intact for counting, export and editing.
+function gatesVisible(){ const el=$('showGates'); return !el || el.checked; }
+function toggleShowGates(){
+  if(!gatesVisible() && gateMode) toggleGateMode();   // leave edit mode when hiding
+  drawGateSVG();
+  dRender();
+}
 
 function gather(){
   const card=$('card');
@@ -669,7 +973,9 @@ function gather(){
     annotations: ANNOT,
     aliases: ALIAS,
     threshold_lines: LINES,
-    gates: GATES
+    gates: gatesVisible() ? GATES : [],
+    panel_wratios: PANEL_W,
+    panel_hratios: PANEL_H
   };
 }
 function dRender(){ if(rAF) clearTimeout(rAF); rAF=setTimeout(render,140); }
@@ -679,39 +985,40 @@ async function render(){
   busy=true;
   let r;
   try{ r = await window.pywebview.api.render(gather()); }
-  catch(err){ console.error('render falhou:', err); toast('Erro ao renderizar','bad'); }
-  finally{ busy=false; }                         // garante que busy nunca trava em true
+  catch(err){ console.error('render failed:', err); toast(t('Render error'),'bad'); }
+  finally{ busy=false; }                         // make sure busy never sticks at true
   if(!r){ pendingGateFrac=null; maybeLive(); return; }
   if(r.error){ pendingGateFrac=null; toast(r.error,'bad'); maybeLive(); return; }
   LASTRENDER=r;
-  if(pendingGateFrac){                 // regiões travadas: recoloca na mesma fração do gráfico
+  if(pendingGateFrac){                 // locked regions: put them back at the same plot fraction
     const xl=r.xlim,yl=r.ylim;
     GATES=pendingGateFrac.map(g=>({name:g.name,color:g.color,
       points:g.points.map(f=>[+(xl[0]+f[0]*(xl[1]-xl[0])).toFixed(4),+(yl[0]+f[1]*(yl[1]-yl[0])).toFixed(4)]),
       labelxy:g.labelxy?[+(xl[0]+g.labelxy[0]*(xl[1]-xl[0])).toFixed(4),+(yl[0]+g.labelxy[1]*(yl[1]-yl[0])).toFixed(4)]:undefined}));
     pendingGateFrac=null; renderGateList();
-    render(); return;                  // re-renderiza com as regiões já reposicionadas
+    render(); return;                  // re-render with the regions already repositioned
   }
+  PANELRENDER=null; hidePanelLayer();       // leaving panel view: drop its drag handles
   const img=$('plot'); img.src=r.img; img.style.display='block'; $('empty').style.display='none';
   img.onload=()=>{ placeLegend(r); placeGates(r); };
   maybeLive(); scheduleCommit();
 }
-// Render contínuo (slider): enquanto um render roda, marca que quer outro; ao terminar,
-// re-renderiza com o estado mais novo. Dá atualização ao vivo sem empilhar requisições.
+// Continuous render (slider): while a render runs, flag that another is wanted; when it
+// finishes, re-render with the newest state. Live updates without stacking requests.
 let _wantLive=false;
 function liveRender(){ if(busy){ _wantLive=true; } else { render(); } }
 function maybeLive(){ if(_wantLive){ _wantLive=false; render(); } }
 
-/* ===================== HISTÓRICO / DESFAZER (Ctrl-Z) ===================== */
-// Guarda no máximo 8 passos. Cada passo armazena SÓ os campos que mudaram (valores
-// antigos), comparando o estado atual com o anterior — não snapshots inteiros.
+/* ===================== HISTORY / UNDO (Ctrl-Z) ===================== */
+// Keeps at most 8 steps. Each step stores ONLY the fields that changed (their old
+// values), comparing the current state with the previous one — not whole snapshots.
 let undoStack=[], lastSnap=null, undoing=false, _commitTimer=null;
-function snap(){ return JSON.parse(JSON.stringify(captureUI())); }   // cópia por valor
+function snap(){ return JSON.parse(JSON.stringify(captureUI())); }   // copy by value
 function scheduleCommit(){ clearTimeout(_commitTimer); _commitTimer=setTimeout(commitHistory,350); }
 function commitHistory(){
   if(undoing) return;
   const cur=snap();
-  if(lastSnap===null){ lastSnap=cur; return; }     // baseline: nada a desfazer ainda
+  if(lastSnap===null){ lastSnap=cur; return; }     // baseline: nothing to undo yet
   const d={}; let changed=false;
   const keys=new Set([...Object.keys(lastSnap),...Object.keys(cur)]);
   for(const k of keys){
@@ -721,39 +1028,39 @@ function commitHistory(){
   lastSnap=cur;
 }
 function doUndo(){
-  if(!undoStack.length){ toast('Nada para desfazer'); return; }
+  if(!undoStack.length){ toast(t('Nothing to undo')); return; }
   const d=undoStack.pop();
-  const restored={...snap(), ...d};                // reverte só os campos alterados
+  const restored={...snap(), ...d};                // revert only the changed fields
   undoing=true;
-  applyUI(restored);                               // restaura tudo + re-renderiza
+  applyUI(restored);                               // restore everything + re-render
   lastSnap=restored;
   setTimeout(()=>{ undoing=false; },60);
-  toast('Desfeito ↶');
+  toast(t('Undone ↶'));
 }
 function resetHistory(){ undoStack=[]; lastSnap=null; }
 document.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey) && (e.key==='z'||e.key==='Z') && !e.shiftKey){
     const tag=document.activeElement && document.activeElement.tagName;
-    if(tag==='INPUT'||tag==='TEXTAREA') return;     // preserva o desfazer nativo em campos de texto
+    if(tag==='INPUT'||tag==='TEXTAREA') return;     // keep native undo in text fields
     e.preventDefault(); doUndo();
   }
 });
 
 function plotBase(){
-  if(!COLS.numeric.length && !COLS.category.length){ toast('Carregue um CSV primeiro','bad'); return; }
+  if(!COLS.numeric.length && !COLS.category.length){ toast(t('Load a CSV first'),'bad'); return; }
   STACK=[readLayer()]; updLayers(); render();
 }
 function overlay(){
-  if(!STACK.length){ toast('Plote a camada base primeiro'); return; }
-  if(SPEC.level!=='axes'){ toast(`'${SPEC.label}' é figure-level e não sobrepõe`,'bad'); return; }
+  if(!STACK.length){ toast(t('Plot the base layer first')); return; }
+  if(SPEC.level!=='axes'){ toast(`'${SPEC.label}' is figure-level and does not overlay`,'bad'); return; }
   STACK.push(readLayer()); updLayers(); render();
 }
 function clearLayers(){ STACK=[]; updLayers(); }
 function updLayers(){
-  $('layersLbl').textContent='camadas: '+(STACK.length? STACK.map(l=>CATALOG.find(s=>s.key===l.spec_key).label).join(' + '):'—');
+  $('layersLbl').textContent=t('layers')+': '+(STACK.length? STACK.map(l=>CATALOG.find(s=>s.key===l.spec_key).label).join(' + '):'—');
 }
 
-/* ----- legenda: posicionar overlay + arraste ----- */
+/* ----- legend: position overlay + drag ----- */
 function placeLegend(r){
   const box=$('legendBox'), img=$('plot');
   if(!r.legend || !$('legShow').checked){ box.style.display='none'; return; }
@@ -780,7 +1087,7 @@ function placeLegend(r){
       const sc=m.scale;
       const leftNat=(box.offsetLeft-m.ox)/sc;
       const bottomNat=(box.offsetTop-m.oy)/sc + (box.offsetHeight/sc);
-      // fração da FIGURA (origem inferior-esquerda); o backend abre espaço p/ a legenda
+      // FIGURE fraction (lower-left origin); the backend opens space for the legend
       LEG.x = Math.max(0, Math.min(0.98, +(leftNat/m.r.imgW).toFixed(3)));
       LEG.y = Math.max(0, Math.min(0.98, +((m.r.imgH-bottomNat)/m.r.imgH).toFixed(3)));
       $('legPos').value='free';
@@ -789,19 +1096,19 @@ function placeLegend(r){
   });
 })();
 
-/* ----- clique no ponto ----- */
+/* ----- click on a point ----- */
 $('plot').addEventListener('click', async e=>{
   if(!LASTRENDER) return;
   const img=$('plot'); const scale=img.clientWidth/LASTRENDER.imgW;
   const nx=e.offsetX/scale, ny=e.offsetY/scale;
-  if(linePick){                        // pegar X,Y tem prioridade, mesmo em modo de edição
+  if(linePick){                        // picking X,Y has priority, even in edit mode
     const d=await window.pywebview.api.to_data(nx,ny);
-    if(d){ $('lnX').value=+d.x.toFixed(3); $('lnY').value=+d.y.toFixed(3); toast('X,Y capturados','good'); }
-    else toast('Renderize o gráfico primeiro','bad');
+    if(d){ $('lnX').value=+d.x.toFixed(3); $('lnY').value=+d.y.toFixed(3); toast(t('X,Y captured'),'good'); }
+    else toast(t('Render the plot first'),'bad');
     toggleLinePick(); return;
   }
-  if(gateMode) return;             // em edição de regiões o clique restante é do overlay
-  if(annotMode){                       // colocar anotação (coordenada de eixo)
+  if(gateMode) return;             // while editing regions the remaining click belongs to the overlay
+  if(annotMode){                       // place an annotation (axes coordinate)
     const ax=LASTRENDER.axes;
     const fx=Math.max(0,Math.min(1,(nx-ax.left)/(ax.right-ax.left)));
     const fy=Math.max(0,Math.min(1,(ax.bottom-ny)/(ax.bottom-ax.top)));
@@ -811,25 +1118,25 @@ $('plot').addEventListener('click', async e=>{
   const row = await window.pywebview.api.pick(nx,ny);
   if(!row) return;
   $('rowinfo').style.display='block';
-  $('rowinfo').querySelector('h4').textContent='Ponto selecionado';
+  $('rowinfo').querySelector('h4').textContent=t('Selected point');
   $('rowtable').innerHTML = Object.entries(row).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join('');
 });
 function setAnnot(mode){
   annotMode = (annotMode===mode)? null : mode;
   ['annTextBtn','annArrowBtn','annStarBtn'].forEach(id=>$(id).classList.remove('act'));
   if(annotMode){ const m={text:'annTextBtn',arrow:'annArrowBtn',star:'annStarBtn'}[annotMode]; $(m).classList.add('act');
-    toast('Clique no gráfico para posicionar'); }
+    toast(t('Click the plot to position it')); }
 }
-/* ---- copiar a tabela de resultados (abaixo do gráfico) como TSV p/ Excel/Sheets ---- */
+/* ---- copy the results table (below the plot) as TSV for Excel/Sheets ---- */
 function copyRowTable(){
   const rows=[...document.querySelectorAll('#rowtable tr')];
-  if(!rows.length){ toast('Nada para copiar','bad'); return; }
+  if(!rows.length){ toast(t('Nothing to copy'),'bad'); return; }
   const clean=s=>(s||'').replace(/\t/g,' ').replace(/\r?\n/g,' ').trim();
   const tsv=rows.map(tr=>[...tr.children].map(c=>clean(c.innerText)).join('\t')).join('\n');
-  copyText(tsv, rows.length+' linhas copiadas — cole no Excel/Sheets');
+  copyText(tsv, rows.length+' '+t('rows copied'));
 }
 function copyText(txt, msg){
-  const ok=()=>toast(msg||'Copiado','good');
+  const ok=()=>toast(msg||t('Copied'),'good');
   if(navigator.clipboard && navigator.clipboard.writeText){
     navigator.clipboard.writeText(txt).then(ok).catch(()=>fallbackCopy(txt,ok));
   } else fallbackCopy(txt,ok);
@@ -838,7 +1145,7 @@ function fallbackCopy(txt,ok){
   const ta=document.createElement('textarea');
   ta.value=txt; ta.style.position='fixed'; ta.style.left='-9999px'; ta.style.opacity='0';
   document.body.appendChild(ta); ta.focus(); ta.select();
-  try{ document.execCommand('copy'); ok(); }catch(e){ toast('Falha ao copiar','bad'); }
+  try{ document.execCommand('copy'); ok(); }catch(e){ toast(t('Copy failed'),'bad'); }
   document.body.removeChild(ta);
 }
 function undoAnnot(){ ANNOT.pop(); render(); }
@@ -851,7 +1158,7 @@ async function openExcel(){
 }
 async function loadSheet(){
   const r=await window.pywebview.api.choose_sheet($('sheetSel').value); if(!r)return;
-  if(r.error){toast(r.error,'bad');return;} onData(r); toast('Aba carregada','good');
+  if(r.error){toast(r.error,'bad');return;} onData(r); toast(t('Sheet loaded'),'good');
 }
 
 /* ---------- reshape ---------- */
@@ -864,15 +1171,15 @@ function buildReshape(){
 }
 function checkedVals(id){ return [...$(id).querySelectorAll('input:checked')].map(i=>i.value); }
 async function doMelt(){
-  const r=await window.pywebview.api.reshape_melt(checkedVals('meltId'),checkedVals('meltVal'),'variável','valor');
-  if(!r)return; if(r.error){toast(r.error,'bad');return;} onData(r); toast('Convertido para formato longo','good');
+  const r=await window.pywebview.api.reshape_melt(checkedVals('meltId'),checkedVals('meltVal'),'variable','value');
+  if(!r)return; if(r.error){toast(r.error,'bad');return;} onData(r); toast(t('Converted to long format'),'good');
 }
 async function doPivot(){
   const r=await window.pywebview.api.reshape_pivot($('pvIndex').value,$('pvCols').value,$('pvVals').value);
-  if(!r)return; if(r.error){toast(r.error,'bad');return;} onData(r); toast('Convertido para formato largo','good');
+  if(!r)return; if(r.error){toast(r.error,'bad');return;} onData(r); toast(t('Converted to wide format'),'good');
 }
 
-/* ---------- projeto / preset / código ---------- */
+/* ---------- project / preset / code ---------- */
 function setv(id,val,slider){ if(val===undefined||val===null)return; const el=$(id); if(!el)return; el.value=val; if(slider)badge(el); }
 function chk(id,val){ const el=$(id); if(el)el.checked=!!val; }
 function captureUI(){
@@ -886,10 +1193,45 @@ function captureUI(){
       despine:$('despine').checked,ticksize:$('ticksize').value,figwmm:$('figwmm').value,fighmm:$('fighmm').value,
       fig_bg:STYLE.fig_bg,ax_bg:STYLE.ax_bg,colors:STYLE.colors},
     legend:{show:$('legShow').checked,pos:$('legPos').value,size:$('legSize').value,col:$('legCol').value,frame:$('legFrame').checked,x:LEG.x,y:LEG.y,fit:$('legFit').checked,title:$('legTitle').value,relabel:LEGREL},
-    stack:STACK,panel:PANEL,annot:ANNOT,ncols:$('ncols').value,dpi:$('dpi').value,transparent:$('exportTransparent').checked,aliases:ALIAS,lines:LINES,gates:GATES,gatesLocked:gatesLocked};
+    stack:STACK,panel:PANEL,panelW:PANEL_W,panelH:PANEL_H,annot:ANNOT,ncols:$('ncols').value,dpi:$('dpi').value,transparent:$('exportTransparent').checked,aliases:ALIAS,lines:LINES,gates:GATES,gatesLocked:gatesLocked,showGates:gatesVisible()};
 }
+
+/* ---------- legacy projects/presets ----------
+   Older files stored Portuguese theme names and bar_err choice values, and heatmaps
+   stored a categorical palette that is not a valid colormap. Map them onto the current
+   canonical (English) values so an old project opens with its settings intact instead
+   of silently falling back to defaults. Re-saving writes the new format. */
+const LEGACY_THEME = {"Claro · grid":"Light · grid","Claro · ticks":"Light · ticks","Claro · limpo":"Light · clean",
+                      "Escuro · grid":"Dark · grid","Escuro · liso":"Dark · plain","Ardósia":"Slate"};
+const LEGACY_PP = { kind:{barra:"bar",ponto:"point"}, center:{"média":"mean",mediana:"median"},
+                    error:{DP:"SD",EPM:"SEM",IC95:"CI95"} };
+const VALID_CMAPS = ["viridis","magma","rocket","mako","crest","flare","cividis","coolwarm","Spectral","vlag","icefire"];
+function migrateStyle(s){
+  if(s && s.theme && LEGACY_THEME[s.theme]) s.theme = LEGACY_THEME[s.theme];
+  return s;
+}
+function migrateUI(u){
+  if(!u) return u;
+  migrateStyle(u.style||{});
+  const pp = (u.cfg && u.cfg.pp) || {};
+  for(const k in LEGACY_PP){ if(pp[k] && LEGACY_PP[k][pp[k]]) pp[k]=LEGACY_PP[k][pp[k]]; }
+  const isHeat = (u.plotType==='heatmap' || u.plotType==='heatmap_matrix');
+  if(isHeat && pp.palette && !VALID_CMAPS.includes(pp.palette)) pp.palette='viridis';
+  (u.stack||[]).forEach(l=>{
+    const p=l.params||{};
+    for(const k in LEGACY_PP){ if(p[k] && LEGACY_PP[k][p[k]]) p[k]=LEGACY_PP[k][p[k]]; }
+    if((l.spec_key==='heatmap'||l.spec_key==='heatmap_matrix') && p.palette && !VALID_CMAPS.includes(p.palette)) p.palette='viridis';
+  });
+  (u.panel||[]).forEach(it=>{
+    const p=it.params||{};
+    for(const k in LEGACY_PP){ if(p[k] && LEGACY_PP[k][p[k]]) p[k]=LEGACY_PP[k][p[k]]; }
+  });
+  return u;
+}
+
 function applyUI(u){
   if(!u)return;
+  u = migrateUI(u);
   $('filter').value=u.filter||''; $('plotType').value=u.plotType||$('plotType').value; buildConfig();
   if(u.cfg){
     for(const[k,v]of Object.entries(u.cfg.ch||{})){const el=$('plotConfig').querySelector(`[data-ch="${k}"]`); if(el)el.value=v;}
@@ -905,57 +1247,60 @@ function applyUI(u){
   const lg=u.legend||{}; chk('legShow',lg.show);setv('legPos',lg.pos);setv('legSize',lg.size,true);setv('legCol',lg.col,true);chk('legFrame',lg.frame);
   chk('legFit',lg.fit!==undefined?lg.fit:true); setv('legTitle',lg.title); LEGREL=lg.relabel||{};
   LEG.x=(lg.x!==undefined?lg.x:0.74); LEG.y=(lg.y!==undefined?lg.y:0.72);
-  STACK=u.stack||[]; PANEL=u.panel||[]; ANNOT=u.annot||[]; ALIAS=u.aliases||{}; LINES=u.lines||[]; GATES=u.gates||[]; gatesLocked=!!u.gatesLocked; if($('gatesLock'))$('gatesLock').checked=gatesLocked; renderLineList(); renderGateList(); setv('ncols',u.ncols,true); setv('dpi',u.dpi); chk('exportTransparent',u.transparent);
+  STACK=u.stack||[]; PANEL=u.panel||[]; ANNOT=u.annot||[]; ALIAS=u.aliases||{}; LINES=u.lines||[]; GATES=u.gates||[]; gatesLocked=!!u.gatesLocked; if($('gatesLock'))$('gatesLock').checked=gatesLocked; chk('showGates',u.showGates!==undefined?u.showGates:true); renderLineList(); renderGateList(); setv('ncols',u.ncols,true); setv('dpi',u.dpi); chk('exportTransparent',u.transparent);
+  PANEL_W=Array.isArray(u.panelW)?u.panelW.slice():[]; PANEL_H=Array.isArray(u.panelH)?u.panelH.slice():[];
+  PANELRENDER=null; hidePanelLayer(); ensurePanelGrid();
   updLayers(); renderPanelList(); render();
 }
-async function saveProject(){ const r=await window.pywebview.api.save_project(captureUI()); if(r&&r.error)toast(r.error,'bad'); else if(r)toast('Projeto salvo','good'); }
+async function saveProject(){ const r=await window.pywebview.api.save_project(captureUI()); if(r&&r.error)toast(r.error,'bad'); else if(r)toast(t('Project saved'),'good'); }
 async function openProject(){
   const r=await window.pywebview.api.open_project(); if(!r)return; if(r.error){toast(r.error,'bad');return;}
   if(r.data){ if(r.data.error)toast(r.data.error,'bad'); else onData(r.data); }
-  resetHistory(); applyUI(r.ui); toast('Projeto aberto','good');
+  resetHistory(); applyUI(r.ui); toast(t('Project opened'),'good');
 }
-async function savePreset(){ const r=await window.pywebview.api.save_preset(gather()); if(r&&r.error)toast(r.error,'bad'); else if(r)toast('Preset salvo','good'); }
+async function savePreset(){ const r=await window.pywebview.api.save_preset(gather()); if(r&&r.error)toast(r.error,'bad'); else if(r)toast(t('Preset saved'),'good'); }
 async function applyPreset(){
   const r=await window.pywebview.api.apply_preset(); if(!r)return; if(r.error){toast(r.error,'bad');return;}
-  const s=r.style||{}; setv('theme',s.theme);setv('context',s.context);setv('fontScale',s.font_scale,true);chk('grid',s.grid);
+  const s=migrateStyle(r.style||{}); setv('theme',s.theme);setv('context',s.context);setv('fontScale',s.font_scale,true);chk('grid',s.grid);
   chk('logx',s.logx);chk('logy',s.logy);chk('despine',s.despine);setv('ticksize',s.tick_size,true);
+  setv('figwmm',s.fig_w_mm);setv('fighmm',s.fig_h_mm);
   STYLE.fig_bg=s.fig_bg||null;STYLE.ax_bg=s.ax_bg||null;STYLE.colors=s.colors||null;
   renderGroupColorPickers();
   const lg=r.legend||{}; chk('legShow',lg.show);setv('legPos',lg.pos);setv('legSize',lg.fontsize,true);setv('legCol',lg.ncol,true);chk('legFrame',lg.frame);
-  render(); toast('Preset aplicado','good');
+  render(); toast(t('Preset applied'),'good');
 }
-async function exportCode(){ const r=await window.pywebview.api.export_code(gather()); if(r&&r.error)toast(r.error,'bad'); else if(r)toast('Código salvo: '+r,'good'); }
+async function exportCode(){ const r=await window.pywebview.api.export_code(gather()); if(r&&r.error)toast(r.error,'bad'); else if(r)toast(t('Code saved: ')+r,'good'); }
 
-/* ---------- renomear itens da legenda ---------- */
+/* ---------- rename legend items ---------- */
 async function loadLegendLabels(){
   const hueSel=$('plotConfig').querySelector('[data-ch="hue"]');
   const col=hueSel&&hueSel.value;
-  if(!col){ toast('Defina o canal hue primeiro','bad'); return; }
+  if(!col){ toast(t('Set the hue channel first'),'bad'); return; }
   const cats=await window.pywebview.api.categories(col);
-  if(!cats.length){ toast('Sem categorias','bad'); return; }
+  if(!cats.length){ toast(t('No categories'),'bad'); return; }
   $('legRelabel').innerHTML=cats.map(c=>{
     const cur=LEGREL[c]||'';
     return `<div class="row2" style="margin-bottom:4px"><span style="color:var(--mut);align-self:center;min-width:70px">${c}</span>
-      <input type="text" value="${cur}" placeholder="novo nome" oninput="setRelabel('${c.replace(/'/g,'')}',this.value)"></div>`;
+      <input type="text" value="${cur}" placeholder="${t('new name')}" oninput="setRelabel('${c.replace(/'/g,'')}',this.value)"></div>`;
   }).join('');
 }
 function setRelabel(orig,val){ if(val) LEGREL[orig]=val; else delete LEGREL[orig]; dRender(); }
 
-/* ---------- renomear colunas (rótulos de eixo + título da legenda) ---------- */
+/* ---------- rename columns (axis labels + legend title) ---------- */
 function loadColumnAliases(){
   const cols=Object.keys(COLS.kinds||{});
-  if(!cols.length){ toast('Carregue um CSV primeiro','bad'); return; }
+  if(!cols.length){ toast(t('Load a CSV first'),'bad'); return; }
   $('aliasList').innerHTML=cols.map(c=>{
     const cur=(ALIAS[c]||'').replace(/"/g,'&quot;');
     const safe=c.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     return `<div class="row2" style="margin-bottom:4px"><span style="color:var(--mut);align-self:center;min-width:90px">${c}</span>
-      <input type="text" value="${cur}" placeholder="nome de exibição" oninput="setAlias('${safe}',this.value)"></div>`;
+      <input type="text" value="${cur}" placeholder="${t('display name')}" oninput="setAlias('${safe}',this.value)"></div>`;
   }).join('');
 }
 function setAlias(orig,val){ val=(val||'').trim(); if(val) ALIAS[orig]=val; else delete ALIAS[orig]; dRender(); }
 
-/* ---------- entrada manual de dados (estilo Prism) ---------- */
-let GRID={cols:['Grupo','Valor','Réplica'], data:[['','',''],['','',''],['','',''],['','',''],['','','']]};
+/* ---------- manual data entry (Prism style) ---------- */
+let GRID={cols:['Group','Value','Replicate'], data:[['','',''],['','',''],['','',''],['','',''],['','','']]};
 function openDataEntry(){ renderGrid(); $('dataModal').classList.add('show'); }
 function closeDataEntry(){ $('dataModal').classList.remove('show'); }
 function renderGrid(){
@@ -963,50 +1308,50 @@ function renderGrid(){
   h+=GRID.data.map((row,i)=>'<tr>'+row.map((v,j)=>`<td><input value="${(v||'').toString().replace(/"/g,'&quot;')}" oninput="GRID.data[${i}][${j}]=this.value" onpaste="gridPaste(event,${i},${j})"></td>`).join('')+'</tr>').join('');
   h+='</tbody>'; $('dataGrid').innerHTML=h;
 }
-// colar bloco do Excel/Prism (tab = colunas, quebra de linha = linhas), a partir da célula focada
+// paste a block from Excel/Prism (tab = columns, newline = rows), starting at the focused cell
 function gridPaste(e, r, c){
   const txt=((e.clipboardData||window.clipboardData)||{}).getData?((e.clipboardData||window.clipboardData).getData('text')):'';
   if(!txt) return;
   const rows=txt.replace(/\r/g,'').replace(/\n+$/,'').split('\n').map(l=>l.split('\t'));
-  if(rows.length===1 && rows[0].length===1) return;     // valor único -> deixa o paste normal
+  if(rows.length===1 && rows[0].length===1) return;     // single value -> let the normal paste happen
   e.preventDefault();
   const need=c+Math.max(...rows.map(rr=>rr.length));
-  while(GRID.cols.length<need){ GRID.cols.push('Coluna'+(GRID.cols.length+1)); GRID.data.forEach(rw=>rw.push('')); }
+  while(GRID.cols.length<need){ GRID.cols.push('Column'+(GRID.cols.length+1)); GRID.data.forEach(rw=>rw.push('')); }
   const writeBody=(body,startRow)=>body.forEach((rr,i)=>{
     const ri=startRow+i; while(GRID.data.length<=ri) GRID.data.push(GRID.cols.map(()=>''));
     rr.forEach((v,j)=>{ GRID.data[ri][c+j]=v.trim(); });
   });
-  if(r===-1){                                           // colou na linha de cabeçalho
+  if(r===-1){                                           // pasted onto the header row
     rows[0].forEach((v,j)=>{ if(c+j<GRID.cols.length) GRID.cols[c+j]=v.trim(); });
     writeBody(rows.slice(1), 0);
   } else writeBody(rows, r);
   renderGrid();
-  toast(`Colado: ${rows.length}×${Math.max(...rows.map(rr=>rr.length))}`,'good');
+  toast(`Pasted: ${rows.length}×${Math.max(...rows.map(rr=>rr.length))}`,'good');
 }
-function gridHeaderFromRow(){            // promove a 1ª linha de dados a nomes de coluna
-  if(!GRID.data.length){ toast('Sem linhas para usar','bad'); return; }
-  GRID.cols = GRID.data[0].map((v,j)=> (v||'').toString().trim() || ('Coluna'+(j+1)));
+function gridHeaderFromRow(){            // promote the 1st data row to column names
+  if(!GRID.data.length){ toast(t('No rows to use'),'bad'); return; }
+  GRID.cols = GRID.data[0].map((v,j)=> (v||'').toString().trim() || ('Column'+(j+1)));
   GRID.data.shift();
   if(!GRID.data.length) GRID.data.push(GRID.cols.map(()=>''));
   renderGrid();
-  toast('1ª linha virou cabeçalho','good');
+  toast(t('1st row became the header'),'good');
 }
 function gridAddRow(){ GRID.data.push(GRID.cols.map(()=>'')); renderGrid(); }
 function gridDelRow(){ if(GRID.data.length>1){GRID.data.pop(); renderGrid();} }
-function gridAddCol(){ GRID.cols.push('Coluna'+(GRID.cols.length+1)); GRID.data.forEach(r=>r.push('')); renderGrid(); }
+function gridAddCol(){ GRID.cols.push('Column'+(GRID.cols.length+1)); GRID.data.forEach(r=>r.push('')); renderGrid(); }
 function gridDelCol(){ if(GRID.cols.length>1){GRID.cols.pop(); GRID.data.forEach(r=>r.pop()); renderGrid();} }
 async function applyData(){
   const r=await window.pywebview.api.set_manual_data(GRID.cols, GRID.data, $('gridComma').checked);
-  if(!r){ toast('Erro','bad'); return; }
+  if(!r){ toast(t('Error'),'bad'); return; }
   if(r.error){ toast(r.error,'bad'); return; }
-  onData(r); closeDataEntry(); toast('Dados aplicados','good');
+  onData(r); closeDataEntry(); toast(t('Data applied'),'good');
 }
 
-/* ----- análise ----- */
+/* ----- analysis ----- */
 function buildNumCols(){
   $('numCols').innerHTML = COLS.numeric.length
     ? COLS.numeric.map(c=>`<label class="check"><input type="checkbox" value="${c}"> ${c}</label>`).join('')
-    : '<span style="color:var(--faint)">sem colunas numéricas</span>';
+    : '<span style="color:var(--faint)">'+t('no numeric columns')+'</span>';
 }
 function fillTestSelects(){
   $('testVal').innerHTML=COLS.numeric.map(c=>`<option>${c}</option>`).join('');
@@ -1016,31 +1361,31 @@ function fillTestSelects(){
 }
 async function runShannon(){
   const grp=$('shanGrp').value;
-  if(!grp){ toast('Escolha a coluna de grupo','bad'); return; }
+  if(!grp){ toast(t('Choose the group column'),'bad'); return; }
   const dir=$('shanDir').value;
   const m=_expAxes();
   const useGates = GATES.length && m.x && m.y;
-  if(dir==='by_group' && !useGates){ toast('Desenhe regiões e configure X/Y na aba Gráfico','bad'); return; }
+  if(dir==='by_group' && !useGates){ toast(t('Draw regions and set X/Y in the Plot tab'),'bad'); return; }
   const r=await window.pywebview.api.shannon(grp, useGates?m.x:null, useGates?m.y:null, useGates?GATES:null, dir);
-  if(!r){ toast('Carregue um CSV','bad'); return; }
+  if(!r){ toast(t('Load a CSV'),'bad'); return; }
   if(r.error){ toast(r.error,'bad'); return; }
   $('rowinfo').style.display='block';
-  const title = dir==='by_group' ? ('Shannon relativo — regiões ocupadas por "'+grp+'"')
-                                  : ('Shannon — grupos de "'+grp+'"'+(useGates?' por região':''));
+  const title = dir==='by_group' ? ('Relative Shannon — regions occupied by "'+grp+'"')
+                                  : ('Shannon — groups of "'+grp+'"'+(useGates?' per region':''));
   $('rowinfo').querySelector('h4').textContent=title;
   let h='<tr>'+r.columns.map(c=>`<td style="color:var(--mut)"><b>${c}</b></td>`).join('')+'</tr>';
   h+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${v}</td>`).join('')+'</tr>').join('');
   $('rowtable').innerHTML=h;
-  toast('Shannon calculado','good');
+  toast(t('Shannon computed'),'good');
 }
 async function runReduce(){
   const cols=[...$('numCols').querySelectorAll('input:checked')].map(i=>i.value);
-  if(cols.length<2){ toast('Selecione ≥2 colunas','bad'); return; }
-  const btn=$('reduceBtn'); btn.textContent='Rodando…'; btn.disabled=true;
+  if(cols.length<2){ toast(t('Select ≥2 columns'),'bad'); return; }
+  const btn=$('reduceBtn'); btn.textContent=t('Running…'); btn.disabled=true;
   const r=await window.pywebview.api.reduce(cols,$('method').value);
-  btn.textContent='Rodar redução'; btn.disabled=false;
+  btn.textContent=t('Run reduction'); btn.disabled=false;
   if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
-  onData(r); toast('Novas colunas: '+r.new.join(', '),'good');
+  onData(r); toast(t('New columns: ')+r.new.join(', '),'good');
 }
 async function runTest(){
   const out=await window.pywebview.api.compare_groups($('testVal').value,$('testGrp').value);
@@ -1048,43 +1393,43 @@ async function runTest(){
 }
 async function rankPairs(){
   const grp=$('pairGrp').value;
-  if(!grp){ toast('Escolha a coluna de grupo','bad'); return; }
-  const btn=$('pairBtn'); btn.textContent='Calculando…'; btn.disabled=true;
+  if(!grp){ toast(t('Choose the group column'),'bad'); return; }
+  const btn=$('pairBtn'); btn.textContent=t('Computing…'); btn.disabled=true;
   const r=await window.pywebview.api.rank_pairs(grp);
-  btn.textContent='Ranquear pares'; btn.disabled=false;
-  if(!r){ toast('Carregue um CSV','bad'); return; }
+  btn.textContent=t('Rank pairs'); btn.disabled=false;
+  if(!r){ toast(t('Load a CSV'),'bad'); return; }
   if(r.error){ toast(r.error,'bad'); return; }
   $('rowinfo').style.display='block';
-  $('rowinfo').querySelector('h4').textContent='Melhores pares — separação de "'+grp+'"';
+  $('rowinfo').querySelector('h4').textContent=t('Best pairs — separation of ')+'"'+grp+'"';
   let h='<tr>'+r.columns.map(c=>`<td style="color:var(--mut)"><b>${c}</b></td>`).join('')+'</tr>';
   h+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${v}</td>`).join('')+'</tr>').join('');
   $('rowtable').innerHTML=h;
-  toast('Pares ranqueados — melhor no topo','good');
+  toast(t('Pairs ranked — best on top'),'good');
 }
 
-/* ---------- cores por grupo (color picker exato) ---------- */
+/* ---------- per-group colors (exact color picker) ---------- */
 function renderGroupColorPickers(){
   const m=STYLE.colors||{}; const cats=Object.keys(m);
   $('groupColors').innerHTML = cats.length ? cats.map(c=>{
     const safe=c.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     return `<div class="colorrow"><input type="color" value="${m[c]}" oninput="setGroupColor('${safe}',this.value)"><span style="color:var(--mut)">${c}</span></div>`;
-  }).join('') : '<span style="color:var(--faint);font-size:11px">Carregue os grupos para escolher cada cor.</span>';
+  }).join('') : '<span style="color:var(--faint);font-size:11px">'+t('Load the groups to pick each color.')+'</span>';
   $('clearColorsBtn').style.display = cats.length ? 'block' : 'none';
 }
 async function loadGroupColors(){
   const hueSel=$('plotConfig').querySelector('[data-ch="hue"]');
   const col=(hueSel&&hueSel.value)||($('plotConfig').querySelector('[data-ch="x"]')||{}).value;
-  if(!col){ toast('Defina X ou hue primeiro','bad'); return; }
+  if(!col){ toast(t('Set X or hue first'),'bad'); return; }
   const palSel=$('plotConfig').querySelector('[data-pp="palette"]');
   const m=await window.pywebview.api.group_colors(col,(palSel&&palSel.value)||'viridis');
-  if(!m||!Object.keys(m).length){ toast('Sem categorias no grupo','bad'); return; }
-  STYLE.colors = STYLE.colors ? {...m, ...STYLE.colors} : m;   // pré-preenche mantendo escolhas manuais
+  if(!m||!Object.keys(m).length){ toast(t('No categories in the group'),'bad'); return; }
+  STYLE.colors = STYLE.colors ? {...m, ...STYLE.colors} : m;   // pre-fill, keeping manual choices
   renderGroupColorPickers(); dRender();
 }
 function setGroupColor(cat,hex){ (STYLE.colors=STYLE.colors||{})[cat]=hex; dRender(); }
 function clearColors(){ STYLE.colors=null; renderGroupColorPickers(); dRender(); }
 
-/* ---------- linhas de limiar & regiões ---------- */
+/* ---------- threshold lines & regions ---------- */
 function lineDesc(l){
   const a=((l.angle%180)+180)%180;
   if(Math.abs(a-90)<1e-9) return `vertical x=${(+l.x).toFixed(3)}`;
@@ -1097,84 +1442,84 @@ function renderLineList(){
     return `<div style="margin-bottom:8px">
        <div class="row2" style="align-items:center;justify-content:space-between">
          <span style="color:var(--mut)"><span style="color:${l.color}">●</span> L${i+1}: <span id="lnDesc${i}">${lineDesc(l)}</span></span>
-         <button class="btn sm ghost" style="width:auto;padding:3px 8px" onclick="removeLine(${i})">remover</button>
+         <button class="btn sm ghost" style="width:auto;padding:3px 8px" onclick="removeLine(${i})">${t('remove')}</button>
        </div>
        <div class="row2" style="align-items:center;gap:6px;margin-top:3px">
-         <span style="color:var(--faint);font-size:11px">ângulo</span>
+         <span style="color:var(--faint);font-size:11px">${t('angle')}</span>
          <input type="range" min="0" max="179" step="1" value="${a}" oninput="setLineAngle(${i},this.value)" style="flex:1">
          <span id="lnAngVal${i}" style="color:var(--mut);min-width:34px;text-align:right;font-size:11px">${a}°</span>
        </div>
      </div>`;
-  }).join('') : 'nenhuma linha';
+  }).join('') : t('no lines');
 }
 function setLineAngle(i,v){
   LINES[i].angle=+v;
   const av=document.getElementById('lnAngVal'+i); if(av) av.textContent=Math.round(+v)+'°';
   const dv=document.getElementById('lnDesc'+i); if(dv) dv.textContent=lineDesc(LINES[i]);
-  if(gateMode) drawGateSVG();          // overlay instantâneo
-  liveRender();                        // matplotlib ao vivo (coalescido), não só no soltar
+  if(gateMode) drawGateSVG();          // instant overlay
+  liveRender();                        // live matplotlib (coalesced), not only on release
 }
 function lineTypeUI(){
   const t=$('lnType').value;
   $('lnX').disabled = (t==='horizontal');
   $('lnY').disabled = (t==='vertical');
-  $('lnAng').disabled = (t!=='inclinada');
+  $('lnAng').disabled = (t!=='slanted');
 }
 function addLine(){
   const t=$('lnType').value;
   const x=parseFloat($('lnX').value), y=parseFloat($('lnY').value);
   const xl=LASTRENDER?LASTRENDER.xlim:null, yl=LASTRENDER?LASTRENDER.ylim:null;
   let a, ax, ay;
-  if(t==='vertical'){ a=90; if(isNaN(x)){ toast('Linha vertical precisa de X','bad'); return; }
-    ax=x; ay=yl?(yl[0]+yl[1])/2:0; }                       // âncora no meio do Y (pivô central)
-  else if(t==='horizontal'){ a=0; if(isNaN(y)){ toast('Linha horizontal precisa de Y','bad'); return; }
-    ax=xl?(xl[0]+xl[1])/2:0; ay=y; }                        // âncora no meio do X
-  else { a=parseFloat($('lnAng').value)||0; if(isNaN(x)||isNaN(y)){ toast('Linha inclinada precisa de X e Y','bad'); return; }
+  if(t==='vertical'){ a=90; if(isNaN(x)){ toast(t('A vertical line needs X'),'bad'); return; }
+    ax=x; ay=yl?(yl[0]+yl[1])/2:0; }                       // anchor at mid-Y (central pivot)
+  else if(t==='horizontal'){ a=0; if(isNaN(y)){ toast(t('A horizontal line needs Y'),'bad'); return; }
+    ax=xl?(xl[0]+xl[1])/2:0; ay=y; }                        // anchor at mid-X
+  else { a=parseFloat($('lnAng').value)||0; if(isNaN(x)||isNaN(y)){ toast(t('A slanted line needs X and Y'),'bad'); return; }
     ax=x; ay=y; }
   LINES.push({x:ax, y:ay, angle:a, color:$('lnColor').value});
   renderLineList(); render();
-  if(!gateMode) toast('Linha adicionada — ajuste o ângulo no slider ou arraste no gráfico','good');
+  if(!gateMode) toast(t('Line added — adjust the angle on the slider or drag it on the plot'),'good');
 }
 function removeLine(i){ LINES.splice(i,1); renderLineList(); dRender(); }
 function toggleLinePick(){
   linePick=!linePick; $('lnPickBtn').classList.toggle('act',linePick);
-  if(linePick) toast('Clique no gráfico para pegar X,Y');
+  if(linePick) toast(t('Click the plot to pick X,Y'));
 }
 async function analyzeRegions(){
-  if(!LINES.length){ toast('Adicione ao menos uma linha','bad'); return; }
+  if(!LINES.length){ toast(t('Add at least one line'),'bad'); return; }
   const m={}; $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>m[s.dataset.ch]=s.value||null);
-  if(!m.x||!m.y){ toast('Configure X e Y na aba Gráfico','bad'); return; }
+  if(!m.x||!m.y){ toast(t('Set X and Y in the Plot tab'),'bad'); return; }
   const r=await window.pywebview.api.region_stats(m.x,m.y,m.hue,LINES);
-  if(!r){ toast('Carregue um CSV','bad'); return; }
+  if(!r){ toast(t('Load a CSV'),'bad'); return; }
   if(r.error){ toast(r.error,'bad'); return; }
   $('rowinfo').style.display='block';
-  $('rowinfo').querySelector('h4').textContent='Regiões — observações por área (Grupos ≥2 = sobreposição)';
+  $('rowinfo').querySelector('h4').textContent=t('Regions — observations per area (Groups ≥2 = overlap)');
   let h='<tr>'+r.columns.map(c=>`<td style="color:var(--mut)"><b>${c}</b></td>`).join('')+'</tr>';
   h+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${v}</td>`).join('')+'</tr>').join('');
   $('rowtable').innerHTML=h;
-  toast('Regiões analisadas','good');
+  toast(t('Regions analyzed'),'good');
 }
 async function generateGatesFromLines(){
-  if(!LINES.length){ toast('Adicione retas primeiro','bad'); return; }
-  if(!LASTRENDER){ toast('Plote o gráfico primeiro','bad'); return; }
+  if(!LINES.length){ toast(t('Add lines first'),'bad'); return; }
+  if(!LASTRENDER){ toast(t('Plot the figure first'),'bad'); return; }
   const r=await window.pywebview.api.gates_from_lines(LINES, LASTRENDER.xlim, LASTRENDER.ylim);
-  if(!r){ toast('Carregue um CSV','bad'); return; }
+  if(!r){ toast(t('Load a CSV'),'bad'); return; }
   if(r.error){ toast(r.error,'bad'); return; }
   GATES=r.gates; LINES=[]; renderGateList(); renderLineList(); enableGateMode(true); render(); countGates();
-  toast(GATES.length+' regiões geradas (as retas viraram as bordas) — renomeie iguais p/ mesclar','good');
+  toast(GATES.length+' regions built (the lines became the borders) — rename matching ones to merge','good');
 }
 async function mergeGates(){
-  if(GATES.length<2){ toast('Precisa de ao menos 2 regiões','bad'); return; }
+  if(GATES.length<2){ toast(t('Need at least 2 regions'),'bad'); return; }
   const names=GATES.map(g=>g.name);
-  if(new Set(names).size===names.length){ toast('Dê o mesmo nome a 2+ regiões antes de mesclar','bad'); return; }
+  if(new Set(names).size===names.length){ toast(t('Give the same name to 2+ regions before merging'),'bad'); return; }
   const r=await window.pywebview.api.merge_gates(GATES);
-  if(!r){ toast('Carregue um CSV','bad'); return; }
+  if(!r){ toast(t('Load a CSV'),'bad'); return; }
   if(r.error){ toast(r.error,'bad'); return; }
   GATES=r.gates; renderGateList(); render(); countGates();
-  toast('Regiões de mesmo nome unidas num polígono só','good');
+  toast(t('Same-named regions merged into a single polygon'),'good');
 }
 
-/* ===================== REGIÕES POLIGONAIS (gates arrastáveis) ===================== */
+/* ===================== POLYGONAL REGIONS (draggable gates) ===================== */
 function gScale(){ return $('plot').clientWidth/LASTRENDER.imgW; }
 function dataToDisp(dx,dy){
   const A=LASTRENDER.axes,xl=LASTRENDER.xlim,yl=LASTRENDER.ylim,s=gScale(),img=$('plot');
@@ -1193,12 +1538,12 @@ function cardXY(e){ const rc=$('card').getBoundingClientRect(); return [e.client
 function dataFrac(dx,dy){ const xl=LASTRENDER.xlim,yl=LASTRENDER.ylim; return [(dx-xl[0])/(xl[1]-xl[0]),(dy-yl[0])/(yl[1]-yl[0])]; }
 function toggleGatesLock(){
   gatesLocked=$('gatesLock').checked;
-  toast(gatesLocked?'Regiões travadas: mantêm a posição ao trocar X/Y':'Regiões destravadas','good');
+  toast(gatesLocked?'Regions locked: they keep their position when swapping X/Y':'Regions unlocked','good');
 }
 
 function placeGates(r){
   const svg=$('gateLayer'), card=$('card');
-  if(!gateMode || !LASTRENDER){ svg.style.display='none'; return; }
+  if(!gateMode || !gatesVisible() || !LASTRENDER){ svg.style.display='none'; return; }
   svg.style.display='block';
   svg.setAttribute('width', card.clientWidth); svg.setAttribute('height', card.clientHeight);
   drawGateSVG();
@@ -1220,7 +1565,7 @@ function drawGateSVG(){
     if(g.name) h+=`<text x="${lab[0].toFixed(1)}" y="${lab[1].toFixed(1)}" fill="${g.color}" font-size="12" font-weight="bold" text-anchor="middle"
           style="pointer-events:auto;cursor:move" onpointerdown="labelDown(event,${gi})">${g.name}</text>`;
   });
-  LINES.forEach((l,li)=>{                       // linhas de limiar arrastáveis
+  LINES.forEach((l,li)=>{                       // draggable threshold lines
     const ep=lineEndpointsDisp(l); if(!ep) return;
     h+=`<line x1="${ep[0][0].toFixed(1)}" y1="${ep[0][1].toFixed(1)}" x2="${ep[1][0].toFixed(1)}" y2="${ep[1][1].toFixed(1)}"
           stroke="${l.color}" stroke-width="2.4" stroke-dasharray="7 4" opacity="0.9"
@@ -1239,7 +1584,7 @@ function lineEndpointsDisp(l){
   else{
     const m=Math.tan(aa*Math.PI/180);
     let xa=xl[0], xb=xl[1], ya=l.y+m*(xa-l.x), yb=l.y+m*(xb-l.x);
-    if(m!==0){                                                      // recorta à caixa do eixo
+    if(m!==0){                                                      // clip to the axes box
       if(ya<yl[0]){ ya=yl[0]; xa=l.x+(ya-l.y)/m; } else if(ya>yl[1]){ ya=yl[1]; xa=l.x+(ya-l.y)/m; }
       if(yb<yl[0]){ yb=yl[0]; xb=l.x+(yb-l.y)/m; } else if(yb>yl[1]){ yb=yl[1]; xb=l.x+(yb-l.y)/m; }
     }
@@ -1247,35 +1592,35 @@ function lineEndpointsDisp(l){
   }
   return [dataToDisp(pa[0],pa[1]), dataToDisp(pb[0],pb[1])];
 }
-function lineHandleDisp(l){                       // alça num ponto pegável
+function lineHandleDisp(l){                       // grab handle at a pickable point
   const xl=LASTRENDER.xlim, yl=LASTRENDER.ylim, aa=lineAng(l);
-  if(Math.abs(aa-90)<1e-9) return dataToDisp(l.x, (yl[0]+yl[1])/2);   // vertical: meio do Y
-  if(aa===0) return dataToDisp((xl[0]+xl[1])/2, l.y);                 // horizontal: meio do X
-  return dataToDisp(l.x, l.y);                                        // inclinada: o anchor
+  if(Math.abs(aa-90)<1e-9) return dataToDisp(l.x, (yl[0]+yl[1])/2);   // vertical: mid-Y
+  if(aa===0) return dataToDisp((xl[0]+xl[1])/2, l.y);                 // horizontal: mid-X
+  return dataToDisp(l.x, l.y);                                        // slanted: the anchor
 }
 function lineDown(e,li){ e.stopPropagation(); gateDrag={type:'line',li}; }
 function gateVertDown(e,gi,vi){ e.stopPropagation(); gateDrag={type:'vert',gi,vi}; }
 function gateBodyDown(e,gi){ const [dx,dy]=dispToData(...cardXY(e)); gateDrag={type:'body',gi,last:[dx,dy]}; }
 function labelDown(e,gi){ e.stopPropagation(); gateDrag={type:'label',gi}; }
-function snapToSpine(x,y){           // gruda na borda do eixo (spine) quando perto
+function snapToSpine(x,y){           // snap to the axes border (spine) when close
   const xl=LASTRENDER.xlim, yl=LASTRENDER.ylim;
   const sx=Math.abs(xl[1]-xl[0])*0.03, sy=Math.abs(yl[1]-yl[0])*0.03;
   if(Math.abs(x-xl[0])<sx) x=xl[0]; else if(Math.abs(x-xl[1])<sx) x=xl[1];
   if(Math.abs(y-yl[0])<sy) y=yl[0]; else if(Math.abs(y-yl[1])<sy) y=yl[1];
   return [x,y];
 }
-function _projSeg(px,py,a,b){        // ponto mais próximo no segmento a-b (em pixels)
+function _projSeg(px,py,a,b){        // closest point on segment a-b (in pixels)
   const vx=b[0]-a[0], vy=b[1]-a[1], L2=vx*vx+vy*vy;
   let t = L2 ? ((px-a[0])*vx+(py-a[1])*vy)/L2 : 0; t=Math.max(0,Math.min(1,t));
   const x=a[0]+t*vx, y=a[1]+t*vy; return {x,y,d:Math.hypot(x-px,y-py)};
 }
-// ímã: gruda no vértice (prioridade) ou na aresta de OUTRA região, dentro de ~11px
+// magnet: snap to a vertex (priority) or to the edge of ANOTHER region, within ~11px
 function magnetSnap(px,py,exclude){
   const TH=11; let bestV=null, bd=TH;
   GATES.forEach((g,gi)=>{ if(gi===exclude) return;
     g.points.forEach(p=>{ const q=dataToDisp(p[0],p[1]); const d=Math.hypot(q[0]-px,q[1]-py);
       if(d<bd){ bd=d; bestV=[p[0],p[1]]; } }); });
-  if(bestV) return bestV;                       // vértice exato -> ponto compartilhado
+  if(bestV) return bestV;                       // exact vertex -> shared point
   let bestE=null; bd=TH;
   GATES.forEach((g,gi)=>{ if(gi===exclude) return;
     const dp=g.points.map(p=>dataToDisp(p[0],p[1]));
@@ -1289,40 +1634,41 @@ document.addEventListener('pointermove',e=>{
   const cp=cardXY(e); const [dx,dy]=dispToData(cp[0],cp[1]);
   if(gateDrag.type==='vert'){
     let pt = ($('gateMagnet')&&$('gateMagnet').checked) ? magnetSnap(cp[0],cp[1],gateDrag.gi) : null;
-    if(!pt) pt = snapToSpine(dx,dy);            // sem ímã -> tenta grudar na spine
+    if(!pt) pt = snapToSpine(dx,dy);            // no magnet -> try snapping to the spine
     GATES[gateDrag.gi].points[gateDrag.vi]=[+pt[0].toFixed(4),+pt[1].toFixed(4)]; }
   else if(gateDrag.type==='body'){ const g=GATES[gateDrag.gi], ddx=dx-gateDrag.last[0], ddy=dy-gateDrag.last[1];
     g.points=g.points.map(p=>[+(p[0]+ddx).toFixed(4),+(p[1]+ddy).toFixed(4)]); gateDrag.last=[dx,dy]; }
   else if(gateDrag.type==='label'){ GATES[gateDrag.gi].labelxy=[+dx.toFixed(4),+dy.toFixed(4)]; }
   else if(gateDrag.type==='line'){ const l=LINES[gateDrag.li], aa=lineAng(l);
-    if(Math.abs(aa-90)<1e-9){ l.x=+dx.toFixed(4); }            // vertical: só move X
-    else if(aa===0){ l.y=+dy.toFixed(4); }                     // horizontal: só move Y
-    else { l.x=+dx.toFixed(4); l.y=+dy.toFixed(4); } }         // inclinada: move o anchor
+    if(Math.abs(aa-90)<1e-9){ l.x=+dx.toFixed(4); }            // vertical: only X moves
+    else if(aa===0){ l.y=+dy.toFixed(4); }                     // horizontal: only Y moves
+    else { l.x=+dx.toFixed(4); l.y=+dy.toFixed(4); } }         // slanted: move the anchor
   drawGateSVG();
 });
 document.addEventListener('pointerup',()=>{ if(!gateDrag) return; const t=gateDrag.type; gateDrag=null; render(); if(t==='line') renderLineList(); else if(t!=='label') countGates(); });
 
-function gatePolyDbl(e,gi){                 // duplo-clique no corpo: insere vértice
+function gatePolyDbl(e,gi){                 // double-click on the body: insert a vertex
   e.stopPropagation(); const [dx,dy]=dispToData(...cardXY(e)); const g=GATES[gi];
   let best=0,bd=Infinity; g.points.forEach((p,k)=>{const d=(p[0]-dx)**2+(p[1]-dy)**2; if(d<bd){bd=d;best=k;}});
   g.points.splice(best+1,0,[+dx.toFixed(4),+dy.toFixed(4)]); drawGateSVG(); render(); countGates();
 }
-function gateVertDel(e,gi,vi){             // duplo-clique OU botão-direito no vértice: remove (mín. 3)
+function gateVertDel(e,gi,vi){             // double-click OR right-click a vertex: remove it (min. 3)
   e.preventDefault(); e.stopPropagation();
   if(GATES[gi].points.length>3){ GATES[gi].points.splice(vi,1); drawGateSVG(); render(); countGates(); }
-  else toast('Um polígono precisa de ao menos 3 vértices','bad');
+  else toast(t('A polygon needs at least 3 vertices'),'bad');
 }
 function toggleGateMode(){ enableGateMode(!gateMode); }
 function enableGateMode(on){
+  if(on && !gatesVisible()){ toast(t('Turn "Show regions" back on to edit them'),'bad'); return; }
   gateMode=on;
   document.querySelectorAll('.editModeBtn').forEach(b=>{
     b.classList.toggle('act',on);
-    b.textContent = on?'Editando — arraste no gráfico (clique p/ sair)':'Editar no gráfico (arrastar regiões/linhas)';
+    b.textContent = on? t('Editing — drag on the plot (click to exit)') : t('Edit on the plot (drag regions/lines)');
   });
   placeGates(LASTRENDER);
 }
 function addGate(){
-  if(!LASTRENDER){ toast('Plote um gráfico primeiro','bad'); return; }
+  if(!LASTRENDER){ toast(t('Plot a figure first'),'bad'); return; }
   const xl=LASTRENDER.xlim,yl=LASTRENDER.ylim;
   const gx0=xl[0]+(xl[1]-xl[0])*0.38, gx1=xl[0]+(xl[1]-xl[0])*0.62;
   const gy0=yl[0]+(yl[1]-yl[0])*0.38, gy1=yl[0]+(yl[1]-yl[0])*0.62;
@@ -1336,37 +1682,37 @@ function renderGateList(){
        <span style="color:${g.color};font-size:14px">●</span>
        <input type="text" value="${(g.name||'').replace(/"/g,'&quot;')}" oninput="renameGate(${i},this.value)" style="flex:1;padding:3px 6px">
        <button class="btn sm ghost" style="width:auto;padding:3px 8px" onclick="removeGate(${i})">✕</button>
-     </div>`).join('') : '<span style="color:var(--faint);font-size:11px">nenhuma região — adicione e arraste no gráfico</span>';
+     </div>`).join('') : '<span style="color:var(--faint);font-size:11px">'+t('no regions — add one and drag it on the plot')+'</span>';
   refreshGateExportSel();
 }
 function refreshGateExportSel(){
   const box=$('gateExportList'); if(!box) return;
-  const prev={}; box.querySelectorAll('input').forEach(c=>prev[c.value]=c.checked);   // preserva marcações
+  const prev={}; box.querySelectorAll('input').forEach(c=>prev[c.value]=c.checked);   // keep the checkmarks
   const names=[...new Set(GATES.map(g=>g.name).filter(Boolean))];
-  if(!names.length){ box.innerHTML='<span style="color:var(--faint);font-size:11px">nomeie as regiões para poder exportar por gating</span>'; return; }
+  if(!names.length){ box.innerHTML='<span style="color:var(--faint);font-size:11px">'+t('name the regions to export by gating')+'</span>'; return; }
   box.innerHTML = names.map(n=>{
-    const v=n.replace(/"/g,'&quot;'), ck=(n in prev)?prev[n]:true;     // novas entram marcadas
+    const v=n.replace(/"/g,'&quot;'), ck=(n in prev)?prev[n]:true;     // new ones start checked
     return `<label class="check" style="margin:2px 0"><input type="checkbox" value="${v}" ${ck?'checked':''}> ${n.replace(/</g,'&lt;')}</label>`;
   }).join('');
 }
 function _expAxes(){ const m={}; $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>m[s.dataset.ch]=s.value||null); return m; }
 async function exportGated(){
-  if(!GATES.length){ toast('Crie ao menos uma região','bad'); return; }
+  if(!GATES.length){ toast(t('Create at least one region'),'bad'); return; }
   const sel=[...$('gateExportList').querySelectorAll('input:checked')].map(c=>c.value);
-  if(!sel.length){ toast('Marque ao menos uma região','bad'); return; }
-  const m=_expAxes(); if(!m.x||!m.y){ toast('Configure X e Y na aba Gráfico','bad'); return; }
+  if(!sel.length){ toast(t('Check at least one region'),'bad'); return; }
+  const m=_expAxes(); if(!m.x||!m.y){ toast(t('Set X and Y in the Plot tab'),'bad'); return; }
   const per=$('gateExportPer').checked;
   const r=await window.pywebview.api.export_gated(m.x,m.y,GATES,sel,$('gateExportFmt').value,per);
   if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
-  if(r.per_region) toast(`${r.files.length} arquivos (${r.n} obs.) salvos em ${r.folder}`,'good');
-  else toast(`${r.n} de ${r.total} observações (${sel.length} região${sel.length>1?'es':''}) → ${r.path}`,'good');
+  if(r.per_region) toast(`${r.files.length} files (${r.n} obs.) saved in ${r.folder}`,'good');
+  else toast(`${r.n} of ${r.total} observations (${sel.length} region${sel.length>1?'s':''}) → ${r.path}`,'good');
 }
 async function exportGatedAll(){
-  if(!GATES.length){ toast('Crie ao menos uma região','bad'); return; }
-  const m=_expAxes(); if(!m.x||!m.y){ toast('Configure X e Y na aba Gráfico','bad'); return; }
+  if(!GATES.length){ toast(t('Create at least one region'),'bad'); return; }
+  const m=_expAxes(); if(!m.x||!m.y){ toast(t('Set X and Y in the Plot tab'),'bad'); return; }
   const r=await window.pywebview.api.export_gated(m.x,m.y,GATES,'__ALL__',$('gateExportFmt').value);
   if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
-  toast(`${r.total} observações com coluna Região → ${r.path}`,'good');
+  toast(`${r.total} observations with a Region column → ${r.path}`,'good');
 }
 function renameGate(i,v){ GATES[i].name=v; drawGateSVG(); dRender(); countGates(); refreshGateExportSel(); }
 function removeGate(i){ GATES.splice(i,1); renderGateList(); render(); countGates(); }
@@ -1377,7 +1723,7 @@ async function countGates(){
   const r=await window.pywebview.api.gate_stats(m.x,m.y,m.hue,GATES);
   if(!r||r.error) return;
   $('rowinfo').style.display='block';
-  $('rowinfo').querySelector('h4').textContent='Regiões — contagem ao vivo (Grupos ≥2 = sobreposição)';
+  $('rowinfo').querySelector('h4').textContent=t('Regions — live count (Groups ≥2 = overlap)');
   let h='<tr>'+r.columns.map(c=>`<td style="color:var(--mut)"><b>${c}</b></td>`).join('')+'</tr>';
   h+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${v}</td>`).join('')+'</tr>').join('');
   $('rowtable').innerHTML=h;
@@ -1389,20 +1735,20 @@ function refreshColsKeepConfig(r){
   $('plotConfig').querySelectorAll('[data-ch],[data-pp]').forEach(s=>{ const k=(s.dataset.ch?'c:'+s.dataset.ch:'p:'+s.dataset.pp); if(snap[k]!==undefined) s.value=snap[k]; });
 }
 async function saveRegions(){
-  if(!GATES.length && !LINES.length){ toast('Nada para salvar — adicione regiões ou linhas','bad'); return; }
+  if(!GATES.length && !LINES.length){ toast(t('Nothing to save — add regions or lines'),'bad'); return; }
   const m={}; $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>m[s.dataset.ch]=s.value||null);
   const xlim=LASTRENDER?LASTRENDER.xlim:null, ylim=LASTRENDER?LASTRENDER.ylim:null;
   const r=await window.pywebview.api.save_regions({gates:GATES, lines:LINES, x:m.x, y:m.y, xlim, ylim});
-  if(r) toast('Regiões salvas: '+r,'good');
+  if(r) toast(t('Regions saved: ')+r,'good');
 }
 async function loadRegions(){
   const r=await window.pywebview.api.load_regions();
   if(!r) return;
   if(r.error){ toast(r.error,'bad'); return; }
   let gates=r.gates||[], lines=r.lines||[];
-  if($('loadByFrac').checked){                    // reposiciona pela proporção do gráfico
-    if(!LASTRENDER){ toast('Plote um gráfico antes de carregar por fração','bad'); return; }
-    if(!r.xlim||!r.ylim){ toast('Arquivo sem escala de origem — carregado em coordenada de dado','bad'); }
+  if($('loadByFrac').checked){                    // reposition by the plot proportion
+    if(!LASTRENDER){ toast(t('Plot a figure before loading by fraction'),'bad'); return; }
+    if(!r.xlim||!r.ylim){ toast(t('File without a source scale — loaded in data coordinates'),'bad'); }
     else{
       const [sx0,sx1]=r.xlim, [sy0,sy1]=r.ylim, [cx0,cx1]=LASTRENDER.xlim, [cy0,cy1]=LASTRENDER.ylim;
       const FX=x=>+(cx0+((x-sx0)/(sx1-sx0))*(cx1-cx0)).toFixed(4);
@@ -1415,101 +1761,201 @@ async function loadRegions(){
   GATES=gates; LINES=lines;
   renderGateList(); renderLineList(); render(); countGates();
   const m={}; $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>m[s.dataset.ch]=s.value||null);
-  if($('loadByFrac').checked) toast('Regiões carregadas pela proporção do gráfico','good');
+  if($('loadByFrac').checked) toast(t('Regions loaded by the plot proportion'),'good');
   else if((r.x&&m.x&&r.x!==m.x)||(r.y&&m.y&&r.y!==m.y))
-    toast(`Atenção: regiões feitas p/ X=${r.x}, Y=${r.y}; seu gráfico usa X=${m.x}, Y=${m.y}. Confira se os eixos batem.`,'bad');
-  else toast('Regiões carregadas','good');
+    toast(`Warning: regions were made for X=${r.x}, Y=${r.y}; your plot uses X=${m.x}, Y=${m.y}. Check that the axes match.`,'bad');
+  else toast(t('Regions loaded'),'good');
 }
 async function createRegionColumn(){
-  if(!GATES.length){ toast('Adicione ao menos uma região','bad'); return; }
+  if(!GATES.length){ toast(t('Add at least one region'),'bad'); return; }
   const m={}; $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>m[s.dataset.ch]=s.value||null);
-  if(!m.x||!m.y){ toast('Configure X e Y na aba Gráfico','bad'); return; }
-  const name=$('gateColName').value.trim()||'Região';
+  if(!m.x||!m.y){ toast(t('Set X and Y in the Plot tab'),'bad'); return; }
+  const name=$('gateColName').value.trim()||'Region';
   const r=await window.pywebview.api.make_region_column(m.x,m.y,GATES,name);
-  if(!r){ toast('Carregue um CSV','bad'); return; }
+  if(!r){ toast(t('Load a CSV'),'bad'); return; }
   if(r.error){ toast(r.error,'bad'); return; }
   refreshColsKeepConfig(r);
-  toast('Coluna "'+(r.created||name)+'" criada — já dá pra usar como hue/eixo','good');
+  toast(t('Column created: ')+(r.created||name),'good');
 }
 
 /* ----- export ----- */
 async function exportFig(){
-  if(!STACK.length){ toast('Plote algo primeiro','bad'); return; }
+  if(!STACK.length){ toast(t('Plot something first'),'bad'); return; }
   const r=await window.pywebview.api.export_figure(gather());
-  if(r && r.error) toast(r.error,'bad'); else if(r) toast('Salvo: '+r,'good');
+  if(r && r.error) toast(r.error,'bad'); else if(r) toast(t('Saved: ')+r,'good');
 }
 async function exportCsv(){
   const r=await window.pywebview.api.export_csv();
-  if(r) toast('CSV salvo','good');
+  if(r) toast(t('CSV saved'),'good');
 }
 
-let rz=null; window.addEventListener('resize',()=>{ if(rz)clearTimeout(rz); rz=setTimeout(render,200); });
+let rz=null; window.addEventListener('resize',()=>{ if(rz)clearTimeout(rz);
+  rz=setTimeout(()=>{ if(PANELRENDER) buildPanel(); else render(); },200); });
 
-/* ---------- aba avançado: setup ---------- */
+/* ---------- advanced tab: setup ---------- */
 function buildAdvanced(){
   $('advCols').innerHTML = COLS.numeric.length
     ? COLS.numeric.map(c=>`<label class="check"><input type="checkbox" value="${c}"> ${c}</label>`).join('')
-    : '<span style="color:var(--faint)">sem colunas numéricas</span>';
+    : '<span style="color:var(--faint)">'+t('no numeric columns')+'</span>';
   $('advHue').innerHTML = '<option value="">—</option>'+COLS.category.map(c=>`<option>${c}</option>`).join('');
-  $('tblGrp').innerHTML = '<option value="">(sem grupo)</option>'+COLS.category.map(c=>`<option>${c}</option>`).join('');
+  $('tblGrp').innerHTML = '<option value="">'+t('(no group)')+'</option>'+COLS.category.map(c=>`<option>${c}</option>`).join('');
   buildReshape();
 }
 function advSelectedCols(){ return [...$('advCols').querySelectorAll('input:checked')].map(i=>i.value); }
 function showImage(dataUrl){
   const img=$('plot'); img.src=dataUrl; img.style.display='block'; $('empty').style.display='none';
-  $('legendBox').style.display='none'; LASTRENDER=null;   // figuras avançadas não têm arraste/pick
+  $('legendBox').style.display='none'; $('gateLayer').style.display='none';
+  LASTRENDER=null;   // advanced/panel figures have no drag/pick
+}
+function selectAllNumCols(on){
+  const boxes=$('numCols').querySelectorAll('input[type=checkbox]');
+  if(!boxes.length){ toast(t('Load a CSV first'),'bad'); return; }
+  boxes.forEach(b=>b.checked=!!on);
 }
 
-/* ---------- painel multi-figura ---------- */
-let PANEL=[];
-function addPanelItem(){
-  if(!STACK.length){ toast('Monte um gráfico primeiro','bad'); return; }
-  const base=STACK[0];
-  PANEL.push({spec_key:base.spec_key, mapping:base.mapping, params:base.params,
-              title:'('+String.fromCharCode(65+PANEL.length)+') '+CATALOG.find(s=>s.key===base.spec_key).label});
-  renderPanelList();
+/* ---------- multi-figure panel (per-frame labels + draggable sizes) ---------- */
+let PANEL=[], PANEL_W=[], PANEL_H=[], PANELRENDER=null, panelDrag=null;
+
+function panelGrid(){
+  const ncols=Math.max(1, parseInt($('ncols').value)||2);
+  const nrows=Math.max(1, Math.ceil(PANEL.length/ncols));
+  return {ncols, nrows};
 }
-function renderPanelList(){ $('panelList').textContent = PANEL.length? PANEL.map(p=>p.title).join('\n') : 'painel vazio'; }
-function clearPanel(){ PANEL=[]; renderPanelList(); }
+// Keep one ratio per column/row, preserving what the user already dragged.
+function ensurePanelGrid(){
+  const {ncols,nrows}=panelGrid();
+  const fit=(arr,n)=>{ const out=arr.slice(0,n); while(out.length<n) out.push(1); return out; };
+  PANEL_W=fit(PANEL_W,ncols); PANEL_H=fit(PANEL_H,nrows);
+}
+function onPanelGridChange(){ ensurePanelGrid(); if(PANELRENDER) buildPanel(); }
+function resetPanelSizes(){
+  PANEL_W=[]; PANEL_H=[]; ensurePanelGrid();
+  if(PANELRENDER) buildPanel();
+  toast(t('Panel sizes reset'),'good');
+}
+
+function addPanelItem(){
+  if(!STACK.length){ toast(t('Build a plot first'),'bad'); return; }
+  const base=STACK[0];
+  const label=CATALOG.find(s=>s.key===base.spec_key).label;
+  const letter=String.fromCharCode(65+PANEL.length);
+  // carry over exactly the title / axis labels typed for this plot
+  PANEL.push({spec_key:base.spec_key, mapping:base.mapping, params:base.params,
+              title:'('+letter+') '+($('title').value.trim() || label),
+              xlabel:$('xlabel').value.trim(), ylabel:$('ylabel').value.trim()});
+  ensurePanelGrid(); renderPanelList();
+}
+function renderPanelList(){
+  $('panelList').textContent = PANEL.length? PANEL.map(p=>p.title).join('\n') : t('empty panel');
+}
+function clearPanel(){ PANEL=[]; PANEL_W=[]; PANEL_H=[]; PANELRENDER=null; hidePanelLayer(); renderPanelList(); }
+
 async function buildPanel(){
-  if(!PANEL.length){ toast('Adicione ao menos um quadro','bad'); return; }
+  if(!PANEL.length){ toast(t('Add at least one frame'),'bad'); return; }
+  ensurePanelGrid();
   const r=await window.pywebview.api.render_panel(PANEL, gather());
   if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
   showImage(r.img);
+  PANELRENDER=r;
+  const img=$('plot');
+  img.onload=()=>drawPanelDividers();
+  drawPanelDividers();
 }
 async function exportPanel(){
-  if(!PANEL.length){ toast('Painel vazio','bad'); return; }
+  if(!PANEL.length){ toast(t('Empty panel'),'bad'); return; }
   const r=await window.pywebview.api.export_panel(PANEL, gather());
-  if(r && r.error) toast(r.error,'bad'); else if(r) toast('Salvo: '+r,'good');
+  if(r && r.error) toast(r.error,'bad'); else if(r) toast(t('Saved: ')+r,'good');
 }
+
+/* --- draggable dividers: they set the gridspec width/height ratios --- */
+function hidePanelLayer(){ const s=$('panelLayer'); if(s){ s.style.display='none'; s.innerHTML=''; } }
+function panelBounds(){                       // the grid region, in figure fraction
+  const R=PANELRENDER.rects;
+  return {gx0:Math.min(...R.map(r=>r[0])), gx1:Math.max(...R.map(r=>r[2])),
+          gy0:Math.min(...R.map(r=>r[1])), gy1:Math.max(...R.map(r=>r[3]))};
+}
+function panelToPx(fx,fy){                    // figure fraction (y up) -> card pixels
+  const img=$('plot'), s=img.clientWidth/PANELRENDER.imgW;
+  return [img.offsetLeft + fx*PANELRENDER.imgW*s, img.offsetTop + (1-fy)*PANELRENDER.imgH*s];
+}
+function cumFrac(arr,k){ const tot=arr.reduce((a,b)=>a+b,0); let s=0; for(let i=0;i<=k;i++) s+=arr[i]; return s/tot; }
+function drawPanelDividers(){
+  const svg=$('panelLayer'), card=$('card');
+  if(!PANELRENDER || !PANEL.length){ hidePanelLayer(); return; }
+  const {ncols,nrows}=panelGrid();
+  const {gx0,gx1,gy0,gy1}=panelBounds();
+  svg.style.display='block';
+  svg.setAttribute('width', card.clientWidth); svg.setAttribute('height', card.clientHeight);
+  let h='';
+  for(let k=0;k<ncols-1;k++){
+    const fx = gx0 + cumFrac(PANEL_W,k)*(gx1-gx0);
+    const [x,yTop]=panelToPx(fx,gy1), [,yBot]=panelToPx(fx,gy0);
+    h+=`<line x1="${x.toFixed(1)}" y1="${yTop.toFixed(1)}" x2="${x.toFixed(1)}" y2="${yBot.toFixed(1)}"
+          stroke="#7c5cff" stroke-width="7" stroke-linecap="round" opacity="0.35"
+          style="pointer-events:auto;cursor:col-resize" onpointerdown="panelDown(event,'w',${k})"/>`;
+  }
+  for(let k=0;k<nrows-1;k++){
+    const fy = gy1 - cumFrac(PANEL_H,k)*(gy1-gy0);
+    const [xL,y]=panelToPx(gx0,fy), [xR]=panelToPx(gx1,fy);
+    h+=`<line x1="${xL.toFixed(1)}" y1="${y.toFixed(1)}" x2="${xR.toFixed(1)}" y2="${y.toFixed(1)}"
+          stroke="#7c5cff" stroke-width="7" stroke-linecap="round" opacity="0.35"
+          style="pointer-events:auto;cursor:row-resize" onpointerdown="panelDown(event,'h',${k})"/>`;
+  }
+  svg.innerHTML=h;
+}
+function panelDown(e,axis,k){ e.stopPropagation(); e.preventDefault(); panelDrag={axis,k}; }
+document.addEventListener('pointermove',e=>{
+  if(!panelDrag || !PANELRENDER) return;
+  const {axis,k}=panelDrag, arr = axis==='w'? PANEL_W : PANEL_H;
+  const {gx0,gx1,gy0,gy1}=panelBounds();
+  const rc=$('card').getBoundingClientRect(), img=$('plot');
+  const s=img.clientWidth/PANELRENDER.imgW;
+  let f;
+  if(axis==='w'){
+    const fx=((e.clientX-rc.left)-img.offsetLeft)/(PANELRENDER.imgW*s);
+    f=(fx-gx0)/(gx1-gx0);
+  }else{
+    const fy=1-((e.clientY-rc.top)-img.offsetTop)/(PANELRENDER.imgH*s);
+    f=(gy1-fy)/(gy1-gy0);
+  }
+  const tot=arr.reduce((a,b)=>a+b,0);
+  let before=0; for(let i=0;i<k;i++) before+=arr[i];
+  const pair=arr[k]+arr[k+1];
+  const target=Math.max(0, Math.min(1, f))*tot;
+  const MIN=0.12*pair;
+  const a=Math.max(MIN, Math.min(pair-MIN, target-before));
+  arr[k]=a; arr[k+1]=pair-a;
+  drawPanelDividers();
+});
+document.addEventListener('pointerup',()=>{ if(panelDrag){ panelDrag=null; buildPanel(); } });
 
 /* ---------- clustermap / pairplot ---------- */
 async function genAdvanced(kind){
   const cols=advSelectedCols();
-  if(cols.length<2){ toast('Selecione ≥2 colunas','bad'); return; }
-  toast('Gerando '+kind+'…');
+  if(cols.length<2){ toast(t('Select ≥2 columns'),'bad'); return; }
+  toast(t('Generating ')+kind+'…');
   const r=await window.pywebview.api.render_advanced(kind, cols, $('advHue').value, $('zscore').checked);
   if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
   showImage(r.img);
 }
 async function exportAdvanced(){
   const r=await window.pywebview.api.export_advanced(gather());
-  if(r && r.error) toast(r.error,'bad'); else if(r) toast('Salvo: '+r,'good');
+  if(r && r.error) toast(r.error,'bad'); else if(r) toast(t('Saved: ')+r,'good');
 }
 
-/* ---------- tabela descritiva ---------- */
+/* ---------- descriptive table ---------- */
 async function genTable(){
   const r=await window.pywebview.api.describe_table($('tblGrp').value, advSelectedCols());
-  if(!r){ toast('Carregue um CSV','bad'); return; }
+  if(!r){ toast(t('Load a CSV'),'bad'); return; }
   $('rowinfo').style.display='block';
-  $('rowinfo').querySelector('h4').textContent='Estatística descritiva';
+  $('rowinfo').querySelector('h4').textContent=t('Descriptive statistics');
   let h='<tr>'+r.columns.map(c=>`<td style="color:var(--mut)"><b>${c}</b></td>`).join('')+'</tr>';
   h+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${v}</td>`).join('')+'</tr>').join('');
   $('rowtable').innerHTML=h;
 }
 async function exportTable(){
   const r=await window.pywebview.api.export_table();
-  if(r) toast('Tabela salva','good');
+  if(r) toast(t('Table saved'),'good');
 }
 </script>
 </body>

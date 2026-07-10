@@ -218,6 +218,47 @@ def _apply_legend(fig, ax, lg: Legend, fg, theme, aliases=None, auto_title="",
     return leg
 
 
+def _renderer(fig):
+    """A renderer able to measure artists, even on a figure with no attached canvas."""
+    canvas = fig.canvas
+    if not hasattr(canvas, "get_renderer"):
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        canvas = FigureCanvasAgg(fig)
+    canvas.draw()
+    return canvas.get_renderer()
+
+
+def _legend_fig_box(fig, leg):
+    """Legend bounding box in figure-fraction coordinates."""
+    bb = leg.get_window_extent(_renderer(fig))
+    inv = fig.transFigure.inverted()
+    (x0, y0) = inv.transform((bb.x0, bb.y0))
+    (x1, y1) = inv.transform((bb.x1, bb.y1))
+    return x0, y0, x1, y1
+
+
+def _fit_outside_legend(fig, ax, leg, pad=0.015):
+    """Shrink the axes until an 'outside' legend fits inside the canvas.
+
+    A fixed subplots_adjust(right=...) is not enough: the legend's width is set in
+    points, so at small figure sizes (e.g. an exact 85 mm journal column) it takes a
+    much larger fraction of the canvas and gets clipped. Measure it and give it exactly
+    the room it needs, iterating because shrinking the axes moves the legend."""
+    for _ in range(5):
+        try:
+            x0, y0, x1, y1 = _legend_fig_box(fig, leg)
+        except Exception:
+            return
+        over = x1 - (1.0 - pad)
+        if over <= 1e-3:
+            return
+        pos = ax.get_position()
+        new_x1 = max(pos.x0 + 0.15, pos.x1 - over)   # never collapse the axes entirely
+        if abs(new_x1 - pos.x1) < 1e-4:
+            return
+        ax.set_position([pos.x0, pos.y0, new_x1 - pos.x0, pos.height])
+
+
 def _fit_free_legend(fig, ax, leg, pad=0.02):
     """Shrink the axes to 'open space' wherever the (free-mode) legend sits, so it is
     never clipped -- as if it were positioned on the outside."""
@@ -348,9 +389,11 @@ def render(layers, df, *, fig=None, figsize=(7, 5), dpi=110, title="", xlabel=""
     disp = lambda c: aliases.get(c, c)
     base = layers[0].mapping
     ax.set_title(title or layers[0].spec.label, color=fg)
-    if base.get("x"):
+    # An explicit label always wins, even on plots with no such channel (a histogram
+    # has no y channel but still deserves the Y label the user typed).
+    if xlabel or base.get("x"):
         ax.set_xlabel(xlabel or disp(base["x"]), color=fg)
-    if base.get("y"):
+    if ylabel or base.get("y"):
         ax.set_ylabel(ylabel or disp(base["y"]), color=fg)
 
     will_legend = legend.show and bool(ax.get_legend_handles_labels()[0] or auto_handles)
@@ -359,8 +402,11 @@ def render(layers, df, *, fig=None, figsize=(7, 5), dpi=110, title="", xlabel=""
     else:
         fig.tight_layout()
     leg = _apply_legend(fig, ax, legend, fg, theme, aliases, auto_title, auto_handles, auto_labels)
-    if legend.pos == "free" and leg is not None and legend.fit:
-        _fit_free_legend(fig, ax, leg)
+    if leg is not None:
+        if legend.pos == "outside":
+            _fit_outside_legend(fig, ax, leg)      # never clip it, whatever the figure size
+        elif legend.pos == "free" and legend.fit:
+            _fit_free_legend(fig, ax, leg)
     _xl, _yl = ax.get_xlim(), ax.get_ylim()      # lock the view before the overlays
     _draw_gates(ax, gates)
     _draw_threshold_lines(ax, lines)
@@ -369,9 +415,23 @@ def render(layers, df, *, fig=None, figsize=(7, 5), dpi=110, title="", xlabel=""
     return fig
 
 
-def render_panel(items, df, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, style=None, aliases=None):
+def _ratios(values, n):
+    """Sanitize a list of grid ratios: n positive numbers, or None for an even grid."""
+    try:
+        out = [max(0.05, float(v)) for v in (values or [])]
+    except (TypeError, ValueError):
+        return None
+    if len(out) != n:
+        return None
+    return out
+
+
+def render_panel(items, df, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, style=None, aliases=None,
+                 width_ratios=None, height_ratios=None):
     """Multi-figure panel (A/B/C): each item is a layer drawn in its own subplot.
-    item = {spec_key, mapping, params, title}. Reuses the registry -- any axes-level plot."""
+    item = {spec_key, mapping, params, title, xlabel, ylabel} -- the title and axis labels
+    the user typed for that plot are carried over. width_ratios/height_ratios size the grid
+    cells, so each plot can be made wider or taller inside the panel."""
     import string
     if not items:
         raise PlotConfigError("No panel to build.")
@@ -389,29 +449,94 @@ def render_panel(items, df, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, styl
     else:
         fig.set_size_inches(*figsize)
         fig.clear()
+    gs = fig.add_gridspec(nrows, ncols,
+                          width_ratios=_ratios(width_ratios, ncols),
+                          height_ratios=_ratios(height_ratios, nrows))
     for i, it in enumerate(items):
-        ax = fig.add_subplot(nrows, ncols, i + 1)
+        ax = fig.add_subplot(gs[i // ncols, i % ncols])
         lay = Layer(it["spec_key"], it["mapping"], it.get("params"))
         validate(lay.spec, df, lay.mapping)
         if style.colors:
             lay.params["__colors__"] = style.colors
         lay.spec.render(ax, df, lay.mapping, lay.params)
+        _strip_auto_legend(ax)
         _apply_theme(fig, ax, style)
         _apply_axes(ax, style)
         ax.set_title(it.get("title") or f"({string.ascii_uppercase[i]})", color=t["fg"], loc="left", fontweight="bold")
-        if lay.mapping.get("x"):
-            ax.set_xlabel(disp(lay.mapping["x"]), color=t["fg"])
-        if lay.mapping.get("y"):
-            ax.set_ylabel(disp(lay.mapping["y"]), color=t["fg"])
+        xl, yl = it.get("xlabel"), it.get("ylabel")
+        if xl or lay.mapping.get("x"):
+            ax.set_xlabel(xl or disp(lay.mapping["x"]), color=t["fg"])
+        if yl or lay.mapping.get("y"):
+            ax.set_ylabel(yl or disp(lay.mapping["y"]), color=t["fg"])
     fig.patch.set_facecolor(style.fig_bg or t["fig"])
     fig.tight_layout()
     return fig
 
 
-def export(fig, path, dpi=300, transparent=False):
+def axes_rects(fig):
+    """Each axes' rectangle in figure fraction (x0, y0, x1, y1), lower-left origin."""
+    out = []
+    for ax in fig.axes:
+        p = ax.get_position()
+        out.append([float(p.x0), float(p.y0), float(p.x1), float(p.y1)])
+    return out
+
+
+def is_dark_theme(theme_name):
+    """True when the theme paints the figure on a dark background."""
+    import matplotlib.colors as mcolors
+    t = THEMES.get(theme_name, THEMES[DEFAULT_THEME])
+    r, g, b = mcolors.to_rgb(t["fig"])
+    return (0.299 * r + 0.587 * g + 0.114 * b) < 0.5
+
+
+def transparent_ink(theme_name):
+    """Foreground color to use when exporting with a transparent background.
+
+    Dropping a dark theme's background leaves its near-white text, ticks and spines
+    invisible on any light page -- they are exported, just unreadable. So for dark
+    themes we re-ink the foreground with the light theme's color. Light themes are
+    already readable and stay untouched."""
+    return THEMES[DEFAULT_THEME]["fg"] if is_dark_theme(theme_name) else None
+
+
+def _recolor_foreground(fig, color):
+    """Re-color every foreground artist (title, labels, ticks, spines, legend, texts)."""
+    for ax in fig.axes:
+        ax.title.set_color(color)
+        ax.xaxis.label.set_color(color)
+        ax.yaxis.label.set_color(color)
+        ax.tick_params(colors=color, which="both")
+        for lbl in ax.get_xticklabels() + ax.get_yticklabels():
+            lbl.set_color(color)
+        for sp in ax.spines.values():
+            sp.set_edgecolor(color)
+        for txt in ax.texts:
+            txt.set_color(color)
+        leg = ax.get_legend()
+        if leg is not None:
+            for txt in leg.get_texts():
+                txt.set_color(color)
+            if leg.get_title():
+                leg.get_title().set_color(color)
+            leg.get_frame().set_facecolor("none")     # keep the legend box see-through too
+            leg.get_frame().set_edgecolor(color)
+    for txt in fig.texts:
+        txt.set_color(color)
+
+
+def export(fig, path, dpi=300, transparent=False, ink=None, tight=True):
+    """Write the figure. transparent=True drops only the backgrounds, keeping every
+    drawn element. `ink` re-colors the foreground so it stays readable (see
+    transparent_ink). tight=False preserves an exact figure size (mm publication size),
+    since bbox_inches='tight' would crop and resize it."""
     fmt = path.rsplit(".", 1)[-1].lower()
-    kw = dict(dpi=dpi, bbox_inches="tight", edgecolor="none", transparent=transparent,
+    if transparent and ink:
+        _recolor_foreground(fig, ink)
+    kw = dict(dpi=dpi, edgecolor="none", transparent=transparent,
               facecolor="none" if transparent else fig.get_facecolor())
+    if tight:
+        kw["bbox_inches"] = "tight"
     if fmt in ("tif", "tiff"):
         kw["pil_kwargs"] = {"compression": "tiff_lzw"}
     fig.savefig(path, **kw)

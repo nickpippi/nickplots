@@ -203,6 +203,7 @@ class Api:
     # depend on the window/preview size at click time (a maximized or smaller window
     # must produce the same file).
     EXPORT_FIGSIZE = (9.0, 6.0)
+    EXPORT_PANEL_FIGSIZE = (12.0, 8.0)
 
     def _render_into(self, fig, state, dpi, fixed_size=False):
         if fixed_size:
@@ -589,6 +590,15 @@ class Api:
         return self._info()
 
     # ------------------------------- export -------------------------------- #
+    def _export_kw(self, state):
+        """Transparent background + readable ink, and exact size when mm is set."""
+        st = state.get("style", {})
+        exact_mm = bool(self._f(st.get("fig_w_mm")) and self._f(st.get("fig_h_mm")))
+        transparent = bool(state.get("transparent"))
+        return dict(transparent=transparent,
+                    ink=E.transparent_ink(st.get("theme")) if transparent else None,
+                    tight=not exact_mm)
+
     def export_figure(self, state):
         if self._view is None or not state.get("layers"):
             return None
@@ -602,7 +612,7 @@ class Api:
         fig = Figure(dpi=dpi)
         try:
             self._render_into(fig, state, dpi, fixed_size=True)
-            E.export(fig, path, dpi=dpi, transparent=bool(state.get("transparent")))
+            E.export(fig, path, dpi=dpi, **self._export_kw(state))
         except Exception as e:
             return dict(error=str(e))
         return path
@@ -618,19 +628,28 @@ class Api:
         fig.savefig(buf, format="png", dpi=dpi, facecolor=fig.get_facecolor())
         return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
+    def _panel_into(self, fig, items, state, dpi, figsize):
+        E.render_panel(items, self._view, fig=fig, ncols=int(state.get("ncols", 2)),
+                       figsize=figsize, dpi=dpi, style=self._style(state["style"]),
+                       aliases=state.get("aliases"),
+                       width_ratios=state.get("panel_wratios"),
+                       height_ratios=state.get("panel_hratios"))
+
     def render_panel(self, items, state):
         if self._view is None or not items:
             return None
         w, h = int(state["width"]), int(state["height"])
         fig = Figure(dpi=DPI)
         try:
-            E.render_panel(items, self._view, fig=fig, ncols=int(state.get("ncols", 2)),
-                           figsize=(max(4, w / DPI), max(3, h / DPI)), style=self._style(state["style"]),
-                           aliases=state.get("aliases"))
+            self._panel_into(fig, items, state, DPI, (max(4, w / DPI), max(3, h / DPI)))
         except Exception as e:
             return dict(error=str(e))
         self._pick = None
-        return dict(img=self._png(fig))
+        ncols = int(state.get("ncols", 2))
+        nrows = -(-len(items) // ncols)
+        return dict(img=self._png(fig), rects=E.axes_rects(fig), nrows=nrows, ncols=ncols,
+                    imgW=float(fig.get_size_inches()[0] * DPI),
+                    imgH=float(fig.get_size_inches()[1] * DPI))
 
     def export_panel(self, items, state):
         if self._view is None or not items:
@@ -644,9 +663,9 @@ class Api:
         dpi = max(300, int(state.get("export_dpi") or 300))
         fig = Figure(dpi=dpi)
         try:
-            E.render_panel(items, self._view, fig=fig, ncols=int(state.get("ncols", 2)),
-                           style=self._style(state["style"]), aliases=state.get("aliases"))
-            E.export(fig, path, dpi=dpi, transparent=bool(state.get("transparent")))
+            # fixed size, like the single-figure export: never depends on the window
+            self._panel_into(fig, items, state, dpi, self.EXPORT_PANEL_FIGSIZE)
+            E.export(fig, path, dpi=dpi, **self._export_kw(state))
         except Exception as e:
             return dict(error=str(e))
         return path
@@ -675,7 +694,7 @@ class Api:
             return None
         path = path if isinstance(path, str) else path[0]
         E.export(self._adv_fig, path, dpi=max(300, int(state.get("export_dpi") or 300)),
-                 transparent=bool(state.get("transparent")))
+                 **self._export_kw(state))
         return path
 
     def describe_table(self, group_col, value_cols):
