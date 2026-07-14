@@ -58,7 +58,7 @@ def _layer_code(spec_key, m, p):
         main = "boxplot" if spec_key == "box_points" else "violinplot"
         extra = "showfliers=False" if spec_key == "box_points" else "inner=None"
         L.append(f"sns.{main}(data=df, x={_lit(x)}, y={_lit(y)}, hue={_lit(hue or x)}, palette={_pal(p)}, legend={bool(hue)}, {extra}, ax=ax)")
-        L.append(f"sns.stripplot(data=df, x={_lit(x)}, y={_lit(y)}, hue={_lit(hue)}, dodge={bool(hue)}, jitter={p['jitter']}, size={p['size']}, alpha={p['alpha']}, color='#1f1f1f', edgecolor='white', linewidth=0.4, legend=False, ax=ax)")
+        L.append(f"sns.stripplot(data=df, x={_lit(x)}, y={_lit(y)}, hue={_lit(hue)}, dodge={bool(hue) and hue != x}, jitter={p['jitter']}, size={p['size']}, alpha={p['alpha']}, color='#1f1f1f', edgecolor='white', linewidth=0.4, legend=False, ax=ax)")
     elif spec_key == "bar_err":
         est = "np.mean" if p["center"] == "mean" else "np.median"
         eb = {"SD": "'sd'", "SEM": "'se'", "CI95": "('ci',95)"}[p["error"]]
@@ -66,7 +66,7 @@ def _layer_code(spec_key, m, p):
         ln = "" if p["kind"] == "bar" else ", linestyle='none'"
         L.append(f"sns.{fn}(data=df, x={_lit(x)}, y={_lit(y)}, hue={_lit(hue or x)}, estimator={est}, errorbar={eb}, palette={_pal(p)}, legend={bool(hue)}{ln}, ax=ax)")
         if p.get("points"):
-            L.append(f"sns.stripplot(data=df, x={_lit(x)}, y={_lit(y)}, hue={_lit(hue)}, dodge={bool(hue)}, jitter=0.18, size={p['psize']}, alpha=0.55, color='#1f1f1f', edgecolor='white', linewidth=0.3, legend=False, ax=ax)")
+            L.append(f"sns.stripplot(data=df, x={_lit(x)}, y={_lit(y)}, hue={_lit(hue)}, dodge={bool(hue) and hue != x}, jitter=0.18, size={p['psize']}, alpha=0.55, color='#1f1f1f', edgecolor='white', linewidth=0.3, legend=False, ax=ax)")
     elif spec_key == "dose4pl":
         L.append("from scipy.optimize import curve_fit")
         L.append("def _f4(xx,a,b,c,d): return d+(a-d)/(1+(xx/c)**b)")

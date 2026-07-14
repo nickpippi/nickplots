@@ -179,7 +179,7 @@ def _r_bar_err(ax, df, m, p):
         sns.pointplot(hue=hue or x, estimator=est, errorbar=ebar, palette=pal,
                       linestyle="none", legend=bool(hue), **common)
     if p["points"]:
-        sns.stripplot(data=df, x=x, y=y, hue=hue, dodge=bool(hue), jitter=0.18,
+        sns.stripplot(data=df, x=x, y=y, hue=hue, dodge=bool(hue) and hue != x, jitter=0.18,
                       size=p["psize"], alpha=0.55, color="#1f1f1f",
                       edgecolor="white", linewidth=0.3, legend=False, ax=ax)
     if p["sig"] and not hue:
@@ -325,7 +325,8 @@ def _r_box_points(ax, df, m, p):
     x, y, hue = m["x"], m["y"], m.get("hue")
     if hue:
         sns.boxplot(data=df, x=x, y=y, hue=hue, palette=p["palette"], showfliers=False, ax=ax)
-        sns.stripplot(data=df, x=x, y=y, hue=hue, palette=p["palette"], dodge=True,
+        # dodge only when hue subdivides x; hue==x (color-only) must stay centered on the box
+        sns.stripplot(data=df, x=x, y=y, hue=hue, palette=p["palette"], dodge=hue != x,
                       jitter=p["jitter"], size=p["size"], alpha=p["alpha"],
                       edgecolor="white", linewidth=0.4, legend=False, ax=ax)
     else:
@@ -340,7 +341,8 @@ def _r_violin_points(ax, df, m, p):
     x, y, hue = m["x"], m["y"], m.get("hue")
     if hue:
         sns.violinplot(data=df, x=x, y=y, hue=hue, palette=p["palette"], inner=None, ax=ax)
-        sns.stripplot(data=df, x=x, y=y, hue=hue, palette=p["palette"], dodge=True,
+        # dodge only when hue subdivides x; hue==x (color-only) must stay centered
+        sns.stripplot(data=df, x=x, y=y, hue=hue, palette=p["palette"], dodge=hue != x,
                       jitter=p["jitter"], size=p["size"], alpha=p["alpha"],
                       edgecolor="white", linewidth=0.4, legend=False, ax=ax)
     else:
