@@ -1914,15 +1914,20 @@ function resetPanelSizes(){
   toast(t('Panel sizes reset'),'good');
 }
 
-function addPanelItem(){
+async function addPanelItem(){
   if(!STACK.length){ toast(t('Build a plot first'),'bad'); return; }
   const base=STACK[0];
   const label=CATALOG.find(s=>s.key===base.spec_key).label;
   const letter=String.fromCharCode(65+PANEL.length);
-  // carry over exactly the title / axis labels typed for this plot
+  const clone=o=>JSON.parse(JSON.stringify(o));
+  // snapshot THIS csv on the backend so the frame keeps its own data (mix CSVs in a panel)
+  const data_id=await window.pywebview.api.stash_panel_data();
+  // carry over the title / axis labels AND the annotations, lines and regions on the plot
   PANEL.push({spec_key:base.spec_key, mapping:base.mapping, params:base.params,
               title:'('+letter+') '+($('title').value.trim() || label),
-              xlabel:$('xlabel').value.trim(), ylabel:$('ylabel').value.trim()});
+              xlabel:$('xlabel').value.trim(), ylabel:$('ylabel').value.trim(),
+              data_id, annotations:clone(ANNOT), lines:clone(LINES),
+              gates:gatesVisible()?clone(GATES):[]});
   ensurePanelGrid(); renderPanelList();
 }
 function renderPanelList(){

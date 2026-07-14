@@ -45,6 +45,8 @@ class Api:
         self._Hpx = 0
         self._csv_path = None
         self._xlsx = None
+        self._panel_data = {}     # id -> dataframe snapshot, one per panel frame
+        self._panel_seq = 0
 
     def _win(self):
         return self._window or (webview.windows[0] if webview.windows else None)
@@ -628,8 +630,21 @@ class Api:
         fig.savefig(buf, format="png", dpi=dpi, facecolor=fig.get_facecolor())
         return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
+    def stash_panel_data(self):
+        """Snapshot the current CSV so a panel frame keeps its own data even after the
+        user opens a different CSV. Returns an id the frame stores; render/export_panel
+        resolve it back to the dataframe. In-memory only (not persisted in projects)."""
+        if self._view is None:
+            return None
+        self._panel_seq += 1
+        self._panel_data[self._panel_seq] = self._view
+        return self._panel_seq
+
     def _panel_into(self, fig, items, state, dpi, figsize):
-        E.render_panel(items, self._view, fig=fig, ncols=int(state.get("ncols", 2)),
+        # each frame draws from its own snapshot; fall back to the live view for frames
+        # with no snapshot (older items / reloaded projects).
+        dfs = [self._panel_data.get(it.get("data_id"), self._view) for it in items]
+        E.render_panel(items, dfs, fig=fig, ncols=int(state.get("ncols", 2)),
                        figsize=figsize, dpi=dpi, style=self._style(state["style"]),
                        aliases=state.get("aliases"),
                        width_ratios=state.get("panel_wratios"),

@@ -339,7 +339,9 @@ def _draw_annotations(ax, anns):
         x, y, txt = a.get("x", 0.5), a.get("y", 0.5), a.get("text", "")
         kind = a.get("kind", "text")
         if kind == "star":
-            ax.text(x, y, "✱", transform=ax.transAxes, fontsize=15, ha="center",
+            # mathtext asterisk: DejaVu's U+2731 glyph renders as a chunky propeller
+            # ("little airplane"); $\ast$ uses the bundled math font and is a clean star.
+            ax.text(x, y, r"$\ast$", transform=ax.transAxes, fontsize=18, ha="center",
                     va="center", color=a.get("color", "#d33"))
         elif kind == "arrow":
             ax.annotate(txt, xy=(x, y), xytext=(x - 0.13, y + 0.13),
@@ -426,12 +428,14 @@ def _ratios(values, n):
     return out
 
 
-def render_panel(items, df, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, style=None, aliases=None,
+def render_panel(items, dfs, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, style=None, aliases=None,
                  width_ratios=None, height_ratios=None):
-    """Multi-figure panel (A/B/C): each item is a layer drawn in its own subplot.
-    item = {spec_key, mapping, params, title, xlabel, ylabel} -- the title and axis labels
-    the user typed for that plot are carried over. width_ratios/height_ratios size the grid
-    cells, so each plot can be made wider or taller inside the panel."""
+    """Multi-figure panel (A/B/C): each item is a layer drawn in its own subplot, from its
+    OWN dataframe (dfs[i]) -- so frames can come from different CSVs.
+    item = {spec_key, mapping, params, title, xlabel, ylabel, annotations, lines, gates}.
+    The title/axis labels typed for that plot are carried over, as are its annotations,
+    threshold lines and regions (drawn in that frame's own coordinates, so they scale with
+    it). width_ratios/height_ratios size the grid cells."""
     import string
     if not items:
         raise PlotConfigError("No panel to build.")
@@ -453,6 +457,7 @@ def render_panel(items, df, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, styl
                           width_ratios=_ratios(width_ratios, ncols),
                           height_ratios=_ratios(height_ratios, nrows))
     for i, it in enumerate(items):
+        df = dfs[i]
         ax = fig.add_subplot(gs[i // ncols, i % ncols])
         lay = Layer(it["spec_key"], it["mapping"], it.get("params"))
         validate(lay.spec, df, lay.mapping)
@@ -468,6 +473,11 @@ def render_panel(items, df, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, styl
             ax.set_xlabel(xl or disp(lay.mapping["x"]), color=t["fg"])
         if yl or lay.mapping.get("y"):
             ax.set_ylabel(yl or disp(lay.mapping["y"]), color=t["fg"])
+        _lx, _ly = ax.get_xlim(), ax.get_ylim()      # overlays must not shift the view
+        _draw_gates(ax, it.get("gates"))
+        _draw_threshold_lines(ax, it.get("lines"))
+        _draw_annotations(ax, it.get("annotations"))
+        ax.set_xlim(_lx); ax.set_ylim(_ly)
     fig.patch.set_facecolor(style.fig_bg or t["fig"])
     fig.tight_layout()
     return fig
