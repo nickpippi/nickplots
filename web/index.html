@@ -75,12 +75,12 @@
   .sectile{background:var(--panel2);border:1px solid var(--line);border-radius:var(--radius);
     padding:12px 13px;margin:12px 0}
   .sectile h3{margin:0 0 4px;font-size:12.5px;font-weight:650;
-    display:flex;align-items:center;gap:6px;justify-content:space-between}
+    display:flex;align-items:center;gap:6px}
   .sectile p.hint{margin:2px 0 0;color:var(--faint);font-size:11px;line-height:1.45}
   p.hint.tucked{display:none}                    /* moved into a "?" tooltip */
 
   /* ---------- "?" help badge + hover tooltip ---------- */
-  .helpbtn{flex:0 0 auto;width:16px;height:16px;padding:0;border-radius:50%;
+  .helpbtn{flex:0 0 auto;margin-left:auto;width:16px;height:16px;padding:0;border-radius:50%;
     border:1px solid var(--line);background:var(--panel3);color:var(--mut);
     font-family:inherit;font-size:10.5px;font-weight:700;line-height:1;
     display:inline-flex;align-items:center;justify-content:center;
@@ -163,6 +163,13 @@
   #legendBox{position:absolute;cursor:grab;border:1.5px dashed transparent;border-radius:6px;display:none}
   #legendBox:hover{border-color:#7c5cff88;background:#7c5cff11}
   #legendBox.drag{cursor:grabbing;border-color:var(--accent);background:#7c5cff1f}
+  /* drag handles to flatten/stretch the single plot (set fig mm size) */
+  .sizeh{position:absolute;display:none;background:var(--accent);opacity:.45;border-radius:6px;
+    z-index:6;touch-action:none;box-shadow:0 0 0 1px #0006}
+  .sizeh:hover{opacity:.9}
+  #hRight{width:6px;height:40px;cursor:ew-resize}
+  #hBottom{width:40px;height:6px;cursor:ns-resize}
+  #hCorner{width:15px;height:15px;border-radius:5px;cursor:nwse-resize}
 
   .rowinfo{border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);
     padding:11px 14px;max-height:140px;overflow:auto;display:none}
@@ -636,6 +643,7 @@
     <div class="topbar">
       <div class="layers" id="hintTop" data-i18n="Load a CSV to start.">Load a CSV to start.</div>
       <div class="anntools">
+        <button class="btn sm primary" onclick="plotBase()" data-i18n="▶  Plot">▶  Plot</button>
         <input type="text" id="annText" placeholder="annotation text" data-i18n-ph="annotation text" style="width:150px">
         <button class="btn sm" onclick="setAnnot('text')" id="annTextBtn" data-i18n="Text">Text</button>
         <button class="btn sm" onclick="setAnnot('arrow')" id="annArrowBtn" data-i18n="Arrow">Arrow</button>
@@ -650,6 +658,9 @@
       <div id="legendBox"></div>
       <svg id="gateLayer" style="position:absolute;left:0;top:0;display:none;pointer-events:none"></svg>
       <svg id="panelLayer" style="position:absolute;left:0;top:0;display:none;pointer-events:none"></svg>
+      <div id="hRight" class="sizeh" onpointerdown="sizeDown(event,'w')" data-i18n-title="Drag: flatten / stretch the width (real reshape, not a stretched image)">​</div>
+      <div id="hBottom" class="sizeh" onpointerdown="sizeDown(event,'h')" data-i18n-title="Drag: flatten / stretch the height">​</div>
+      <div id="hCorner" class="sizeh" onpointerdown="sizeDown(event,'wh')" ondblclick="resetShape()" data-i18n-title="Drag: reshape both · double-click: reset to auto">​</div>
     </div>
     <div class="rowinfo" id="rowinfo"><div class="rowinfohead"><h4 data-i18n="Selected point">Selected point</h4><button class="btn sm ghost" style="width:auto;padding:3px 10px" onclick="copyRowTable()" data-i18n="⧉ Copy">⧉ Copy</button></div><table id="rowtable"></table></div>
   </main>
@@ -832,6 +843,62 @@ const PT = {
   "Draw regions and set X/Y in the Plot tab":"Desenhe regiões e configure X/Y na aba Gráfico",
   "Column created: ":"Coluna criada: ","rows copied":"linhas copiadas","Tip":"Dica",
   "Load the groups to pick each color.":"Carregue os grupos para escolher cada cor.",
+  // --- friendly filter builder ---
+  "Filter — build a condition":"Filtro — monte uma condição",
+  "is equal to":"é igual a","is not equal to":"é diferente de","greater than":"maior que",
+  "greater or equal":"maior ou igual","less than":"menor que","less or equal":"menor ou igual",
+  "contains (text)":"contém (texto)","value":"valor",
+  "＋ Add condition":"＋ Adicionar condição","Clear filter":"Limpar filtro",
+  "Filter (pandas query — advanced)":"Filtro (query pandas — avançado)",
+  "Choose a column":"Escolha uma coluna",
+  // --- style ---
+  "Show n per group (adds (n=k) to the categorical X labels)":"Mostrar n por grupo (adiciona (n=k) aos rótulos categóricos do X)",
+  // --- datasets ---
+  "Datasets (multiple files)":"Bancos de dados (vários arquivos)",
+  "Every CSV you load is kept here. Click one to switch to it, or combine all into one table (adds a source column) to compare across files or build SuperPlots by replicate.":"Cada CSV que você carrega fica aqui. Clique em um para alternar, ou combine todos numa tabela só (adiciona uma coluna de origem) para comparar entre arquivos ou montar SuperPlots por réplica.",
+  "no datasets":"nenhum banco de dados","Combine all":"Combinar todos",
+  "Switched to ":"Alternado para ","Datasets combined":"Bancos de dados combinados",
+  // --- aggregate ---
+  "Aggregate (per replicate / track)":"Agregar (por réplica / track)",
+  "Collapse rows to one per group (mean/median…). Aggregate cells to their track/replicate BEFORE testing to avoid pseudo-replication. Pick several columns to keep groups distinct (e.g. treatment + track_id).":"Colapsa as linhas para uma por grupo (média/mediana…). Agregue as células à sua track/réplica ANTES de testar para evitar pseudorreplicação. Escolha várias colunas para manter os grupos distintos (ex.: treatment + track_id).",
+  "Group by":"Agrupar por","Aggregate":"Agregar",
+  "Pick at least one column to group by":"Escolha ao menos uma coluna para agrupar",
+  "Aggregated: ":"Agregado: "," rows":" linhas",
+  // --- computed column ---
+  "New column (formula)":"Nova coluna (fórmula)",
+  "Create a column from a formula over existing columns. Use the builder for column op column, or type any pandas expression (wrap names with spaces in backticks).":"Crie uma coluna a partir de uma fórmula sobre as colunas existentes. Use o montador para coluna op coluna, ou digite qualquer expressão pandas (envolva nomes com espaço em crases).",
+  "new column name":"nome da nova coluna","Builder → expression":"Montador → expressão",
+  "e.g. net_disp / cum_path":"ex.: net_disp / cum_path",
+  "Create":"Criar","Give a name and a formula":"Dê um nome e uma fórmula",
+  "Pick both columns":"Escolha as duas colunas",
+  // --- template ---
+  "Plot template":"Template de gráfico",
+  "Save the current plot recipe (type + columns + options + labels) and re-apply it to another dataset with the same column names.":"Salve a receita do gráfico atual (tipo + colunas + opções + rótulos) e reaplique em outro banco de dados com os mesmos nomes de coluna.",
+  "💾 Save template":"💾 Salvar template","📂 Apply template":"📂 Aplicar template",
+  "Template saved":"Template salvo","Template applied":"Template aplicado",
+  // --- wide helper + banner ---
+  "Plot wide columns (no melting)":"Plotar colunas wide (sem melting)",
+  "Your measurement is spread across several columns (e.g. control / treated / washout, each holding values)? Pick those columns and a plot type: it tidies them for you and plots, with the columns as the X categories. Also readies the data for Compare groups.":"Sua medida está espalhada em várias colunas (ex.: control / treated / washout, cada uma com valores)? Escolha essas colunas e um tipo de gráfico: ele arruma para você e plota, com as colunas como categorias do X. Também prepara os dados para Comparar grupos.",
+  "Value columns (the wide measure)":"Colunas de valor (a medida wide)",
+  "Keep as ID (optional)":"Manter como ID (opcional)","Tidy & plot":"Arrumar & plotar",
+  "Pick at least two value columns":"Escolha ao menos duas colunas de valor",
+  "Tidied & plotted":"Arrumado & plotado",
+  "This table looks wide (no group column). Tidy some columns to plot or compare them.":"Esta tabela parece estar no formato wide (sem coluna de grupo). Arrume algumas colunas para plotar ou compará-las.",
+  "Tidy columns":"Arrumar colunas",
+  // --- analysis: methods + contingency ---
+  "📋 Methods sentence (copy-ready)":"📋 Frase de métodos (pronta para colar)",
+  "Composition test (chi² / Fisher)":"Teste de composição (qui² / Fisher)",
+  "Association between two categorical columns (e.g. treatment × outcome). Chi-square, Cramér's V, and Fisher exact for 2×2. The count table feeds the plot table (exportable).":"Associação entre duas colunas categóricas (ex.: treatment × outcome). Qui-quadrado, V de Cramér e Fisher exato para 2×2. A tabela de contagem alimenta a tabela do gráfico (exportável).",
+  "Rows (categorical)":"Linhas (categórica)","Columns (categorical)":"Colunas (categórica)",
+  "Test association":"Testar associação","Contingency table":"Tabela de contingência",
+  // --- footer menus ---
+  "Export ▾ (options, code, data)":"Exportar ▾ (opções, código, dados)",
+  "Session ▾ (project, preset)":"Sessão ▾ (projeto, preset)",
+  // --- reshape drag handles ---
+  "Drag: flatten / stretch the width (real reshape, not a stretched image)":"Arraste: achatar / alongar a largura (reshape real, não uma imagem esticada)",
+  "Drag: flatten / stretch the height":"Arraste: achatar / alongar a altura",
+  "Drag: reshape both · double-click: reset to auto":"Arraste: reformatar os dois · duplo-clique: voltar ao automático",
+  "Shape reset to auto":"Formato voltou ao automático",
 };
 
 // Rich hints (contain markup), keyed by id.
@@ -840,8 +907,8 @@ const HTML_HINTS = {
     en:'Pick the <b>exact</b> color of each hue (or X) category. Overrides the palette and does not reshuffle when you swap axes or filter (each category keeps its color).',
     pt:'Escolha a cor <b>exata</b> de cada categoria do hue (ou X). Sobrepõe a paleta e não se embaralha ao trocar os eixos ou filtrar (cada categoria mantém a cor).'},
   "style.sizeHint":{
-    en:'Width × height in mm controls the <b>shape</b> of the plot (e.g. 180×70 = flat, 80×160 = tall) and applies to the preview, the export and the multi-figure panel. The legend never gets clipped: the plot shrinks to make room. Empty = fixed default size.',
-    pt:'Largura × altura em mm controla a <b>forma</b> do gráfico (ex.: 180×70 = achatado, 80×160 = alto) e vale no preview, na exportação e no painel multi-figura. A legenda nunca é cortada: o gráfico encolhe para abrir espaço. Vazio = tamanho padrão fixo.'},
+    en:'Width × height in mm controls the <b>shape</b> of the plot (e.g. 180×70 = flat, 80×160 = tall) and applies to the preview, the export and the multi-figure panel. The legend never gets clipped: the plot shrinks to make room. Empty = fixed default size. <b>Tip:</b> you can also <b>drag the purple handles</b> on the right/bottom/corner of the plot to reshape it visually (double-click the corner to reset).',
+    pt:'Largura × altura em mm controla a <b>forma</b> do gráfico (ex.: 180×70 = achatado, 80×160 = alto) e vale no preview, na exportação e no painel multi-figura. A legenda nunca é cortada: o gráfico encolhe para abrir espaço. Vazio = tamanho padrão fixo. <b>Dica:</b> você também pode <b>arrastar as alças roxas</b> na direita/base/canto do gráfico para reformatá-lo de forma visual (duplo-clique no canto para resetar).'},
   "legend.renameColsHint":{
     en:'Pretty column name on the axes and in the legend title/sub-titles — e.g. <b>gene_exp_2 → Gene Expression</b>. Visual only: does not alter the data, the filter or the exported code.',
     pt:'Nome bonito da coluna nos eixos e no título/sub-títulos da legenda — ex.: <b>gene_exp_2 → Gene Expression</b>. Só visual: não altera os dados, o filtro nem o código exportado.'},
@@ -883,6 +950,9 @@ const PT_SPEC = {
   ecdf:"ECDF (distribuição acumulada)", regband:"Regressão + banda de IC",
   paired:"Pareado (antes-depois)", hist:"Histograma", kde:"KDE",
   ridge:"Ridgeline (distribuição por grupo)", heatmap:"Heatmap (correlação)", volcano:"Volcano Plot",
+  superplot:"SuperPlot (células + médias por réplica)", qq:"Q-Q plot (normalidade)",
+  km:"Kaplan-Meier (sobrevivência + log-rank)", traj:"Trajetórias (tracks XY)",
+  msd:"MSD (deslocamento quadrático médio)", stacked:"Composição empilhada (+ qui²/Fisher)",
 };
 const PT_PARAM = {
   alpha:"alpha", palette:"paleta", bins:"bins", kde:"kde", fill:"preencher",
@@ -898,12 +968,21 @@ const PT_PARAM = {
   kind:"tipo", center:"centro", error:"erro", psize:"tamanho do ponto", sig:"significância",
   levels:"níveis", grid:"grade", contour:"contorno", size:"tamanho", regression:"regressão",
   ci:"IC", log_x:"eixo X log", points:"pontos", zscore:"z-score", fc_thr:"limiar log2FC", p_thr:"limiar p",
+  "error band":"banda de erro", "raw points alpha":"alpha dos pontos brutos",
+  "event value(s), comma-sep":"valor(es) do evento, separados por vírgula",
+  "mark censored (ticks)":"marcar censurados (ticks)", "equal aspect":"proporção igual",
+  "log-log axes":"eixos log-log", "proportion (else count)":"proporção (senão contagem)",
+  "chi-square p in title":"p do qui² no título",
 };
 const PT_CHOICE = { bar:"barra", point:"ponto", mean:"média", median:"mediana",
-                    SD:"DP", SEM:"EPM", CI95:"IC95" };
+                    SD:"DP", SEM:"EPM", CI95:"IC95", none:"nenhum" };
 const PT_CHANNEL = { x:"X", y:"Y", hue:"Hue", size:"Tamanho", style:"Estilo",
                      dose:"dose", response:"resposta", "sample (id)":"amostra (id)",
-                     "p-value":"p-valor", log2FC:"log2FC" };
+                     "p-value":"p-valor", log2FC:"log2FC",
+                     replicate:"réplica", condition:"condição", value:"valor",
+                     "time / duration":"tempo / duração", "event (status)":"evento (status)",
+                     group:"grupo", "pos x":"pos x", "pos y":"pos y", "track id":"id da track",
+                     "time (order)":"tempo (ordem)", category:"categoria" };
 const PT_THEME = {
   "Light · grid":"Claro · grade", "Light · ticks":"Claro · ticks", "Light · clean":"Claro · limpo",
   "Dark · grid":"Escuro · grade", "Dark · plain":"Escuro · liso", "Slate":"Ardósia",
@@ -938,6 +1017,7 @@ function applyLang(){
     else el.textContent = txt;
   });
   document.querySelectorAll('[data-i18n-ph]').forEach(el=>{ el.placeholder = t(el.dataset.i18nPh); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{ el.title = t(el.dataset.i18nTitle); });
   document.querySelectorAll('[data-i18n-html]').forEach(el=>{
     const h = HTML_HINTS[el.dataset.i18nHtml]; if(h) el.innerHTML = h[LANG] || h.en;
   });
@@ -1273,7 +1353,7 @@ async function render(){
   }
   PANELRENDER=null; hidePanelLayer();       // leaving panel view: drop its drag handles
   const img=$('plot'); img.src=r.img; img.style.display='block'; $('empty').style.display='none';
-  img.onload=()=>{ placeLegend(r); placeGates(r); };
+  img.onload=()=>{ placeLegend(r); placeGates(r); placeSizeHandles(); };
   maybeLive(); scheduleCommit();
 }
 // Continuous render (slider): while a render runs, flag that another is wanted; when it
@@ -2094,8 +2174,8 @@ function renderDatasets(list, active){
   $('datasetList').innerHTML = list.map(n=>{
     const on = n===active;
     const safe=n.replace(/"/g,'&quot;');
-    return `<div class="row2" style="align-items:center;margin:2px 0">
-      <button class="btn sm ${on?'':'ghost'}" style="flex:1;text-align:left" onclick="activateDataset('${safe}')">${on?'● ':''}${n}</button>
+    return `<div class="row2" style="align-items:center;margin:2px 0;min-width:0">
+      <button class="btn sm ${on?'':'ghost'}" title="${safe}" style="flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="activateDataset('${safe}')">${on?'● ':''}${n}</button>
       <button class="btn sm ghost" style="flex:0 0 auto" onclick="removeDataset('${safe}')">✕</button></div>`;
   }).join('');
 }
@@ -2178,7 +2258,55 @@ function showImage(dataUrl){
   const img=$('plot'); img.src=dataUrl; img.style.display='block'; $('empty').style.display='none';
   $('legendBox').style.display='none'; $('gateLayer').style.display='none';
   LASTRENDER=null;   // advanced/panel figures have no drag/pick
+  placeSizeHandles();               // hide the reshape handles (only for single plots)
 }
+
+/* ---------- drag to flatten/stretch the single plot (sets fig mm size) ---------- */
+// The preview renders at DPI=110 (api.py), so imgW/imgH px -> physical mm via 25.4/DPI.
+const DPI_PREVIEW=110;
+let sizeDrag=null;
+function currentMM(){
+  let w=parseFloat($('figwmm').value), h=parseFloat($('fighmm').value);
+  if(!(w>0)||!(h>0)){
+    if(!LASTRENDER) return null;
+    w=LASTRENDER.imgW/DPI_PREVIEW*25.4; h=LASTRENDER.imgH/DPI_PREVIEW*25.4;
+  }
+  return {w,h};
+}
+function placeSizeHandles(){
+  const show = !!LASTRENDER && !PANELRENDER;
+  const R=$('hRight'),B=$('hBottom'),C=$('hCorner'); if(!R) return;
+  [R,B,C].forEach(e=>e.style.display = show?'block':'none');
+  if(!show) return;
+  const img=$('plot'), L=img.offsetLeft, T=img.offsetTop, W=img.clientWidth, H=img.clientHeight;
+  R.style.left=(L+W-3)+'px';    R.style.top=(T+H/2-20)+'px';
+  B.style.left=(L+W/2-20)+'px'; B.style.top=(T+H-3)+'px';
+  C.style.left=(L+W-8)+'px';    C.style.top=(T+H-8)+'px';
+}
+function sizeDown(e,axis){
+  e.preventDefault(); e.stopPropagation();
+  const mm=currentMM(); if(!mm){ toast(t('Plot a figure first'),'bad'); return; }
+  const img=$('plot');
+  try{ e.target.setPointerCapture(e.pointerId); }catch(_){}   // keep events during fast drags
+  sizeDrag={axis, x:e.clientX, y:e.clientY, w:mm.w, h:mm.h,
+            mmpxW:mm.w/Math.max(1,img.clientWidth), mmpxH:mm.h/Math.max(1,img.clientHeight),
+            card:$('card').getBoundingClientRect()};
+}
+document.addEventListener('pointermove',e=>{
+  if(!sizeDrag) return;
+  const d=sizeDrag; let w=d.w, h=d.h;
+  if(d.axis!=='h') w=Math.max(20,Math.min(500, d.w+(e.clientX-d.x)*d.mmpxW));
+  if(d.axis!=='w') h=Math.max(20,Math.min(500, d.h+(e.clientY-d.y)*d.mmpxH));
+  $('figwmm').value=Math.round(w); $('fighmm').value=Math.round(h);
+  // move the grabbed handle with the cursor NOW (tactile), the render catches up live
+  const cr=d.card;
+  if(d.axis!=='h') $('hRight').style.left=(e.clientX-cr.left-3)+'px';
+  if(d.axis!=='w') $('hBottom').style.top=(e.clientY-cr.top-3)+'px';
+  if(d.axis==='wh'){ const C=$('hCorner'); C.style.left=(e.clientX-cr.left-8)+'px'; C.style.top=(e.clientY-cr.top-8)+'px'; }
+  liveRender();     // continuous, coalesced render (NOT the 140ms-debounced dRender)
+});
+document.addEventListener('pointerup',()=>{ if(sizeDrag){ sizeDrag=null; render(); } });
+function resetShape(){ $('figwmm').value=''; $('fighmm').value=''; render(); toast(t('Shape reset to auto'),'good'); }
 function selectAllNumCols(on){
   const boxes=$('numCols').querySelectorAll('input[type=checkbox]');
   if(!boxes.length){ toast(t('Load a CSV first'),'bad'); return; }
