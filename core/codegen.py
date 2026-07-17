@@ -30,7 +30,8 @@ def _layer_code(spec_key, m, p):
             L.append("_a,_b=np.polyfit(_x.dropna(),_y[_x.notna()].dropna(),1); _xs=np.linspace(_x.min(),_x.max(),100)")
             L.append("ax.plot(_xs,_a*_xs+_b,c='black',lw=1.2)")
     elif spec_key == "line":
-        L.append(f"sns.lineplot(data=df, x={_lit(x)}, y={_lit(y)}, hue={_lit(hue)}, linewidth={p['linewidth']}, alpha={p['alpha']}, palette={_pal(p) if hue else None}, ax=ax)")
+        _eb = {"none": "None", "SD": "'sd'", "SEM": "'se'", "CI95": "('ci',95)"}[p.get("errorbar", "none")]
+        L.append(f"sns.lineplot(data=df, x={_lit(x)}, y={_lit(y)}, hue={_lit(hue)}, linewidth={p['linewidth']}, alpha={p['alpha']}, errorbar={_eb}, palette={_pal(p) if hue else None}, ax=ax)")
     elif spec_key == "bar":
         L.append(f"sns.barplot(data=df, x={_lit(x)}, y={_lit(y)}, hue={_lit(hue or x)}, palette={_pal(p)}, alpha={p['alpha']}, legend={bool(hue)}, ax=ax)")
     elif spec_key in ("box", "violin", "strip"):

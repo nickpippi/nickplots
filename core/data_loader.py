@@ -65,7 +65,9 @@ def apply_filter(df: pd.DataFrame, expr: str) -> tuple[pd.DataFrame, str | None]
     if not expr:
         return df, None
     try:
-        return df.query(expr), None
+        # engine="python": supports string methods (.str.contains) and backtick column
+        # names from the friendly filter builder; fast enough for these data sizes.
+        return df.query(expr, engine="python"), None
     except Exception as e:  # SyntaxError, UndefinedVariableError, etc.
         return df, f"Invalid filter expression: {e}"
 

@@ -93,8 +93,11 @@ def _r_scatter(ax, df, m, p):
 
 
 def _r_line(ax, df, m, p):
+    # seaborn's default CI band bootstraps 1000x per group -> minutes on many-obs-per-x
+    # data. Default to no band (instant); the band is opt-in via the "error band" param.
+    eb = {"none": None, "SD": "sd", "SEM": "se", "CI95": ("ci", 95)}[p.get("errorbar", "none")]
     sns.lineplot(data=df, x=m["x"], y=m["y"], hue=m.get("hue"),
-                 linewidth=p["linewidth"], alpha=p["alpha"],
+                 linewidth=p["linewidth"], alpha=p["alpha"], errorbar=eb,
                  palette=_resolve_palette(df, m["hue"], p) if m.get("hue") else None, ax=ax)
 
 
@@ -436,6 +439,151 @@ def _overlay_regression(ax, df, xcol, ycol):
             va="top", fontsize=8, bbox=dict(fc="white", alpha=0.7, ec="none"))
 
 
+def _r_superplot(ax, df, m, p):
+    """SuperPlot (Lord et al., JCB 2020): faint raw points + one big marker per
+    replicate mean, colored by replicate. Test on the replicate means, not the cells —
+    this is the honest way to plot data with many cells per replicate."""
+    x, y, rep = m["x"], m["y"], m.get("rep")
+    d = df[[c for c in [x, y, rep] if c]].copy()
+    d[y] = pd.to_numeric(d[y], errors="coerce")
+    d = d.dropna(subset=[x, y])
+    if rep:
+        d[rep] = d[rep].astype(str)           # numeric replicate ids -> discrete colors
+        pal = _resolve_palette(d, rep, p)
+        sns.stripplot(data=d, x=x, y=y, hue=rep, palette=pal, dodge=False, jitter=0.28,
+                      size=p["size"] * 0.6, alpha=0.35, legend=False, ax=ax)
+        means = d.groupby([x, rep], observed=True)[y].mean().reset_index()
+        # legend only helps with few replicates (the SuperPlot use case); many track ids
+        # would overflow the figure, so suppress it there.
+        sns.stripplot(data=means, x=x, y=y, hue=rep, palette=pal, dodge=False, jitter=0.06,
+                      size=p["size"] * 2.4, alpha=1.0, edgecolor="black", linewidth=1.1,
+                      legend=(d[rep].nunique() <= 12), ax=ax)
+    else:
+        sns.stripplot(data=d, x=x, y=y, color="#9aa0aa", jitter=0.28,
+                      size=p["size"] * 0.6, alpha=0.35, ax=ax)
+    # thick line at each condition's grand mean
+    for i, c in enumerate(list(pd.unique(d[x]))):
+        gm = d.loc[d[x] == c, y].mean()
+        ax.plot([i - 0.32, i + 0.32], [gm, gm], color="#333", lw=2.2, zorder=5)
+
+
+def _r_qq(ax, df, m, p):
+    """Normal Q-Q plot per group: points on the diagonal => normally distributed."""
+    from scipy import stats as st
+    y, hue = m["val"], m.get("hue")
+    groups = list(df.groupby(hue)) if hue else [(None, df)]
+    colors = _group_colors([g for g, _ in groups], p) if hue else ["#3a6ea5"]
+    for (name, sub), col in zip(groups, colors):
+        v = pd.to_numeric(sub[y], errors="coerce").dropna().to_numpy()
+        if len(v) < 3:
+            continue
+        (osm, osr), (slope, inter, _r) = st.probplot(v, dist="norm")
+        ax.scatter(osm, osr, s=14, color=col, alpha=p["alpha"],
+                   label=str(name) if hue else None)
+        ax.plot(osm, slope * osm + inter, color=col, lw=1.0)
+    ax.set_xlabel("Theoretical quantiles"); ax.set_ylabel("Sample quantiles")
+    if hue:
+        ax.legend()
+
+
+def _r_km(ax, df, m, p):
+    """Kaplan-Meier survival curves (+ log-rank p when grouped). 'time' = duration,
+    'event' = status column, 'event value(s)' = which status counts as the event
+    (comma-separated; empty = every non-empty status counts)."""
+    from .stats import km_curves
+    time, event, hue = m["time"], m.get("event"), m.get("hue")
+    ev = [s.strip() for s in str(p.get("event_value", "")).split(",") if s.strip()]
+    curves, lr = km_curves(df, time, event, ev, hue)
+    colors = _group_colors(list(curves), p) if hue else ["#3a6ea5"]
+    for (name, (t, s, cens)), col in zip(curves.items(), colors):
+        ax.step(t, s, where="post", color=col, lw=1.6, label=(str(name) if hue else None))
+        if p.get("censors", True) and len(cens):
+            sc = np.interp(cens, t, s)        # survival at each censoring time
+            ax.plot(cens, sc, "|", color=col, ms=7, mew=1.2)
+    ax.set_ylim(0, 1.03); ax.set_xlabel(time); ax.set_ylabel("Survival probability")
+    if lr:
+        ax.text(0.02, 0.05, f"log-rank p = {lr['p']:.3g}", transform=ax.transAxes,
+                ha="left", va="bottom", fontsize=9,
+                bbox=dict(fc="white", alpha=0.7, ec="none"))
+    if hue:
+        ax.legend(title=hue)
+
+
+def _r_traj(ax, df, m, p):
+    """XY trajectories: one path per track (id), optionally ordered by a time column and
+    colored by group (hue)."""
+    x, y, tid, hue, tcol = m["x"], m["y"], m["id"], m.get("hue"), m.get("time")
+    cmap, seen = None, set()
+    if hue:
+        groups = list(df.groupby(hue))
+        cols = _group_colors([g for g, _ in groups], p)
+        cmap = {g: cols[i] for i, (g, _) in enumerate(groups)}
+    for _, sub in df.groupby(tid):
+        if tcol:
+            sub = sub.sort_values(tcol)
+        c = cmap[sub[hue].iloc[0]] if hue else None
+        lbl = None
+        if hue and sub[hue].iloc[0] not in seen:      # one legend entry per group
+            lbl = str(sub[hue].iloc[0]); seen.add(sub[hue].iloc[0])
+        ax.plot(pd.to_numeric(sub[x], errors="coerce"),
+                pd.to_numeric(sub[y], errors="coerce"),
+                lw=p["linewidth"], alpha=p["alpha"], color=c, label=lbl)
+    ax.set_xlabel(x); ax.set_ylabel(y)
+    if p.get("equal", True):
+        ax.set_aspect("equal", adjustable="datalim")
+    if hue:
+        ax.legend(title=hue)
+
+
+def _r_msd(ax, df, m, p):
+    """Mean squared displacement vs lag, averaged across tracks, per group."""
+    from .stats import msd_by_track
+    curves = msd_by_track(df, m["id"], m["px"], m["py"], m.get("time"), m.get("hue"))
+    if not curves:
+        return
+    colors = _group_colors(list(curves), p)
+    for (name, (lags, msd, ntr)), col in zip(curves.items(), colors):
+        ax.plot(lags, msd, marker="o", ms=3, lw=1.4, color=col,
+                label=(f"{name} (n={ntr})" if name is not None else None))
+    ax.set_xlabel("lag (frames)"); ax.set_ylabel("MSD")
+    if p.get("loglog"):
+        ax.set_xscale("log"); ax.set_yscale("log")
+    if any(n is not None for n in curves):
+        ax.legend()
+
+
+def _r_stacked(ax, df, m, p):
+    """Composition bars: for each x category, the proportion (or count) of each hue
+    category, stacked. Optional chi-square/Fisher p annotation."""
+    x, hue = m["x"], m["hue"]
+    ct = pd.crosstab(df[x].astype(str), df[hue].astype(str))
+    if p.get("proportion", True):
+        ct = ct.div(ct.sum(axis=1).replace(0, np.nan), axis=0)
+    cats = list(ct.columns)
+    colors = _group_colors(cats, p)
+    bottom = np.zeros(len(ct))
+    xs = np.arange(len(ct))
+    for c, col in zip(cats, colors):
+        vals = ct[c].to_numpy(float)
+        ax.bar(xs, vals, bottom=bottom, color=col, width=0.8, label=str(c),
+               edgecolor="white", linewidth=0.5)
+        bottom += np.nan_to_num(vals)
+    ax.set_xticks(xs); ax.set_xticklabels(ct.index)
+    ax.set_ylabel("proportion" if p.get("proportion", True) else "count")
+    if p.get("show_p"):
+        try:
+            from .stats import contingency_test
+            pl = contingency_test(df, x, hue)["text"].splitlines()
+            ptxt = next((ln for ln in pl if ln.startswith("Chi-square")), "")
+            # inside top-left with a white box: the engine overwrites the title, and 1.0+
+            # would sit under it. White bbox keeps it readable over the bars.
+            ax.text(0.02, 0.98, ptxt, transform=ax.transAxes, ha="left", va="top", fontsize=8,
+                    bbox=dict(fc="white", alpha=0.75, ec="none"))
+        except Exception:
+            pass
+    ax.legend(title=hue)
+
+
 _ALPHA = Param("alpha", "float", 0.8, 0.0, 1.0)
 _PAL = Param("palette", "palette", "colorblind",
              choices=("colorblind", "cividis", "viridis", "mako", "crest", "flare",
@@ -454,7 +602,9 @@ REGISTRY: dict[str, PlotSpec] = {s.key: s for s in [
              params=[_ALPHA, _PAL, Param("regression", "bool", False, label="Regression + R²")]),
     PlotSpec("line", "Line", "axes", _r_line,
              channels=[Channel("x", True), Channel("y", True, (NUMBER,)), Channel("hue", accepts=(CATEGORY,))],
-             params=[Param("linewidth", "float", 1.5, 0.5, 6.0), _ALPHA, _PAL]),
+             params=[Param("linewidth", "float", 1.5, 0.5, 6.0),
+                     Param("errorbar", "choice", "none", choices=("none", "SD", "SEM", "CI95"), label="error band"),
+                     _ALPHA, _PAL]),
     PlotSpec("bar", "Bar", "axes", _r_bar,
              channels=[Channel("x", True, (CATEGORY,)), Channel("y", True, (NUMBER,)), Channel("hue", accepts=(CATEGORY,))],
              params=[_ALPHA, _PAL]),
@@ -527,4 +677,37 @@ REGISTRY: dict[str, PlotSpec] = {s.key: s for s in [
              channels=[Channel("x", True, (NUMBER,), "log2FC"), Channel("y", True, (NUMBER,), "p-value")],
              params=[Param("fc_thr", "float", 1.0, 0.0, 10.0, label="|log2FC| threshold"),
                      Param("p_thr", "float", 0.05, 0.0, 1.0, label="p threshold"), _ALPHA]),
+    PlotSpec("superplot", "SuperPlot (cells + replicate means)", "axes", _r_superplot,
+             channels=[Channel("x", True, (CATEGORY,), "condition"), Channel("y", True, (NUMBER,)),
+                       Channel("rep", accepts=(CATEGORY, NUMBER), label="replicate")],
+             params=[Param("size", "float", 5, 1, 12, label="point size"),
+                     Param("alpha", "float", 0.35, 0.0, 1.0, label="raw points alpha"), _PAL]),
+    PlotSpec("qq", "Q-Q plot (normality)", "axes", _r_qq,
+             channels=[Channel("val", True, (NUMBER,), "value"), Channel("hue", accepts=(CATEGORY,))],
+             params=[_ALPHA, _PAL]),
+    PlotSpec("km", "Kaplan-Meier (survival + log-rank)", "axes", _r_km,
+             channels=[Channel("time", True, (NUMBER,), "time / duration"),
+                       Channel("event", accepts=(CATEGORY, NUMBER), label="event (status)"),
+                       Channel("hue", accepts=(CATEGORY,), label="group")],
+             params=[Param("event_value", "text", "", label="event value(s), comma-sep"),
+                     Param("censors", "bool", True, label="mark censored (ticks)"), _PAL]),
+    PlotSpec("traj", "Trajectories (XY tracks)", "axes", _r_traj,
+             channels=[Channel("x", True, (NUMBER,), "pos x"), Channel("y", True, (NUMBER,), "pos y"),
+                       Channel("id", True, label="track id"),
+                       Channel("time", accepts=(NUMBER,), label="time (order)"),
+                       Channel("hue", accepts=(CATEGORY,), label="group")],
+             params=[Param("linewidth", "float", 0.9, 0.2, 4.0),
+                     Param("alpha", "float", 0.7, 0.05, 1.0),
+                     Param("equal", "bool", True, label="equal aspect"), _PAL]),
+    PlotSpec("msd", "MSD (mean squared displacement)", "axes", _r_msd,
+             channels=[Channel("id", True, label="track id"),
+                       Channel("px", True, (NUMBER,), "pos x"), Channel("py", True, (NUMBER,), "pos y"),
+                       Channel("time", accepts=(NUMBER,), label="time (order)"),
+                       Channel("hue", accepts=(CATEGORY,), label="group")],
+             params=[Param("loglog", "bool", False, label="log-log axes"), _PAL]),
+    PlotSpec("stacked", "Stacked composition (+ chi2/Fisher)", "axes", _r_stacked,
+             channels=[Channel("x", True, (CATEGORY,), "condition"),
+                       Channel("hue", True, (CATEGORY,), "category")],
+             params=[Param("proportion", "bool", True, label="proportion (else count)"),
+                     Param("show_p", "bool", True, label="chi-square p in title"), _PAL]),
 ]}

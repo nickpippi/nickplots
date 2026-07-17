@@ -718,3 +718,230 @@ def robust_compare(df, value_col, group_col):
     L.append("Note: each row counts as 1 independent observation. If the cells come from")
     L.append("wells/replicates, aggregate by replicate first (avoids pseudo-replication).")
     return "\n".join(L)
+
+
+# =========================== aggregation (anti pseudo-replication) ============ #
+def aggregate_by(df, group_cols, method="mean"):
+    """Collapse rows to one row per group (mean/median/sum/count of every numeric
+    column). Non-numeric columns that are constant within a group are carried over
+    (first value). This is the fix for pseudo-replication: aggregate cells to their
+    replicate/track BEFORE testing, so n = number of replicates, not of cells."""
+    group_cols = [c for c in (group_cols or []) if c in df.columns]
+    if not group_cols:
+        raise ValueError("Choose at least one column to group by.")
+    if method not in ("mean", "median", "sum", "count"):
+        raise ValueError(f"Unknown aggregation: {method}")
+    g = df.groupby(group_cols, dropna=False)
+    num = [c for c in df.select_dtypes("number").columns if c not in group_cols]
+    res = getattr(g[num], method)() if num else pd.DataFrame(index=g.size().index)
+    obj = [c for c in df.columns if c not in group_cols and c not in num]
+    if obj:                                   # carry group-constant text columns
+        res = res.join(g[obj].first())
+    res["n_obs"] = g.size()                   # how many rows collapsed into each group
+    return res.reset_index()
+
+
+# =============================== Kaplan-Meier ================================= #
+def _event_mask(series, event_values):
+    """1 = event, 0 = censored. If event_values given, event = value in that set.
+    Otherwise: numeric column -> event where value != 0; text -> event where non-empty."""
+    if event_values:
+        want = {str(v) for v in event_values}
+        return series.astype(str).isin(want).to_numpy()
+    if pd.api.types.is_numeric_dtype(series):
+        return (pd.to_numeric(series, errors="coerce").fillna(0) != 0).to_numpy()
+    return series.notna().to_numpy() & (series.astype(str).str.strip() != "").to_numpy()
+
+
+def _km_one(time, event):
+    """Kaplan-Meier estimate for one group. Returns (t, S) as step arrays starting at
+    (0, 1), plus the censoring times."""
+    t = np.asarray(time, float)
+    e = np.asarray(event, bool)
+    ok = np.isfinite(t)
+    t, e = t[ok], e[ok]
+    order = np.argsort(t)
+    t, e = t[order], e[order]
+    times, surv = [0.0], [1.0]
+    s = 1.0
+    for ut in np.unique(t[e]):                # only event times drop the curve
+        at_risk = int(np.sum(t >= ut))
+        d = int(np.sum((t == ut) & e))
+        if at_risk > 0:
+            s *= (1 - d / at_risk)
+        times.append(float(ut)); surv.append(s)
+    cens = t[~e]
+    return np.array(times), np.array(surv), cens
+
+
+def km_curves(df, time_col, event_col, event_values=None, group_col=None):
+    """Kaplan-Meier survival curves (+ log-rank when grouped). Returns
+    (curves, logrank) where curves = {group: (t, S, censor_times)} and logrank =
+    {chi2, df, p} or None. group=None key when no grouping."""
+    d = df[[c for c in [time_col, event_col, group_col] if c]].copy()
+    d[time_col] = pd.to_numeric(d[time_col], errors="coerce")
+    d = d.dropna(subset=[time_col])
+    ev = _event_mask(d[event_col], event_values) if event_col else np.ones(len(d), bool)
+    curves = {}
+    if group_col:
+        tt = d[time_col].to_numpy()
+        gg = d[group_col].astype(str).to_numpy()
+        for name in pd.unique(gg):
+            sel = gg == name
+            curves[str(name)] = _km_one(tt[sel], ev[sel])
+        lr = logrank_test(tt, ev, gg)
+    else:
+        curves[None] = _km_one(d[time_col].to_numpy(), ev)
+        lr = None
+    return curves, lr
+
+
+def logrank_test(time, event, group):
+    """Multi-group log-rank test. time/event/group are parallel arrays (event bool).
+    Returns {chi2, df, p} using the multivariate hypergeometric covariance."""
+    from scipy.stats import chi2 as _chi2
+    t = np.asarray(time, float); e = np.asarray(event, bool); g = np.asarray(group)
+    ok = np.isfinite(t)
+    t, e, g = t[ok], e[ok], g[ok]
+    groups = list(pd.unique(g))
+    k = len(groups)
+    if k < 2:
+        return None
+    O = np.zeros(k); E = np.zeros(k); V = np.zeros((k, k))
+    for ut in np.unique(t[e]):
+        atrisk = t >= ut
+        N = int(atrisk.sum())
+        if N == 0:
+            continue
+        d = int(((t == ut) & e).sum())
+        n = np.array([int((atrisk & (g == name)).sum()) for name in groups], float)
+        dg = np.array([int(((t == ut) & e & (g == name)).sum()) for name in groups], float)
+        O += dg
+        E += d * n / N
+        if N > 1:
+            factor = d * (N - d) / (N - 1)
+            for a in range(k):
+                for b in range(k):
+                    kron = 1.0 if a == b else 0.0
+                    V[a, b] += factor * (n[a] / N) * (kron - n[b] / N)
+    diff = (O - E)[:-1]                        # drop one group (rank deficiency)
+    Vred = V[:-1, :-1]
+    try:
+        chi2 = float(diff @ np.linalg.solve(Vred, diff))
+    except np.linalg.LinAlgError:
+        chi2 = float(diff @ np.linalg.pinv(Vred) @ diff)
+    dfree = k - 1
+    return dict(chi2=chi2, df=dfree, p=float(_chi2.sf(chi2, dfree)),
+                observed={str(groups[i]): float(O[i]) for i in range(k)},
+                expected={str(groups[i]): float(E[i]) for i in range(k)})
+
+
+# ================================== MSD ====================================== #
+def msd_by_track(df, track_col, x_col, y_col, time_col=None, group_col=None, max_lag=None):
+    """Mean squared displacement averaged across tracks, per group.
+    Returns {group: (lags, msd, n_tracks)}. group=None key when ungrouped.
+    Each track is ordered by time_col (or row order), then MSD(tau) = mean over the
+    track of |r(i+tau)-r(i)|^2; the per-track curves are averaged within each group."""
+    d = df.copy()
+    d[x_col] = pd.to_numeric(d[x_col], errors="coerce")
+    d[y_col] = pd.to_numeric(d[y_col], errors="coerce")
+
+    def track_msd(sub):
+        if time_col:
+            sub = sub.sort_values(time_col)
+        xy = sub[[x_col, y_col]].dropna().to_numpy(float)
+        m = len(xy)
+        if m < 2:
+            return None
+        top = min(max_lag or (m - 1), m - 1)
+        out = np.full(top + 1, np.nan)
+        out[0] = 0.0                          # MSD(0)=0; keeps the lag-0 column non-empty
+        for lag in range(1, top + 1):
+            disp = xy[lag:] - xy[:-lag]
+            out[lag] = np.mean(np.sum(disp * disp, axis=1))
+        return out
+
+    def group_curve(gdf):
+        per = [track_msd(sub) for _, sub in gdf.groupby(track_col)]
+        per = [c for c in per if c is not None]
+        if not per:
+            return None
+        L = max(len(c) for c in per)
+        M = np.full((len(per), L), np.nan)
+        for i, c in enumerate(per):
+            M[i, :len(c)] = c
+        msd = np.nanmean(M, axis=0)
+        lags = np.arange(L)
+        return lags[1:], msd[1:], len(per)         # drop lag 0 (MSD=0)
+
+    curves = {}
+    if group_col:
+        for name, gdf in d.groupby(group_col, dropna=False):
+            c = group_curve(gdf)
+            if c is not None:
+                curves[str(name)] = c
+    else:
+        c = group_curve(d)
+        if c is not None:
+            curves[None] = c
+    return curves
+
+
+# ====================== contingency (composition) test ======================= #
+def contingency_test(df, row_col, col_col):
+    """Chi-square test of independence for two categorical columns (+ Fisher exact for
+    2x2). Returns display-ready text plus the count table."""
+    from scipy.stats import chi2_contingency, fisher_exact
+    if not row_col or not col_col:
+        raise ValueError("Choose two categorical columns.")
+    ct = pd.crosstab(df[row_col].astype(str), df[col_col].astype(str))
+    if ct.size == 0 or ct.shape[0] < 2 or ct.shape[1] < 2:
+        raise ValueError("Need at least 2x2 non-empty categories.")
+    chi2, p, dof, exp = chi2_contingency(ct)
+    n = int(ct.to_numpy().sum())
+    # Cramer's V effect size
+    v = float(np.sqrt(chi2 / (n * (min(ct.shape) - 1)))) if n and min(ct.shape) > 1 else float("nan")
+    low_exp = int((exp < 5).sum())
+    lines = [f"Contingency: {row_col} x {col_col}   (n={n})",
+             f"Chi-square = {chi2:.3f}, df={dof}, p = {p:.3g}",
+             f"Cramer's V = {v:.3f}"]
+    if ct.shape == (2, 2):
+        odds, pf = fisher_exact(ct.to_numpy())
+        lines.append(f"Fisher exact (2x2): OR = {odds:.3g}, p = {pf:.3g}")
+    if low_exp:
+        lines.append(f"Warning: {low_exp} cell(s) with expected count < 5 "
+                     f"(chi-square approximation weak; prefer Fisher).")
+    return dict(text="\n".join(lines), columns=["", *ct.columns.tolist()],
+                rows=[[idx, *map(int, row)] for idx, row in zip(ct.index, ct.to_numpy())])
+
+
+# ===================== ready-to-paste methods sentence ======================= #
+def methods_sentence(df, value_col, group_col):
+    """One-paragraph statistics sentence for a figure legend / methods section,
+    with test name, n per group, effect size + CI and p — computed the same robust way
+    as robust_compare (non-parametric)."""
+    from scipy import stats as st
+    d = df[[value_col, group_col]].copy()
+    d[value_col] = pd.to_numeric(d[value_col], errors="coerce")
+    d = d.dropna()
+    d[group_col] = d[group_col].astype(str)
+    groups = {g: sub[value_col].to_numpy(float) for g, sub in d.groupby(group_col)}
+    groups = {g: v for g, v in groups.items() if len(v)}
+    names = list(groups)
+    if len(names) < 2:
+        return "Need at least two non-empty groups."
+    ns = ", ".join(f"{g}: n={len(v)}" for g, v in groups.items())
+    if len(names) == 2:
+        a, b = groups[names[0]], groups[names[1]]
+        U, p = st.mannwhitneyu(a, b, alternative="two-sided")
+        delta = _cliffs_delta(a, b)
+        lo, hi = _boot_ci(_cliffs_delta, a, b)
+        return (f"{value_col} was compared between {names[0]} and {names[1]} "
+                f"({ns}) with a two-sided Mann-Whitney U test "
+                f"(U={U:.0f}, p={p:.3g}); effect size Cliff's delta = {delta:.2f} "
+                f"[95% CI {lo:.2f}, {hi:.2f}].")
+    H, p = st.kruskal(*groups.values())
+    pw = pairwise_sig(d, value_col, group_col)
+    npairs = f"; {len(pw)} pairwise comparison(s), Holm-corrected" if pw else ""
+    return (f"{value_col} was compared across {len(names)} groups ({ns}) with a "
+            f"Kruskal-Wallis test (H={H:.2f}, df={len(names)-1}, p={p:.3g}){npairs}.")

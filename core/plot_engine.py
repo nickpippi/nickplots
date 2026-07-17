@@ -6,7 +6,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from .data_loader import column_kinds
+from .data_loader import column_kinds, CATEGORY
 from .plot_registry import REGISTRY, PlotSpec
 
 
@@ -45,6 +45,7 @@ class Style:
     fig_w_mm: float | None = None    # if both set, they override the size
     fig_h_mm: float | None = None
     colors: dict | None = None       # {category: color} hand-picked per-group colors
+    show_n: bool = False             # append (n=k) to categorical x tick labels
 
 
 def _apply_axes(ax, st):
@@ -334,6 +335,21 @@ def _draw_threshold_lines(ax, lines):
                       color=color, ls="--", lw=1.3, zorder=3)
 
 
+def _append_group_n(ax, df, xcol):
+    """Append (n=k) to each categorical x tick label, k = rows in that category."""
+    counts = df[xcol].astype(str).value_counts()
+    labs = ax.get_xticklabels()
+    if not labs:
+        return
+    new = []
+    for tl in labs:
+        key = tl.get_text()
+        n = counts.get(key)
+        new.append(f"{key}\n(n={int(n)})" if n is not None else key)
+    ax.set_xticks(ax.get_xticks())            # pin ticks before relabel (avoids warning)
+    ax.set_xticklabels(new)
+
+
 def _draw_annotations(ax, anns):
     for a in anns or []:
         x, y, txt = a.get("x", 0.5), a.get("y", 0.5), a.get("text", "")
@@ -397,6 +413,8 @@ def render(layers, df, *, fig=None, figsize=(7, 5), dpi=110, title="", xlabel=""
         ax.set_xlabel(xlabel or disp(base["x"]), color=fg)
     if ylabel or base.get("y"):
         ax.set_ylabel(ylabel or disp(base["y"]), color=fg)
+    if style.show_n and base.get("x") and column_kinds(df).get(base["x"]) == CATEGORY:
+        _append_group_n(ax, df, base["x"])
 
     will_legend = legend.show and bool(ax.get_legend_handles_labels()[0] or auto_handles)
     if legend.pos == "outside" and will_legend:

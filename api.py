@@ -47,6 +47,8 @@ class Api:
         self._xlsx = None
         self._panel_data = {}     # id -> dataframe snapshot, one per panel frame
         self._panel_seq = 0
+        self._datasets = {}       # name -> loaded dataframe (multi-dataset manager)
+        self._active = None
 
     def _win(self):
         return self._window or (webview.windows[0] if webview.windows else None)
@@ -59,7 +61,8 @@ class Api:
         d = dict(path=path, n=int(len(self._view)), cols=list(self._view.columns),
                  kinds=DL.column_kinds(self._view),
                  numeric=DL.columns_by_kind(self._view, DL.NUMBER),
-                 category=DL.columns_by_kind(self._view, DL.CATEGORY), error=error)
+                 category=DL.columns_by_kind(self._view, DL.CATEGORY), error=error,
+                 datasets=list(self._datasets.keys()), active=self._active)
         if extra:
             d.update(extra)
         return d
@@ -79,7 +82,47 @@ class Api:
         self._view = self._df
         self._csv_path = path
         self._xlsx = None
+        name = os.path.basename(path); base = name; i = 2
+        while name in self._datasets:                 # keep every loaded file distinct
+            name = f"{base} ({i})"; i += 1
+        self._datasets[name] = self._df
+        self._active = name
         return self._info(path)
+
+    def list_datasets(self):
+        return dict(datasets=list(self._datasets.keys()), active=self._active)
+
+    def activate_dataset(self, name):
+        """Switch the working data to a previously loaded dataset (as originally loaded)."""
+        if name not in self._datasets:
+            return None
+        self._df = self._view = self._datasets[name]
+        self._active = name
+        self._csv_path = None
+        return self._info(name)
+
+    def remove_dataset(self, name):
+        self._datasets.pop(name, None)
+        if self._active == name:
+            if self._datasets:
+                self._active = next(iter(self._datasets))
+                self._df = self._view = self._datasets[self._active]
+            else:
+                self._active = self._df = self._view = None
+                return dict(datasets=[], active=None, cleared=True)
+        return self._info(self._active)
+
+    def combine_datasets(self, colname="dataset"):
+        """Concatenate every loaded dataset into one, tagging each row with its source
+        file in a new column — for cross-file comparison and SuperPlots by replicate."""
+        if len(self._datasets) < 2:
+            return dict(error="Load at least 2 datasets to combine.")
+        col = (colname or "dataset").strip() or "dataset"
+        frames = [df.assign(**{col: name}) for name, df in self._datasets.items()]
+        self._df = self._view = pd.concat(frames, ignore_index=True)
+        self._active = "(combined)"
+        self._csv_path = None
+        return self._info("(combined)")
 
     def set_filter(self, expr):
         if self._df is None:
@@ -156,7 +199,7 @@ class Api:
                      ymin=self._f(d.get("ymin")), ymax=self._f(d.get("ymax")),
                      despine=bool(d.get("despine")), tick_size=float(d.get("tick_size") or 0),
                      fig_w_mm=self._f(d.get("fig_w_mm")), fig_h_mm=self._f(d.get("fig_h_mm")),
-                     colors=(d.get("colors") or None))
+                     colors=(d.get("colors") or None), show_n=bool(d.get("show_n")))
 
     def _legend(self, d):
         return Legend(show=bool(d["show"]), pos=d["pos"], x=float(d["x"]), y=float(d["y"]),
@@ -590,6 +633,114 @@ class Api:
         else:
             self._view = self._df
         return self._info()
+
+    def aggregate_data(self, group_cols, method="mean"):
+        """Collapse the current data to one row per group (mean/median/sum/count).
+        Becomes the new working data (like reshape). Fix for pseudo-replication:
+        aggregate cells to their replicate/track before plotting or testing."""
+        if self._view is None:
+            return None
+        try:
+            self._df = S.aggregate_by(self._view, group_cols, method)
+        except Exception as e:
+            return dict(error=str(e))
+        self._view = self._df
+        return self._info(extra={"aggregated": True})
+
+    def add_computed_column(self, name, expr):
+        """Create a new column from a pandas expression over the existing columns
+        (e.g. 'net_disp / cum_path'). Applies to the full dataframe so it survives
+        filters. Column names with spaces must be wrapped in backticks in the expr."""
+        if self._df is None:
+            return dict(error="Load data first.")
+        name = (name or "").strip()
+        if not name:
+            return dict(error="Give the new column a name.")
+        try:
+            values = self._df.eval(expr)
+        except Exception as e:
+            return dict(error=f"Invalid formula: {e}")
+        self._df = self._df.copy()
+        self._df[name] = values
+        if self._view is not self._df:
+            self._view = self._view.copy()
+            try:
+                self._view[name] = self._df[name].reindex(self._view.index)
+            except Exception:
+                self._view = self._df
+        else:
+            self._view = self._df
+        return self._info(extra={"created": name})
+
+    def contingency(self, row_col, col_col):
+        """Chi-square (+ Fisher 2x2) test of association between two categorical
+        columns. Result feeds the plot table (exportable) and a text summary."""
+        if self._view is None:
+            return None
+        try:
+            r = S.contingency_test(self._view, row_col, col_col)
+        except Exception as e:
+            return dict(error=str(e))
+        import pandas as _pd
+        self._table = _pd.DataFrame(r["rows"], columns=r["columns"])
+        return r
+
+    def methods_sentence(self, value_col, group_col):
+        """Ready-to-paste statistics sentence for a figure legend / methods section."""
+        if self._view is None:
+            return "Load data first."
+        try:
+            return S.methods_sentence(self._view, value_col, group_col)
+        except Exception as e:
+            return f"Error: {e}"
+
+    def survival_test(self, time_col, event_col, event_value, group_col):
+        """Log-rank test text for Kaplan-Meier groups (the KM plot shows the same p)."""
+        if self._view is None:
+            return "Load data first."
+        try:
+            ev = [s.strip() for s in str(event_value or "").split(",") if s.strip()]
+            _, lr = S.km_curves(self._view, time_col, event_col, ev, group_col)
+        except Exception as e:
+            return f"Error: {e}"
+        if not lr:
+            return "Need a grouping column with at least 2 groups."
+        obs = ", ".join(f"{g}: {int(o)} events" for g, o in lr["observed"].items())
+        return (f"Log-rank test: chi-square = {lr['chi2']:.2f}, df = {lr['df']}, "
+                f"p = {lr['p']:.3g}\nObserved events -> {obs}")
+
+    def save_template(self, state):
+        """Save the plot 'recipe' (type + channel mapping + params + labels) to a file,
+        so it can be re-applied to ANOTHER dataset with the same column names."""
+        layers = state.get("layers") or []
+        if not layers:
+            return dict(error="Build a plot first.")
+        path = self._win().create_file_dialog(
+            webview.SAVE_DIALOG, save_filename="plot.template.json",
+            file_types=("Nickplots Template (*.json)",))
+        if not path:
+            return None
+        path = path if isinstance(path, str) else path[0]
+        tpl = dict(kind="nickplots_template", version=1, layers=layers,
+                   title=state.get("title", ""), xlabel=state.get("xlabel", ""),
+                   ylabel=state.get("ylabel", ""), ncols=state.get("ncols"))
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(tpl, f, ensure_ascii=False, indent=2)
+        return path
+
+    def apply_template(self):
+        """Load a plot recipe saved with save_template."""
+        res = self._win().create_file_dialog(
+            webview.OPEN_DIALOG, file_types=("Nickplots Template (*.json)", "All files (*.*)"))
+        if not res:
+            return None
+        try:
+            d = json.load(open(res[0], encoding="utf-8"))
+        except Exception as e:
+            return dict(error=str(e))
+        if d.get("kind") != "nickplots_template":
+            return dict(error="Not a Nickplots template file.")
+        return d
 
     # ------------------------------- export -------------------------------- #
     def _export_kw(self, state):

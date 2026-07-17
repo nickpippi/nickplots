@@ -124,6 +124,22 @@
 
   .footer{padding:12px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:7px;
     background:#12151d}
+  /* collapsible menus (footer) */
+  .menu{border:1px solid var(--line);border-radius:10px;background:var(--panel2);overflow:hidden}
+  .menu>summary{list-style:none;cursor:pointer;padding:7px 11px;font-size:11.5px;color:var(--txt);user-select:none}
+  .menu>summary::-webkit-details-marker{display:none}
+  .menu>summary::after{content:'▾';float:right;color:var(--mut)}
+  .menu[open]>summary::after{content:'▴'}
+  .menu .menubody{padding:8px 9px;display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--line)}
+  /* accordion tiles: collapse everything but the title */
+  .sectile.collapsed>:not(h3){display:none}
+  .sectile.collapsed{padding-bottom:9px}
+  .sectile h3{cursor:pointer}
+  .sectile h3 .chev{color:var(--mut);font-size:10px;flex:0 0 auto;margin-right:2px}
+  /* wide-data nudge banner */
+  .banner{display:flex;align-items:center;gap:8px;background:var(--panel3);border:1px solid var(--line);
+    border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:11.5px;color:var(--mut)}
+  .banner .grow{flex:1}
 
   /* ---------- stage ---------- */
   .stage{flex:1;display:flex;flex-direction:column;padding:16px;gap:12px;min-width:0}
@@ -218,7 +234,30 @@
     <div class="panels">
       <!-- PLOT -->
       <section class="panel active" id="p-g">
-        <label class="lbl" data-i18n="Filter (pandas query)">Filter (pandas query)</label>
+        <div id="wideBanner" class="banner" style="display:none">
+          <span class="grow" data-i18n="This table looks wide (no group column). Tidy some columns to plot or compare them.">This table looks wide (no group column). Tidy some columns to plot or compare them.</span>
+          <button class="btn sm" style="flex:0 0 auto" onclick="gotoWideHelper()" data-i18n="Tidy columns">Tidy columns</button>
+          <button class="btn sm ghost" style="flex:0 0 auto" onclick="$('wideBanner').style.display='none'">✕</button>
+        </div>
+        <label class="lbl" data-i18n="Filter — build a condition">Filter — build a condition</label>
+        <div class="row3">
+          <select id="fCol"><option value="">column</option></select>
+          <select id="fOp">
+            <option value="==" data-i18n="is equal to">is equal to</option>
+            <option value="!=" data-i18n="is not equal to">is not equal to</option>
+            <option value="&gt;" data-i18n="greater than">greater than</option>
+            <option value="&gt;=" data-i18n="greater or equal">greater or equal</option>
+            <option value="&lt;" data-i18n="less than">less than</option>
+            <option value="&lt;=" data-i18n="less or equal">less or equal</option>
+            <option value="contains" data-i18n="contains (text)">contains (text)</option>
+          </select>
+          <input type="text" id="fVal" placeholder="value" data-i18n-ph="value" onkeydown="if(event.key==='Enter')addFilterCond()">
+        </div>
+        <div class="row2" style="margin-top:5px">
+          <button class="btn sm" onclick="addFilterCond()" data-i18n="＋ Add condition">＋ Add condition</button>
+          <button class="btn sm ghost" onclick="$('filter').value='';applyFilter()" data-i18n="Clear filter">Clear filter</button>
+        </div>
+        <label class="lbl" data-i18n="Filter (pandas query — advanced)">Filter (pandas query — advanced)</label>
         <div class="row2">
           <input type="text" id="filter" placeholder="dose > 5 and group == 'high'" data-i18n-ph="dose > 5 and group == 'high'">
           <button class="btn sm" style="flex:0 0 auto" onclick="applyFilter()" data-i18n="Apply">Apply</button>
@@ -254,6 +293,7 @@
         <div class="slider"><input type="range" id="fontScale" min="0.7" max="1.8" step="0.05" value="1"
              oninput="badge(this);dRender()"><span class="val">1.00</span></div>
         <label class="check"><input type="checkbox" id="grid" checked onchange="dRender()"> <span data-i18n="Grid">Grid</span></label>
+        <label class="check"><input type="checkbox" id="showN" onchange="dRender()"> <span data-i18n="Show n per group (adds (n=k) to the categorical X labels)">Show n per group (adds (n=k) to the categorical X labels)</span></label>
         <div class="sectile">
           <h3 data-i18n="Color override">Color override</h3>
           <p class="hint" data-i18n="Overrides the theme background. Clear to go back to the theme.">Overrides the theme background. Clear to go back to the theme.</p>
@@ -346,7 +386,16 @@
           <label class="lbl" data-i18n="Value (numeric)">Value (numeric)</label><select id="testVal"></select>
           <label class="lbl" data-i18n="Group (categorical)">Group (categorical)</label><select id="testGrp"></select>
           <button class="btn sm" style="margin-top:8px;width:100%" onclick="runTest()" data-i18n="Compare (non-parametric + effect + CI)">Compare (non-parametric + effect + CI)</button>
+          <button class="btn sm ghost" style="margin-top:6px;width:100%" onclick="runMethods()" data-i18n="📋 Methods sentence (copy-ready)">📋 Methods sentence (copy-ready)</button>
           <div class="statusbox" id="testOut" style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:11px">—</div>
+        </div>
+        <div class="sectile">
+          <h3 data-i18n="Composition test (chi² / Fisher)">Composition test (chi² / Fisher)</h3>
+          <p class="hint" data-i18n="Association between two categorical columns (e.g. treatment × outcome). Chi-square, Cramér's V, and Fisher exact for 2×2. The count table feeds the plot table (exportable).">Association between two categorical columns (e.g. treatment × outcome). Chi-square, Cramér's V, and Fisher exact for 2×2. The count table feeds the plot table (exportable).</p>
+          <label class="lbl" data-i18n="Rows (categorical)">Rows (categorical)</label><select id="ctRow"></select>
+          <label class="lbl" data-i18n="Columns (categorical)">Columns (categorical)</label><select id="ctCol"></select>
+          <button class="btn sm" style="margin-top:8px;width:100%" onclick="runContingency()" data-i18n="Test association">Test association</button>
+          <div class="statusbox" id="ctOut" style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:11px">—</div>
         </div>
         <div class="sectile">
           <h3 data-i18n="Diversity (Shannon index)">Diversity (Shannon index)</h3>
@@ -440,6 +489,48 @@
           </div>
         </div>
         <div class="sectile">
+          <h3 data-i18n="Datasets (multiple files)">Datasets (multiple files)</h3>
+          <p class="hint" data-i18n="Every CSV you load is kept here. Click one to switch to it, or combine all into one table (adds a source column) to compare across files or build SuperPlots by replicate.">Every CSV you load is kept here. Click one to switch to it, or combine all into one table (adds a source column) to compare across files or build SuperPlots by replicate.</p>
+          <div id="datasetList" class="statusbox" data-i18n="no datasets">no datasets</div>
+          <div class="row2" style="margin-top:6px;align-items:center">
+            <input type="text" id="combineCol" value="dataset" style="flex:1">
+            <button class="btn sm" style="flex:0 0 auto" onclick="combineDatasets()" data-i18n="Combine all">Combine all</button>
+          </div>
+        </div>
+        <div class="sectile">
+          <h3 data-i18n="Aggregate (per replicate / track)">Aggregate (per replicate / track)</h3>
+          <p class="hint" data-i18n="Collapse rows to one per group (mean/median…). Aggregate cells to their track/replicate BEFORE testing to avoid pseudo-replication. Pick several columns to keep groups distinct (e.g. treatment + track_id).">Collapse rows to one per group (mean/median…). Aggregate cells to their track/replicate BEFORE testing to avoid pseudo-replication. Pick several columns to keep groups distinct (e.g. treatment + track_id).</p>
+          <label class="lbl" data-i18n="Group by">Group by</label>
+          <div class="scrollbox" id="aggCols" style="max-height:120px"><span style="color:var(--faint)" data-i18n="load a CSV">load a CSV</span></div>
+          <div class="row2" style="margin-top:6px">
+            <select id="aggMethod" style="flex:1"><option>mean</option><option>median</option><option>sum</option><option>count</option></select>
+            <button class="btn sm" style="flex:0 0 auto" onclick="runAggregate()" data-i18n="Aggregate">Aggregate</button>
+          </div>
+        </div>
+        <div class="sectile">
+          <h3 data-i18n="New column (formula)">New column (formula)</h3>
+          <p class="hint" data-i18n="Create a column from a formula over existing columns. Use the builder for column op column, or type any pandas expression (wrap names with spaces in backticks).">Create a column from a formula over existing columns. Use the builder for column op column, or type any pandas expression (wrap names with spaces in backticks).</p>
+          <input type="text" id="newColName" placeholder="new column name" data-i18n-ph="new column name">
+          <div class="row3" style="margin-top:5px">
+            <select id="fcA"></select>
+            <select id="fcOp"><option value="+">+</option><option value="-">−</option><option value="*">×</option><option value="/">÷</option></select>
+            <select id="fcB"></select>
+          </div>
+          <button class="btn sm ghost" style="margin-top:5px;width:100%" onclick="buildFormula()" data-i18n="Builder → expression">Builder → expression</button>
+          <div class="row2" style="margin-top:5px">
+            <input type="text" id="newColExpr" placeholder="e.g. net_disp / cum_path" data-i18n-ph="e.g. net_disp / cum_path" style="flex:1">
+            <button class="btn sm" style="flex:0 0 auto" onclick="runComputedColumn()" data-i18n="Create">Create</button>
+          </div>
+        </div>
+        <div class="sectile">
+          <h3 data-i18n="Plot template">Plot template</h3>
+          <p class="hint" data-i18n="Save the current plot recipe (type + columns + options + labels) and re-apply it to another dataset with the same column names.">Save the current plot recipe (type + columns + options + labels) and re-apply it to another dataset with the same column names.</p>
+          <div class="row2">
+            <button class="btn sm" onclick="saveTemplate()" data-i18n="💾 Save template">💾 Save template</button>
+            <button class="btn sm ghost" onclick="applyTemplate()" data-i18n="📂 Apply template">📂 Apply template</button>
+          </div>
+        </div>
+        <div class="sectile">
           <h3 data-i18n="Multi-figure panel (A/B/C)">Multi-figure panel (A/B/C)</h3>
           <p class="hint" data-i18n-html="adv.panelHint">Build the plot in the "Plot" tab, then add it as a panel frame. Each frame keeps the <b>title and axis labels</b> you typed for it. After building, <b>drag the dividers on the panel</b> to resize the plots; the mm size in the Style tab applies to the panel too.</p>
           <button class="btn sm" onclick="addPanelItem()" data-i18n="＋ Add current plot to the panel">＋ Add current plot to the panel</button>
@@ -466,6 +557,24 @@
           </div>
           <button class="btn sm" style="margin-top:4px;width:100%" onclick="exportAdvanced()" data-i18n="Export this figure">Export this figure</button>
         </div>
+        <div class="sectile" id="widePlotTile">
+          <h3 data-i18n="Plot wide columns (no melting)">Plot wide columns (no melting)</h3>
+          <p class="hint" data-i18n="Your measurement is spread across several columns (e.g. control / treated / washout, each holding values)? Pick those columns and a plot type: it tidies them for you and plots, with the columns as the X categories. Also readies the data for Compare groups.">Your measurement is spread across several columns (e.g. control / treated / washout, each holding values)? Pick those columns and a plot type: it tidies them for you and plots, with the columns as the X categories. Also readies the data for Compare groups.</p>
+          <label class="lbl" data-i18n="Value columns (the wide measure)">Value columns (the wide measure)</label>
+          <div class="scrollbox" id="wideCols" style="max-height:120px"><span style="color:var(--faint)" data-i18n="load a CSV">load a CSV</span></div>
+          <label class="lbl" data-i18n="Keep as ID (optional)">Keep as ID (optional)</label>
+          <select id="wideId"><option value="">—</option></select>
+          <div class="row2" style="margin-top:6px">
+            <select id="widePlot" style="flex:1">
+              <option value="box_points">box + points</option>
+              <option value="box">box</option>
+              <option value="violin">violin</option>
+              <option value="bar_err">bar ± error</option>
+              <option value="strip">strip</option>
+            </select>
+            <button class="btn sm" style="flex:0 0 auto" onclick="widePlotGo()" data-i18n="Tidy & plot">Tidy &amp; plot</button>
+          </div>
+        </div>
         <div class="sectile">
           <h3 data-i18n="Reshape data (long ⇄ wide)">Reshape data (long ⇄ wide)</h3>
           <p class="hint" data-i18n="Wide→long (melt): collapses several measure columns into one. Long→wide (pivot): spreads categories into columns.">Wide→long (melt): collapses several measure columns into one. Long→wide (pivot): spreads categories into columns.</p>
@@ -491,26 +600,34 @@
     </div>
 
     <div class="footer">
-      <div class="dpirow">
-        <span data-i18n="Export DPI">Export DPI</span>
-        <input type="number" id="dpi" value="300" min="300" max="1200" step="50"
-               onchange="if(+this.value<300)this.value=300">
-        <span class="muted" data-i18n="(min. 300)">(min. 300)</span>
-      </div>
-      <label class="check" style="margin:2px 0"><input type="checkbox" id="exportTransparent"> <span data-i18n="Transparent background (keeps ticks, labels and title)">Transparent background (keeps ticks, labels and title)</span></label>
       <button class="btn" onclick="exportFig()" data-i18n="⬇  Export figure (TIFF/PNG/PDF/SVG)">⬇  Export figure (TIFF/PNG/PDF/SVG)</button>
-      <div class="row2">
-        <button class="btn sm" onclick="exportCode()" data-i18n="⬇ Python code">⬇ Python code</button>
-        <button class="btn sm ghost" onclick="exportCsv()" data-i18n="Filtered CSV">Filtered CSV</button>
-      </div>
-      <div class="row2">
-        <button class="btn sm" onclick="saveProject()" data-i18n="💾 Save project">💾 Save project</button>
-        <button class="btn sm" onclick="openProject()" data-i18n="📂 Open project">📂 Open project</button>
-      </div>
-      <div class="row2">
-        <button class="btn sm ghost" onclick="savePreset()" data-i18n="Save preset">Save preset</button>
-        <button class="btn sm ghost" onclick="applyPreset()" data-i18n="Apply preset">Apply preset</button>
-      </div>
+      <details class="menu">
+        <summary data-i18n="Export ▾ (options, code, data)">Export ▾ (options, code, data)</summary>
+        <div class="menubody">
+          <div class="dpirow">
+            <span data-i18n="Export DPI">Export DPI</span>
+            <input type="number" id="dpi" value="300" min="300" max="1200" step="50"
+                   onchange="if(+this.value<300)this.value=300">
+            <span class="muted" data-i18n="(min. 300)">(min. 300)</span>
+          </div>
+          <label class="check" style="margin:2px 0"><input type="checkbox" id="exportTransparent"> <span data-i18n="Transparent background (keeps ticks, labels and title)">Transparent background (keeps ticks, labels and title)</span></label>
+          <button class="btn sm" onclick="exportCode()" data-i18n="⬇ Python code">⬇ Python code</button>
+          <button class="btn sm ghost" onclick="exportCsv()" data-i18n="Filtered CSV">Filtered CSV</button>
+        </div>
+      </details>
+      <details class="menu">
+        <summary data-i18n="Session ▾ (project, preset)">Session ▾ (project, preset)</summary>
+        <div class="menubody">
+          <div class="row2">
+            <button class="btn sm" onclick="saveProject()" data-i18n="💾 Save project">💾 Save project</button>
+            <button class="btn sm" onclick="openProject()" data-i18n="📂 Open project">📂 Open project</button>
+          </div>
+          <div class="row2">
+            <button class="btn sm ghost" onclick="savePreset()" data-i18n="Save preset">Save preset</button>
+            <button class="btn sm ghost" onclick="applyPreset()" data-i18n="Apply preset">Apply preset</button>
+          </div>
+        </div>
+      </details>
     </div>
   </aside>
 
@@ -902,8 +1019,32 @@ window.addEventListener('pywebviewready', async () => {
   $('lang').value = LANG;
   fillPlotTypes(); fillThemes(); buildConfig();
   setupHelp();                 // must run before applyLang: it adds the "Tip" caption
+  setupAccordion();            // collapsible tiles (declutter dense tabs)
   applyLang();
 });
+
+// Each panel's .sectile tiles become an exclusive accordion: one open at a time,
+// the first open by default. Clicking the "?" help badge never toggles the tile.
+function setupAccordion(){
+  document.querySelectorAll('.panel').forEach(panel=>{
+    const tiles=[...panel.querySelectorAll('.sectile')];
+    tiles.forEach((tile,i)=>{
+      const h3=tile.querySelector('h3'); if(!h3) return;
+      if(!h3.querySelector('.chev')){                 // chevron marker at the start
+        const c=document.createElement('span'); c.className='chev'; c.textContent='▾';
+        h3.insertBefore(c, h3.firstChild);
+      }
+      if(i>0) tile.classList.add('collapsed');
+      h3.addEventListener('click',e=>{
+        if(e.target.closest('.helpbtn')) return;      // let the "?" badge do its thing
+        const open=!tile.classList.contains('collapsed');
+        tiles.forEach(t=>{ t.classList.add('collapsed'); const v=t.querySelector('h3 .chev'); if(v)v.textContent='▸'; });
+        if(!open){ tile.classList.remove('collapsed'); const v=h3.querySelector('.chev'); if(v)v.textContent='▾'; }
+      });
+      if(i>0){ const v=h3.querySelector('.chev'); if(v)v.textContent='▸'; }
+    });
+  });
+}
 
 function tab(t){
   document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('active',e.dataset.t===t));
@@ -937,6 +1078,56 @@ function onData(r){
     ? COLS.numeric.map(c=>`<option>${c}</option>`).join('')
     : '<option value="">—</option>';
   buildConfig(); buildNumCols(); fillTestSelects(); buildAdvanced(); renderGateList(); resetHistory();
+  fillFilterCols(); fillAnalysisCols(); fillAggCols(); renderDatasets(r.datasets||[], r.active);
+  fillWideCols(); maybeWideBanner();
+}
+function fillWideCols(){
+  $('wideCols').innerHTML = COLS.numeric.length
+    ? COLS.numeric.map(c=>`<label class="check"><input type="checkbox" value="${c}"> ${c}</label>`).join('')
+    : '<span style="color:var(--faint)">'+t('no numeric columns')+'</span>';
+  $('wideId').innerHTML = '<option value="">—</option>'+Object.keys(COLS.kinds).map(c=>`<option>${c}</option>`).join('');
+}
+// Nudge when the data has no category column but several numeric ones -> likely wide.
+function maybeWideBanner(){
+  const b=$('wideBanner'); if(!b) return;
+  b.style.display = (COLS.category.length===0 && COLS.numeric.length>=2) ? 'flex' : 'none';
+}
+function gotoWideHelper(){
+  tab('x');
+  const tile=$('widePlotTile'); if(!tile) return;
+  tile.parentElement.querySelectorAll('.sectile').forEach(s=>{ s.classList.add('collapsed'); const v=s.querySelector('h3 .chev'); if(v)v.textContent='▸'; });
+  tile.classList.remove('collapsed'); const c=tile.querySelector('h3 .chev'); if(c)c.textContent='▾';
+  tile.scrollIntoView({behavior:'smooth',block:'center'});
+}
+async function widePlotGo(){
+  const vals=[...$('wideCols').querySelectorAll('input:checked')].map(i=>i.value);
+  if(vals.length<2){ toast(t('Pick at least two value columns'),'bad'); return; }
+  const idc=$('wideId').value;
+  const r=await window.pywebview.api.reshape_melt(idc?[idc]:[], vals, 'condition','value');
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  onData(r);
+  $('plotType').value=$('widePlot').value; buildConfig();
+  const setCh=(ch,v)=>{ const s=$('plotConfig').querySelector('[data-ch="'+ch+'"]'); if(s && [...s.options].some(o=>o.value===v)) s.value=v; };
+  setCh('x','condition'); setCh('y','value');
+  tab('g'); plotBase();
+  toast(t('Tidied & plotted'),'good');
+}
+function fillFilterCols(){
+  const all=Object.keys(COLS.kinds);
+  $('fCol').innerHTML = '<option value="">column</option>'+all.map(c=>`<option>${c}</option>`).join('');
+}
+function addFilterCond(){
+  const col=$('fCol').value, op=$('fOp').value, raw=$('fVal').value.trim();
+  if(!col){ toast(t('Choose a column'),'bad'); return; }
+  const isNum = COLS.kinds[col]==='number';
+  const q = s => '"'+String(s).replace(/"/g,'\\"')+'"';
+  let cond;
+  if(op==='contains') cond='`'+col+'`.str.contains('+q(raw)+', case=False, na=False)';
+  else { const val = (isNum && raw!=='' && !isNaN(raw)) ? raw : q(raw); cond='`'+col+'` '+op+' '+val; }
+  const cur=$('filter').value.trim();
+  $('filter').value = cur ? cur+' and '+cond : cond;
+  $('fVal').value='';
+  applyFilter();
 }
 async function toCategory(){
   const col = $('toCatCol').value;
@@ -970,6 +1161,8 @@ function buildConfig(){
       // value stays canonical (English); only the shown text is translated
       h+=`<label class="lbl">${tParam(p.label)}</label><select data-pp="${p.name}" onchange="dRender()">`+
          p.choices.map(c=>`<option value="${c}" ${c===p.default?'selected':''}>${p.kind==='palette'?c:tChoice(c)}</option>`).join('')+`</select>`;
+    }else if(p.kind==='text'){
+      h+=`<label class="lbl">${tParam(p.label)}</label><input type="text" data-pp="${p.name}" value="${p.default||''}" oninput="dRender()">`;
     }else{
       const step = p.kind==='int'?1:0.05;
       h+=`<label class="lbl">${tParam(p.label)}</label><div class="slider">
@@ -1039,7 +1232,7 @@ function gather(){
     title:$('title').value, xlabel:$('xlabel').value, ylabel:$('ylabel').value,
     layers: STACK.length? STACK : [],
     style:{theme:$('theme').value, context:$('context').value, font_scale:parseFloat($('fontScale').value),
-           grid:$('grid').checked, fig_bg:STYLE.fig_bg, ax_bg:STYLE.ax_bg, colors:STYLE.colors,
+           grid:$('grid').checked, show_n:$('showN').checked, fig_bg:STYLE.fig_bg, ax_bg:STYLE.ax_bg, colors:STYLE.colors,
            logx:$('logx').checked, logy:$('logy').checked,
            xmin:$('xmin').value, xmax:$('xmax').value, ymin:$('ymin').value, ymax:$('ymax').value,
            despine:$('despine').checked, tick_size:parseFloat($('ticksize').value)||0,
@@ -1882,6 +2075,105 @@ function buildAdvanced(){
   buildReshape();
 }
 function advSelectedCols(){ return [...$('advCols').querySelectorAll('input:checked')].map(i=>i.value); }
+
+/* ---------- datasets / aggregation / formula / template / new analyses ---------- */
+function fillAnalysisCols(){
+  const cat=COLS.category.map(c=>`<option>${c}</option>`).join('');
+  $('ctRow').innerHTML=cat; $('ctCol').innerHTML=cat;
+}
+function fillAggCols(){
+  const all=Object.keys(COLS.kinds);
+  $('aggCols').innerHTML = all.length
+    ? all.map(c=>`<label class="check"><input type="checkbox" value="${c}"> ${c}</label>`).join('')
+    : '<span style="color:var(--faint)">'+t('load a CSV')+'</span>';
+  const num='<option value="">—</option>'+COLS.numeric.map(c=>`<option>${c}</option>`).join('');
+  $('fcA').innerHTML=num; $('fcB').innerHTML=num;
+}
+function renderDatasets(list, active){
+  if(!list || !list.length){ $('datasetList').textContent=t('no datasets'); return; }
+  $('datasetList').innerHTML = list.map(n=>{
+    const on = n===active;
+    const safe=n.replace(/"/g,'&quot;');
+    return `<div class="row2" style="align-items:center;margin:2px 0">
+      <button class="btn sm ${on?'':'ghost'}" style="flex:1;text-align:left" onclick="activateDataset('${safe}')">${on?'● ':''}${n}</button>
+      <button class="btn sm ghost" style="flex:0 0 auto" onclick="removeDataset('${safe}')">✕</button></div>`;
+  }).join('');
+}
+async function activateDataset(name){
+  const r=await window.pywebview.api.activate_dataset(name);
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  onData(r); dRender(); toast(t('Switched to ')+name,'good');
+}
+async function removeDataset(name){
+  const r=await window.pywebview.api.remove_dataset(name);
+  if(!r) return;
+  if(r.cleared){ COLS={numeric:[],category:[],kinds:{}}; renderDatasets([],null); $('chipText').textContent=t('no file'); return; }
+  onData(r);
+}
+async function combineDatasets(){
+  const r=await window.pywebview.api.combine_datasets($('combineCol').value);
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  onData(r); toast(t('Datasets combined'),'good');
+}
+async function runAggregate(){
+  const cols=[...$('aggCols').querySelectorAll('input:checked')].map(i=>i.value);
+  if(!cols.length){ toast(t('Pick at least one column to group by'),'bad'); return; }
+  const r=await window.pywebview.api.aggregate_data(cols, $('aggMethod').value);
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  onData(r); toast(t('Aggregated: ')+r.n+t(' rows'),'good');
+}
+function buildFormula(){
+  const a=$('fcA').value, op=$('fcOp').value, b=$('fcB').value;
+  if(!a||!b){ toast(t('Pick both columns'),'bad'); return; }
+  const bt=c=>/[^A-Za-z0-9_]/.test(c)?'`'+c+'`':c;    // backtick names with spaces/symbols
+  $('newColExpr').value = bt(a)+' '+op+' '+bt(b);
+}
+async function runComputedColumn(){
+  const name=$('newColName').value.trim(), expr=$('newColExpr').value.trim();
+  if(!name||!expr){ toast(t('Give a name and a formula'),'bad'); return; }
+  const r=await window.pywebview.api.add_computed_column(name, expr);
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  onData(r); toast(t('Column created: ')+(r.created||name),'good');
+}
+async function saveTemplate(){
+  if(!STACK.length){ toast(t('Plot something first'),'bad'); return; }
+  const r=await window.pywebview.api.save_template(gather());
+  if(r && r.error) toast(r.error,'bad'); else if(r) toast(t('Template saved'),'good');
+}
+async function applyTemplate(){
+  const d=await window.pywebview.api.apply_template();
+  if(!d) return; if(d.error){ toast(d.error,'bad'); return; }
+  applyTemplateData(d); toast(t('Template applied'),'good');
+}
+function applyTemplateData(d){
+  const layers=d.layers||[];
+  if(!layers.length) return;
+  // reflect the first layer in the config panel, then restore the whole stack
+  $('plotType').value = layers[0].spec_key; buildConfig();
+  const L=layers[0];
+  $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>{ if(L.mapping[s.dataset.ch]!=null && [...s.options].some(o=>o.value===L.mapping[s.dataset.ch])) s.value=L.mapping[s.dataset.ch]; });
+  $('plotConfig').querySelectorAll('[data-pp]').forEach(w=>{ const v=L.params[w.dataset.pp];
+    if(v===undefined) return;
+    if(w.type==='checkbox') w.checked=!!v; else { w.value=v; if(w.type==='range') badge(w); }
+  });
+  $('title').value=d.title||''; $('xlabel').value=d.xlabel||''; $('ylabel').value=d.ylabel||'';
+  STACK=layers.slice(); updLayers(); render();
+}
+async function runMethods(){
+  const out=await window.pywebview.api.methods_sentence($('testVal').value,$('testGrp').value);
+  $('testOut').textContent=out||'—';
+}
+async function runContingency(){
+  const r=await window.pywebview.api.contingency($('ctRow').value,$('ctCol').value);
+  if(!r){ toast(t('Load a CSV'),'bad'); return; }
+  if(r.error){ $('ctOut').textContent=r.error; return; }
+  $('ctOut').textContent=r.text;
+  $('rowinfo').style.display='block';
+  $('rowinfo').querySelector('h4').textContent=t('Contingency table');
+  let h='<tr>'+r.columns.map(c=>`<td style="color:var(--mut)"><b>${c}</b></td>`).join('')+'</tr>';
+  h+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${v}</td>`).join('')+'</tr>').join('');
+  $('rowtable').innerHTML=h;
+}
 function showImage(dataUrl){
   const img=$('plot'); img.src=dataUrl; img.style.display='block'; $('empty').style.display='none';
   $('legendBox').style.display='none'; $('gateLayer').style.display='none';
