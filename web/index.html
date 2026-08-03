@@ -202,6 +202,36 @@
   #dataGrid th input{font-weight:650;background:var(--panel2)}
   #dataGrid input:focus{background:#7c5cff18}
   .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 16px;border-top:1px solid var(--line)}
+  /* tool modal: left nav + panes (menu inside a menu) */
+  .toolcard{width:min(920px,95vw)}
+  .toolbody{display:flex;flex:1;min-height:0}
+  .toolnav{width:196px;flex:0 0 auto;border-right:1px solid var(--line);padding:10px;
+    overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+  .toolnav .btn{text-align:left;justify-content:flex-start}
+  .toolpanes{flex:1;min-width:0;padding:14px 16px;overflow-y:auto}
+  .toolpane{display:none}
+  .toolpane.on{display:block}
+  .toolpane h4{margin:0 0 4px;font-size:13px}
+  .toolout{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:11px;
+    background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px;
+    margin-top:8px;max-height:280px;overflow:auto}
+  .toolpane textarea{width:100%;min-height:110px;background:var(--panel2);color:var(--txt);
+    border:1px solid var(--line);border-radius:8px;padding:7px;font-family:ui-monospace,monospace;font-size:11px}
+  .toolpane h4{display:flex;align-items:center;gap:6px}
+  .toolpane p.desc{margin:2px 0 8px;color:var(--faint);font-size:11px;line-height:1.45}
+  /* labelled fields: every control says what it expects */
+  .toolgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin-top:8px}
+  .toolgrid label{display:flex;flex-direction:column;gap:3px;font-size:10.5px;
+    color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+  .toolgrid label b{font-weight:650;color:var(--txt);text-transform:none;letter-spacing:0;font-size:11.5px}
+  .toolrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px}
+  .toolrow>*{flex:1;min-width:120px}
+  .toolrow .btn{flex:0 0 auto}
+  /* "All / None" bar injected into every checkbox list */
+  .selall{display:flex;gap:5px;margin:0 0 5px;position:sticky;top:0;background:var(--panel2);padding-bottom:3px}
+  .selall .btn{width:auto;padding:2px 8px;font-size:10.5px}
+  .toolbtns{display:flex;gap:5px;margin:8px 16px 0}
+  .toolbtns .btn{flex:1;padding:6px 4px;font-size:11px}
 
   .panels::-webkit-scrollbar,.scrollbox::-webkit-scrollbar,.rowinfo::-webkit-scrollbar{width:9px}
   .panels::-webkit-scrollbar-thumb,.scrollbox::-webkit-scrollbar-thumb,.rowinfo::-webkit-scrollbar-thumb{
@@ -236,6 +266,11 @@
       <div class="tab" data-t="l" onclick="tab('l')" data-i18n="Legend">Legend</div>
       <div class="tab" data-t="a" onclick="tab('a')" data-i18n="Analysis">Analysis</div>
       <div class="tab" data-t="x" onclick="tab('x')" data-i18n="Advanced">Advanced</div>
+    </div>
+    <div class="toolbtns">
+      <button class="btn sm" onclick="openTool('bench')" data-i18n="🧪 Bench math">🧪 Bench math</button>
+      <button class="btn sm" onclick="openTool('stats')" data-i18n="📊 Statistics">📊 Statistics</button>
+      <button class="btn sm" onclick="openTool('data')" data-i18n="🩺 Data tools">🩺 Data tools</button>
     </div>
 
     <div class="panels">
@@ -272,6 +307,12 @@
         <label class="lbl" data-i18n="Plot type">Plot type</label>
         <select id="plotType" onchange="buildConfig()"></select>
         <div id="plotConfig"></div>
+        <label class="lbl" data-i18n="Split by (facet) — one panel per level">Split by (facet) — one panel per level</label>
+        <div class="row3">
+          <select id="facetCol" onchange="dRender()"><option value="">—</option></select>
+          <input type="number" id="facetCols" value="2" min="1" max="6" onchange="dRender()" title="columns">
+          <label class="check" style="margin:0"><input type="checkbox" id="facetShare" checked onchange="dRender()"> <span data-i18n="same scale">same scale</span></label>
+        </div>
         <label class="lbl" data-i18n="Labels">Labels</label>
         <div class="field"><input type="text" id="title" placeholder="Title" data-i18n-ph="Title" oninput="dRender()"></div>
         <div class="row2">
@@ -379,10 +420,6 @@
         <div class="sectile">
           <h3 data-i18n="Dimensionality reduction">Dimensionality reduction</h3>
           <label class="lbl" data-i18n="Numeric columns">Numeric columns</label>
-          <div class="row2" style="margin-bottom:5px">
-            <button class="btn sm" onclick="selectAllNumCols(true)" data-i18n="Select all">Select all</button>
-            <button class="btn sm ghost" onclick="selectAllNumCols(false)" data-i18n="Select none">Select none</button>
-          </div>
           <div class="scrollbox" id="numCols"><span style="color:var(--faint)" data-i18n="load a CSV">load a CSV</span></div>
           <label class="lbl" data-i18n="Method">Method</label>
           <select id="method"><option>PCA</option><option>t-SNE</option><option>UMAP</option></select>
@@ -441,16 +478,17 @@
           </div>
           <button class="btn sm ghost" id="lnPickBtn" style="margin-top:4px;width:100%" onclick="toggleLinePick()" data-i18n="Click the plot to pick X,Y">Click the plot to pick X,Y</button>
           <div id="lineList" class="statusbox" style="margin-top:6px" data-i18n="no lines">no lines</div>
-          <button class="btn sm ghost editModeBtn" style="margin-top:6px;width:100%" onclick="toggleGateMode()" data-i18n="Edit on the plot (drag regions/lines)">Edit on the plot (drag regions/lines)</button>
+          <div class="row2" style="margin-top:6px">
+            <button class="btn sm ghost editModeBtn" style="flex:1" onclick="toggleGateMode()" data-i18n="Edit on the plot (drag regions/lines)">Edit on the plot (drag regions/lines)</button>
+            <button class="btn sm" style="flex:1" onclick="analyzeRegions()" data-i18n="Analyze regions">Analyze regions</button>
+          </div>
           <button class="btn sm" style="margin-top:6px;width:100%" onclick="generateGatesFromLines()" data-i18n="⬇ Build regions from the lines (intersection cells)">⬇ Build regions from the lines (intersection cells)</button>
-          <button class="btn sm" style="margin-top:6px;width:100%" onclick="analyzeRegions()" data-i18n="Analyze regions">Analyze regions</button>
         </div>
         <div class="sectile">
           <h3 data-i18n="Named regions (gating)">Named regions (gating)</h3>
           <p class="hint" data-i18n-html="analysis.gatingHint">Draw closed regions (straight-edged, tiltable polygons), <b>name</b> them and <b>drag them on the plot</b> to adjust. Double-click an <b>edge</b> to insert a vertex; double-click or <b>right-click</b> a vertex to remove it (min. 3). Drag the <b>name</b> to reposition it. The live per-group count appears below. "Create column" generates a categorical column with each observation's region name. Uses the X/Y/hue from the Plot tab.</p>
           <label class="check"><input type="checkbox" id="showGates" checked onchange="toggleShowGates()"> <span data-i18n="👁 Show regions on the plot (turn off to preview without them)">👁 Show regions on the plot (turn off to preview without them)</span></label>
-          <label class="check"><input type="checkbox" id="gateMagnet" checked> <span data-i18n="🧲 Magnet: vertex snaps to vertices/edges of other regions">🧲 Magnet: vertex snaps to vertices/edges of other regions</span></label>
-          <div class="row2" style="align-items:center">
+          <div class="row2" style="align-items:center;margin-top:6px">
             <input type="text" id="gateName" placeholder="name (e.g. LR)" data-i18n-ph="name (e.g. LR)" style="flex:1">
             <input type="color" id="gateColor" value="#e23b3b" style="flex:0 0 auto">
           </div>
@@ -458,30 +496,51 @@
             <button class="btn sm" style="flex:1" onclick="addGate()" data-i18n="＋ Region">＋ Region</button>
             <button class="btn sm ghost editModeBtn" style="flex:1" id="gateModeBtn" onclick="toggleGateMode()" data-i18n="Edit on the plot (drag regions/lines)">Edit on the plot (drag regions/lines)</button>
           </div>
-          <p class="hint" style="margin-top:4px" data-i18n="In edit mode: drag the vertices or the interior; double-click the body adds a vertex, on a vertex removes it.">In edit mode: drag the vertices or the interior; double-click the body adds a vertex, on a vertex removes it.</p>
-          <label class="check" style="margin-top:4px"><input type="checkbox" id="gatesLock" onchange="toggleGatesLock()"> <span data-i18n="Lock regions (keep position when swapping X/Y)">Lock regions (keep position when swapping X/Y)</span></label>
-          <p class="hint" style="margin-top:4px" data-i18n-html="analysis.mergeHint">To <b>merge</b> regions, give them the <b>same name</b> (e.g. two cells both become "low") — they are counted together and get the same label in the created column.</p>
           <div id="gateList" style="margin-top:6px"></div>
-          <button class="btn sm ghost" style="margin-top:6px;width:100%" onclick="countGates()" data-i18n="Refresh count">Refresh count</button>
-          <button class="btn sm" style="margin-top:6px;width:100%" onclick="mergeGates()" data-i18n="⬡ Merge geometrically (same-named regions)">⬡ Merge geometrically (same-named regions)</button>
-          <div class="row2" style="margin-top:8px;align-items:center">
+          <div class="row2" style="margin-top:6px">
+            <button class="btn sm ghost" style="flex:1" onclick="countGates()" data-i18n="Refresh count">Refresh count</button>
+            <button class="btn sm" style="flex:1" onclick="mergeGates()" data-i18n="⬡ Merge same-named">⬡ Merge same-named</button>
+          </div>
+          <div class="row2" style="margin-top:6px;align-items:center">
             <input type="text" id="gateColName" placeholder="column name" data-i18n-ph="column name" value="Region" style="flex:1">
             <button class="btn sm" style="flex:0 0 auto" onclick="createRegionColumn()" data-i18n="Create column">Create column</button>
           </div>
-          <p class="hint" style="margin-top:8px" data-i18n-html="analysis.saveLoadHint">Save regions + lines to a file to <b>reuse on another sheet</b> (with the same axes). It warns if you load them on different axes.</p>
-          <div class="row2">
-            <button class="btn sm" style="flex:1" onclick="saveRegions()" data-i18n="💾 Save regions">💾 Save regions</button>
-            <button class="btn sm ghost" style="flex:1" onclick="loadRegions()" data-i18n="📂 Load regions">📂 Load regions</button>
-          </div>
-          <label class="check" style="margin-top:4px"><input type="checkbox" id="loadByFrac"> <span data-i18n="Load by plot proportion (fraction) — to reuse at different scales">Load by plot proportion (fraction) — to reuse at different scales</span></label>
-          <p class="hint" style="margin-top:10px" data-i18n-html="analysis.exportGatingHint"><b>Export gating</b> — each cell is assigned to <b>a single</b> region (the one it fits best: deeper "inside" wins; on the line goes to the nearest). The <b>Region</b> column shows which. Keeps all columns. Check which ones to include.</p>
-          <div id="gateExportList" style="max-height:120px;overflow:auto;border:1px solid var(--panel3);border-radius:8px;padding:6px 8px"></div>
-          <div class="row2" style="align-items:center;margin-top:6px">
-            <select id="gateExportFmt" style="flex:0 0 auto;width:auto"><option value="csv">CSV</option><option value="xlsx">Excel</option></select>
-            <button class="btn sm" style="flex:1" onclick="exportGated()" data-i18n="⬇ Export checked">⬇ Export checked</button>
-          </div>
-          <label class="check" style="margin-top:6px"><input type="checkbox" id="gateExportPer"> <span data-i18n="Export 1 file per region (pick a folder)">Export 1 file per region (pick a folder)</span></label>
-          <button class="btn sm ghost" style="width:100%;margin-top:6px" onclick="exportGatedAll()" data-i18n="Export everything (+ Region column)">Export everything (+ Region column)</button>
+
+          <details class="menu" style="margin-top:8px">
+            <summary data-i18n="Editing options">Editing options</summary>
+            <div class="menubody">
+              <label class="check"><input type="checkbox" id="gateMagnet" checked> <span data-i18n="🧲 Magnet: vertex snaps to vertices/edges of other regions">🧲 Magnet: vertex snaps to vertices/edges of other regions</span></label>
+              <label class="check"><input type="checkbox" id="gatesLock" onchange="toggleGatesLock()"> <span data-i18n="Lock regions (keep position when swapping X/Y)">Lock regions (keep position when swapping X/Y)</span></label>
+              <p class="hint" data-i18n="In edit mode: drag the vertices or the interior; double-click the body adds a vertex, on a vertex removes it.">In edit mode: drag the vertices or the interior; double-click the body adds a vertex, on a vertex removes it.</p>
+              <p class="hint" data-i18n-html="analysis.mergeHint">To <b>merge</b> regions, give them the <b>same name</b> — they are counted together and get the same label in the created column.</p>
+            </div>
+          </details>
+
+          <details class="menu" style="margin-top:6px">
+            <summary data-i18n="Save / load regions">Save / load regions</summary>
+            <div class="menubody">
+              <p class="hint" data-i18n-html="analysis.saveLoadHint">Save regions + lines to a file to <b>reuse on another sheet</b> (with the same axes). It warns if you load them on different axes.</p>
+              <div class="row2">
+                <button class="btn sm" style="flex:1" onclick="saveRegions()" data-i18n="💾 Save regions">💾 Save regions</button>
+                <button class="btn sm ghost" style="flex:1" onclick="loadRegions()" data-i18n="📂 Load regions">📂 Load regions</button>
+              </div>
+              <label class="check"><input type="checkbox" id="loadByFrac"> <span data-i18n="Load by plot proportion (fraction) — to reuse at different scales">Load by plot proportion (fraction) — to reuse at different scales</span></label>
+            </div>
+          </details>
+
+          <details class="menu" style="margin-top:6px">
+            <summary data-i18n="Export gating (data by region)">Export gating (data by region)</summary>
+            <div class="menubody">
+              <p class="hint" data-i18n-html="analysis.exportGatingHint"><b>Export gating</b> — each cell is assigned to <b>a single</b> region (the one it fits best: deeper "inside" wins; on the line goes to the nearest). The <b>Region</b> column shows which. Keeps all columns. Check which ones to include.</p>
+              <div id="gateExportList" style="max-height:120px;overflow:auto;border:1px solid var(--panel3);border-radius:8px;padding:6px 8px"></div>
+              <div class="row2" style="align-items:center">
+                <select id="gateExportFmt" style="flex:0 0 auto;width:auto"><option value="csv">CSV</option><option value="xlsx">Excel</option></select>
+                <button class="btn sm" style="flex:1" onclick="exportGated()" data-i18n="⬇ Export checked">⬇ Export checked</button>
+              </div>
+              <label class="check"><input type="checkbox" id="gateExportPer"> <span data-i18n="Export 1 file per region (pick a folder)">Export 1 file per region (pick a folder)</span></label>
+              <button class="btn sm ghost" style="width:100%" onclick="exportGatedAll()" data-i18n="Export everything (+ Region column)">Export everything (+ Region column)</button>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -666,6 +725,202 @@
   </main>
 </div>
 <div class="toast" id="toast"></div>
+
+<div id="toolModal" class="modal">
+  <div class="modal-card toolcard">
+    <div class="modal-head">
+      <h3 id="toolTitle">Tools</h3>
+      <button class="btn sm ghost" onclick="closeTool()">✕</button>
+    </div>
+    <div class="toolbody">
+      <div class="toolnav" id="toolNav"></div>
+      <div class="toolpanes">
+
+        <!-- ============ BENCH MATH ============ -->
+        <div class="toolpane" data-group="bench" data-name="qPCR (ΔΔCt)">
+          <h4 data-i18n="qPCR relative quantification (2^-ΔΔCt)">qPCR relative quantification (2^-ΔΔCt)</h4>
+          <p class="desc" data-i18n="Turns raw Ct readings into fold change. Needs a LONG table: one row per Ct reading.">Turns raw Ct readings into fold change. Needs a LONG table: one row per Ct reading.</p>
+          <p class="hint" data-i18n-html="tool.qpcr"></p>
+          <div class="toolgrid">
+            <label><b data-i18n="Ct value (column)">Ct value (column)</b><select id="qCt"></select></label>
+            <label><b data-i18n="Gene / target (column)">Gene / target (column)</b><select id="qGene" onchange="fillGeneAndRef()"></select></label>
+            <label><b data-i18n="Sample ID (column)">Sample ID (column)</b><select id="qSample"></select></label>
+            <label><b data-i18n="Group / condition (column)">Group / condition (column)</b><select id="qGroup" onchange="fillGeneAndRef()"></select></label>
+            <label><b data-i18n="Housekeeping gene (a value)">Housekeeping gene (a value)</b><select id="qHK"></select></label>
+            <label><b data-i18n="Reference group (a value)">Reference group (a value)</b><select id="qRef"></select></label>
+          </div>
+          <div class="toolrow"><button class="btn sm" onclick="runDdct()" data-i18n="Compute ΔΔCt">Compute ΔΔCt</button></div>
+          <div class="toolout" id="qOut">—</div>
+        </div>
+
+        <div class="toolpane" data-group="bench" data-name="Standard curve">
+          <h4 data-i18n="Standard curve + interpolate unknowns">Standard curve + interpolate unknowns</h4>
+          <p class="desc" data-i18n="BCA / Bradford / ELISA: fit the standards, then read the unknowns off the curve.">BCA / Bradford / ELISA: fit the standards, then read the unknowns off the curve.</p>
+          <p class="hint" data-i18n-html="tool.stdcurve"></p>
+          <div class="toolgrid">
+            <label><b data-i18n="Known concentration (column)">Known concentration (column)</b><select id="scConc"></select></label>
+            <label><b data-i18n="Signal / absorbance (column)">Signal / absorbance (column)</b><select id="scSignal"></select></label>
+            <label><b data-i18n="Curve model">Curve model</b><select id="scModel"><option value="linear">linear</option><option value="4pl">4PL</option></select></label>
+            <label><b data-i18n="New column name">New column name</b><input type="text" id="scName" value="conc_calc"></label>
+          </div>
+          <div class="toolrow"><button class="btn sm" onclick="runStdCurve()" data-i18n="Fit &amp; interpolate">Fit &amp; interpolate</button></div>
+          <div class="toolout" id="scOut">—</div>
+        </div>
+
+        <div class="toolpane" data-group="bench" data-name="Normalize">
+          <h4 data-i18n="Normalize a column">Normalize a column</h4>
+          <p class="desc" data-i18n="Western blot loading control, % of control, fold, z-score. Creates a new column.">Western blot loading control, % of control, fold, z-score. Creates a new column.</p>
+          <p class="hint" data-i18n-html="tool.normalize"></p>
+          <div class="toolgrid">
+            <label><b data-i18n="Value to normalize (column)">Value to normalize (column)</b><select id="nzCol"></select></label>
+            <label><b data-i18n="Method">Method</b>
+              <select id="nzMethod" onchange="nzUI()">
+                <option value="percent_control">% of control</option>
+                <option value="fold_control">fold of control</option>
+                <option value="baseline_subtract">subtract control</option>
+                <option value="divide_by">divide by column (loading)</option>
+                <option value="zscore">z-score</option>
+                <option value="minmax">min-max</option>
+              </select></label>
+            <label id="nzGroupL"><b data-i18n="Group column">Group column</b><select id="nzGroup" onchange="fillNzControl()"></select></label>
+            <label id="nzControlL"><b data-i18n="Which level is the control">Which level is the control</b><select id="nzControl"></select></label>
+            <label id="nzByL"><b data-i18n="Divide by (loading control column)">Divide by (loading control column)</b><select id="nzBy"></select></label>
+            <label><b data-i18n="New column name">New column name</b><input type="text" id="nzName" placeholder="new column name" data-i18n-ph="new column name"></label>
+          </div>
+          <div class="toolrow"><button class="btn sm" onclick="runNormalize()" data-i18n="Create column">Create column</button></div>
+          <div class="toolout" id="nzOut">—</div>
+        </div>
+
+        <div class="toolpane" data-group="bench" data-name="Kinetics &amp; growth">
+          <h4 data-i18n="Enzyme kinetics &amp; growth curves">Enzyme kinetics &amp; growth curves</h4>
+          <p class="hint" data-i18n="These are fits you SEE, so they live in the plot list: choose 'Michaelis-Menten (Km / Vmax)' for enzyme kinetics, 'Growth curve (doubling time)' for OD/time, or 'Standard curve (+ R²)' to picture the fit above. Each annotates its parameters on the figure.">These are fits you SEE, so they live in the plot list: choose 'Michaelis-Menten (Km / Vmax)' for enzyme kinetics, 'Growth curve (doubling time)' for OD/time, or 'Standard curve (+ R²)' to picture the fit above. Each annotates its parameters on the figure.</p>
+          <div class="toolrow">
+            <button class="btn sm" onclick="gotoPlot('michaelis')" data-i18n="Open Michaelis-Menten">Open Michaelis-Menten</button>
+            <button class="btn sm" onclick="gotoPlot('growth')" data-i18n="Open Growth curve">Open Growth curve</button>
+            <button class="btn sm" onclick="gotoPlot('stdcurve')" data-i18n="Open Standard curve">Open Standard curve</button>
+          </div>
+        </div>
+
+        <!-- ============ STATISTICS ============ -->
+        <div class="toolpane" data-group="stats" data-name="Which test?">
+          <h4 data-i18n="Which test should I use?">Which test should I use?</h4>
+          <p class="desc" data-i18n="Not sure which test? Start here.">Not sure which test? Start here.</p>
+          <p class="hint" data-i18n-html="tool.whichtest"></p>
+          <div class="toolgrid">
+            <label><b data-i18n="Value to compare (numeric column)">Value to compare (numeric column)</b><select id="wtVal"></select></label>
+            <label><b data-i18n="Group column (categorical)">Group column (categorical)</b><select id="wtGrp"></select></label>
+          </div>
+          <div class="toolrow">
+            <label class="check" style="flex:0 0 auto"><input type="checkbox" id="wtPaired"> <span data-i18n="paired / repeated">paired / repeated</span></label>
+            <button class="btn sm" onclick="runWhichTest()" data-i18n="Recommend">Recommend</button></div>
+          <div class="toolout" id="wtOut">—</div>
+        </div>
+
+        <div class="toolpane" data-group="stats" data-name="Two-way ANOVA">
+          <h4 data-i18n="Two-way ANOVA (two factors + interaction)">Two-way ANOVA (two factors + interaction)</h4>
+          <p class="desc" data-i18n="Two factors at once, e.g. treatment × time.">Two factors at once, e.g. treatment × time.</p>
+          <p class="hint" data-i18n-html="tool.anova2"></p>
+          <div class="toolgrid">
+            <label><b data-i18n="Measured value (numeric column)">Measured value (numeric column)</b><select id="a2Val"></select></label>
+            <label><b data-i18n="Factor A (categorical)">Factor A (categorical)</b><select id="a2A"></select></label>
+            <label><b data-i18n="Factor B (categorical)">Factor B (categorical)</b><select id="a2B"></select></label>
+          </div>
+          <div class="toolrow"><button class="btn sm" onclick="runAnova2()" data-i18n="Run">Run</button></div>
+          <div class="toolout" id="a2Out">—</div>
+        </div>
+
+        <div class="toolpane" data-group="stats" data-name="Repeated measures">
+          <h4 data-i18n="Repeated measures (within-subject)">Repeated measures (within-subject)</h4>
+          <p class="desc" data-i18n="Same subject measured in several conditions (pre/post, time course).">Same subject measured in several conditions (pre/post, time course).</p>
+          <p class="hint" data-i18n-html="tool.rm"></p>
+          <div class="toolgrid">
+            <label><b data-i18n="Measured value (numeric column)">Measured value (numeric column)</b><select id="rmVal"></select></label>
+            <label><b data-i18n="Condition / time (categorical)">Condition / time (categorical)</b><select id="rmWithin"></select></label>
+            <label><b data-i18n="Subject ID (repeated unit)">Subject ID (repeated unit)</b><select id="rmSubj"></select></label>
+          </div>
+          <div class="toolrow"><button class="btn sm" onclick="runRm()" data-i18n="Run">Run</button></div>
+          <div class="toolout" id="rmOut">—</div>
+        </div>
+
+        <div class="toolpane" data-group="stats" data-name="Power / sample size">
+          <h4 data-i18n="Power &amp; sample size">Power &amp; sample size</h4>
+          <p class="desc" data-i18n="How many replicates do I need? (two-sample t-test)">How many replicates do I need? (two-sample t-test)</p>
+          <p class="hint" data-i18n-html="tool.power"></p>
+          <div class="toolgrid">
+            <label><b data-i18n="Effect size to detect (Cohen's d)">Effect size to detect (Cohen's d)</b><input type="number" id="pwD" value="0.8" step="0.1"></label>
+            <label><b data-i18n="Alpha (false positive rate)">Alpha (false positive rate)</b><input type="number" id="pwAlpha" value="0.05" step="0.01"></label>
+            <label><b data-i18n="Target power">Target power</b><input type="number" id="pwPower" value="0.8" step="0.05"></label>
+            <label><b data-i18n="n per group (optional)">n per group (optional)</b><input type="number" id="pwN"></label>
+          </div>
+          <div class="toolrow"><button class="btn sm" onclick="runPower()" data-i18n="Compute">Compute</button></div>
+          <div class="toolout" id="pwOut">—</div>
+        </div>
+
+        <div class="toolpane" data-group="stats" data-name="Outliers">
+          <h4 data-i18n="Outlier scan">Outlier scan</h4>
+          <p class="desc" data-i18n="Flags suspicious points. Never deletes anything.">Flags suspicious points. Never deletes anything.</p>
+          <p class="hint" data-i18n-html="tool.outliers"></p>
+          <div class="toolgrid">
+            <label><b data-i18n="Value to scan (numeric column)">Value to scan (numeric column)</b><select id="olVal"></select></label>
+            <label><b data-i18n="Within group (optional)">Within group (optional)</b><select id="olGrp"></select></label>
+            <label><b data-i18n="Method">Method</b><select id="olMethod"><option value="grubbs">Grubbs</option><option value="iqr">IQR</option><option value="mad">MAD</option></select></label>
+          </div>
+          <div class="toolrow">
+            <label class="check" style="flex:0 0 auto"><input type="checkbox" id="olCol"> <span data-i18n="create flag column">create flag column</span></label>
+            <button class="btn sm" onclick="runOutliers()" data-i18n="Scan">Scan</button></div>
+          <div class="toolout" id="olOut">—</div>
+        </div>
+
+        <div class="toolpane" data-group="stats" data-name="Correlation + p">
+          <h4 data-i18n="Correlation matrix with significance">Correlation matrix with significance</h4>
+          <p class="desc" data-i18n="All pairs of numeric columns, with corrected p-values.">All pairs of numeric columns, with corrected p-values.</p>
+          <p class="hint" data-i18n-html="tool.corr"></p>
+          <label class="lbl" data-i18n="Numeric columns to correlate (pick 2 or more)">Numeric columns to correlate (pick 2 or more)</label>
+          <div class="scrollbox" id="corrCols" style="max-height:130px"></div>
+          <div class="toolrow"><label><b data-i18n="Correlation method">Correlation method</b><select id="corrMethod"><option value="pearson">Pearson</option><option value="spearman">Spearman</option></select></label>
+            <button class="btn sm" onclick="runCorr()" data-i18n="Compute">Compute</button></div>
+          <div class="toolout" id="corrOut">—</div>
+        </div>
+
+        <!-- ============ DATA TOOLS ============ -->
+        <div class="toolpane" data-group="data" data-name="Data health">
+          <h4 data-i18n="Data health check">Data health check</h4>
+          <p class="desc" data-i18n="Run this right after importing a file.">Run this right after importing a file.</p>
+          <p class="hint" data-i18n-html="tool.health"></p>
+          <button class="btn sm" onclick="runHealth()" data-i18n="Check the data">Check the data</button>
+          <div class="toolout" id="hcOut">—</div>
+        </div>
+
+        <div class="toolpane" data-group="data" data-name="Data overview">
+          <h4 data-i18n="Data overview (small multiples)">Data overview (small multiples)</h4>
+          <p class="desc" data-i18n="See every numeric column at once.">See every numeric column at once.</p>
+          <p class="hint" data-i18n-html="tool.overview"></p>
+          <label class="lbl" data-i18n="Numeric columns to show">Numeric columns to show</label>
+          <div class="scrollbox" id="ovCols" style="max-height:130px"></div>
+          <div class="toolrow"><label><b data-i18n="Group by (optional)">Group by (optional)</b><select id="ovGroup"></select></label>
+            <button class="btn sm" onclick="runOverview()" data-i18n="Show overview">Show overview</button></div>
+        </div>
+
+        <div class="toolpane" data-group="data" data-name="Plate import">
+          <h4 data-i18n="Plate reader import (96 / 384)">Plate reader import (96 / 384)</h4>
+          <p class="desc" data-i18n="Paste a 96/384-well grid from Excel and get a tidy table.">Paste a 96/384-well grid from Excel and get a tidy table.</p>
+          <p class="hint" data-i18n-html="tool.plate"></p>
+          <label class="lbl" data-i18n="Values grid">Values grid</label>
+          <textarea id="plVals" placeholder="0.1&#9;0.2&#9;0.3&#10;0.4&#9;0.5&#9;0.6"></textarea>
+          <label class="lbl" data-i18n="Condition map (optional, same shape)">Condition map (optional, same shape)</label>
+          <textarea id="plMap" placeholder="ctrl&#9;ctrl&#9;drug&#10;drug&#9;drug&#9;ctrl"></textarea>
+          <div class="toolgrid">
+            <label><b data-i18n="Name for the value column">Name for the value column</b><input type="text" id="plValName" value="value"></label>
+            <label><b data-i18n="Name for the condition column">Name for the condition column</b><input type="text" id="plCondName" value="condition"></label>
+          </div>
+          <div class="toolrow"><button class="btn sm" onclick="runPlate()" data-i18n="Import plate">Import plate</button></div>
+          <div class="toolout" id="plOut">—</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
 
 <div id="dataModal" class="modal">
   <div class="modal-card">
@@ -899,6 +1154,114 @@ const PT = {
   "Drag: flatten / stretch the height":"Arraste: achatar / alongar a altura",
   "Drag: reshape both · double-click: reset to auto":"Arraste: reformatar os dois · duplo-clique: voltar ao automático",
   "Shape reset to auto":"Formato voltou ao automático",
+  // --- tool modal + facet + select all ---
+  "🧪 Bench math":"🧪 Cálculos de bancada","📊 Statistics":"📊 Estatística","🩺 Data tools":"🩺 Ferramentas de dados",
+  "Tools":"Ferramentas","All":"Todas","None":"Nenhuma",
+  "Split by (facet) — one panel per level":"Dividir por (facet) — um painel por nível",
+  "same scale":"mesma escala",
+  "Select at least 2 columns":"Selecione ao menos 2 colunas",
+  "Select at least one column":"Selecione ao menos uma coluna",
+  // pane names (left nav)
+  "qPCR (ΔΔCt)":"qPCR (ΔΔCt)","Standard curve":"Curva-padrão","Normalize":"Normalizar",
+  "Kinetics & growth":"Cinética & crescimento","Which test?":"Qual teste?",
+  "Two-way ANOVA":"ANOVA de duas vias","Repeated measures":"Medidas repetidas",
+  "Power / sample size":"Poder / tamanho amostral","Outliers":"Outliers",
+  "Correlation + p":"Correlação + p","Data health":"Saúde dos dados",
+  "Data overview":"Visão geral dos dados","Plate import":"Importar placa",
+  // bench panes
+  "qPCR relative quantification (2^-ΔΔCt)":"Quantificação relativa de qPCR (2^-ΔΔCt)",
+  "Averages technical replicates per sample+gene, computes ΔCt (target − housekeeping), ΔΔCt against the reference group, and fold change. The tidy result becomes your working data, ready to plot.":"Faz a média das réplicas técnicas por amostra+gene, calcula ΔCt (alvo − housekeeping), ΔΔCt contra o grupo de referência, e o fold change. O resultado organizado vira seus dados de trabalho, pronto para plotar.",
+  "Compute ΔΔCt":"Calcular ΔΔCt","ΔΔCt computed":"ΔΔCt calculado",
+  "Done: fold_change / ddCt columns created. This tidy table is now your data — plot fold_change by group.":"Pronto: colunas fold_change / ddCt criadas. Esta tabela agora são seus dados — plote fold_change por grupo.",
+  "Standard curve + interpolate unknowns":"Curva-padrão + interpolar desconhecidos",
+  "Fits the rows that have a known concentration (BCA/Bradford/ELISA), then reads every row's signal back off the curve into a new column. Warns on low R² and on values outside the standard range.":"Ajusta as linhas que têm concentração conhecida (BCA/Bradford/ELISA) e depois lê o sinal de cada linha de volta na curva, numa coluna nova. Avisa se o R² for baixo e se algum valor cair fora da faixa dos padrões.",
+  "Fit & interpolate":"Ajustar & interpolar",
+  "Normalize a column":"Normalizar uma coluna",
+  "Bench normalisations. 'divide by column' is the Western blot case (signal ÷ loading control). % of control / fold / baseline use the mean of the chosen control level.":"Normalizações de bancada. 'dividir por coluna' é o caso do Western blot (sinal ÷ controle de carga). % do controle / fold / baseline usam a média do nível de controle escolhido.",
+  "Create column":"Criar coluna",
+  "Enzyme kinetics & growth curves":"Cinética enzimática & curvas de crescimento",
+  "These are fits you SEE, so they live in the plot list: choose 'Michaelis-Menten (Km / Vmax)' for enzyme kinetics, 'Growth curve (doubling time)' for OD/time, or 'Standard curve (+ R²)' to picture the fit above. Each annotates its parameters on the figure.":"Esses ajustes você VÊ, então ficam na lista de gráficos: escolha 'Michaelis-Menten (Km / Vmax)' para cinética enzimática, 'Curva de crescimento (tempo de duplicação)' para OD/tempo, ou 'Curva-padrão (+ R²)' para ver o ajuste acima. Cada um anota seus parâmetros na figura.",
+  "Open Michaelis-Menten":"Abrir Michaelis-Menten","Open Growth curve":"Abrir Curva de crescimento",
+  "Open Standard curve":"Abrir Curva-padrão",
+  // stats panes
+  "Which test should I use?":"Qual teste eu devo usar?",
+  "Inspects your design and data (group count, n, normality, equal variance) and names the test, with the reasoning and where to run it.":"Analisa seu desenho e seus dados (nº de grupos, n, normalidade, igualdade de variâncias) e diz o teste, com o porquê e onde rodá-lo.",
+  "paired / repeated":"pareado / repetido","Recommend":"Recomendar","Run":"Rodar","Compute":"Calcular","Scan":"Varrer",
+  "Two-way ANOVA (two factors + interaction)":"ANOVA de duas vias (dois fatores + interação)",
+  "For designs like treatment × time. Type II sums of squares, handles unbalanced groups. A significant interaction means one factor's effect depends on the other.":"Para desenhos como tratamento × tempo. Somas de quadrados do Tipo II, lida com grupos desbalanceados. Uma interação significativa quer dizer que o efeito de um fator depende do outro.",
+  "Repeated measures (within-subject)":"Medidas repetidas (intra-sujeito)",
+  "Same subject measured in several conditions. Reports the RM-ANOVA plus the non-parametric partner (Wilcoxon for 2 conditions, Friedman for 3+). Subjects missing a condition are dropped.":"Mesmo sujeito medido em várias condições. Reporta a ANOVA de medidas repetidas mais o equivalente não-paramétrico (Wilcoxon para 2 condições, Friedman para 3+). Sujeitos sem alguma condição são descartados.",
+  "Power & sample size":"Poder & tamanho amostral",
+  "Two-sample t-test. Give the effect size you want to detect (Cohen's d: 0.2 small, 0.5 medium, 0.8 large) to get n per group; give an n to get the achieved power. n is the independent unit (replicates), not cells.":"Teste t de duas amostras. Informe o tamanho de efeito que quer detectar (d de Cohen: 0,2 pequeno, 0,5 médio, 0,8 grande) para obter o n por grupo; informe um n para obter o poder atingido. n é a unidade independente (réplicas), não células.",
+  "n (optional)":"n (opcional)",
+  "Outlier scan":"Varredura de outliers",
+  "Flags candidates by Grubbs (iterated), IQR (1.5×) or MAD (3.5). It never deletes anything: optionally it writes a true/false column so the decision is documented.":"Sinaliza candidatos por Grubbs (iterado), IQR (1,5×) ou MAD (3,5). Nunca apaga nada: opcionalmente cria uma coluna verdadeiro/falso para documentar a decisão.",
+  "create flag column":"criar coluna de marcação",
+  "Correlation matrix with significance":"Matriz de correlação com significância",
+  "Pairwise r with p-values corrected across all pairs (Benjamini-Hochberg). The table exports; for the picture use the 'Heatmap (correlation)' plot with 'significance stars' on.":"r par a par com p corrigido entre todos os pares (Benjamini-Hochberg). A tabela exporta; para a figura use o gráfico 'Heatmap (correlação)' com 'estrelas de significância' ligado.",
+  "Correlation (BH-corrected)":"Correlação (corrigida por BH)",
+  // data tools panes
+  "Data health check":"Checagem de saúde dos dados",
+  "Sanity check before you plot: missing values per column, duplicated rows, constant/empty columns, and columns that look numeric but do not fully parse (decimal comma, stray text).":"Checagem antes de plotar: valores faltantes por coluna, linhas duplicadas, colunas constantes/vazias, e colunas que parecem numéricas mas não convertem por completo (vírgula decimal, texto solto).",
+  "Check the data":"Checar os dados",
+  "Data overview (small multiples)":"Visão geral dos dados (pequenos múltiplos)",
+  "One glance at the whole table: a histogram per numeric column, or a box + points per group when you pick a grouping column. Missing-value counts are shown in each title.":"Uma olhada na tabela inteira: um histograma por coluna numérica, ou um box + pontos por grupo quando você escolhe uma coluna de agrupamento. A contagem de faltantes aparece em cada título.",
+  "Show overview":"Mostrar visão geral",
+  "Overview ready — \"Export this figure\" saves it":"Visão geral pronta — \"Exportar esta figura\" salva ela",
+  "Plate reader import (96 / 384)":"Importar leitora de placa (96 / 384)",
+  "Paste the plate grid straight from Excel (tab-separated). Row/column labels are ignored automatically. Optionally paste a same-shaped map of condition names; the result becomes a tidy table (well, row, col, value, condition).":"Cole a grade da placa direto do Excel (separado por tab). Rótulos de linha/coluna são ignorados automaticamente. Opcionalmente cole um mapa do mesmo formato com os nomes das condições; o resultado vira uma tabela organizada (poço, linha, coluna, valor, condição).",
+  "Values grid":"Grade de valores","Condition map (optional, same shape)":"Mapa de condições (opcional, mesmo formato)",
+  "Import plate":"Importar placa","Paste the plate grid first":"Cole a grade da placa primeiro",
+  "Imported ":"Importados "," wells":" poços","Plate imported":"Placa importada",
+  // --- tool modal: labelled fields ---
+  "Turns raw Ct readings into fold change. Needs a LONG table: one row per Ct reading.":"Transforma leituras de Ct em fold change. Precisa de uma tabela LONGA: uma linha por leitura de Ct.",
+  "BCA / Bradford / ELISA: fit the standards, then read the unknowns off the curve.":"BCA / Bradford / ELISA: ajusta os padrões e lê os desconhecidos na curva.",
+  "Western blot loading control, % of control, fold, z-score. Creates a new column.":"Controle de carga de Western blot, % do controle, fold, z-score. Cria uma coluna nova.",
+  "Not sure which test? Start here.":"Na dúvida sobre qual teste? Comece aqui.",
+  "Two factors at once, e.g. treatment × time.":"Dois fatores ao mesmo tempo, ex.: tratamento × tempo.",
+  "Same subject measured in several conditions (pre/post, time course).":"Mesmo sujeito medido em várias condições (pré/pós, curso temporal).",
+  "How many replicates do I need? (two-sample t-test)":"De quantas réplicas eu preciso? (teste t de duas amostras)",
+  "Flags suspicious points. Never deletes anything.":"Marca pontos suspeitos. Nunca apaga nada.",
+  "All pairs of numeric columns, with corrected p-values.":"Todos os pares de colunas numéricas, com p corrigido.",
+  "Run this right after importing a file.":"Rode isso logo depois de importar um arquivo.",
+  "See every numeric column at once.":"Veja todas as colunas numéricas de uma vez.",
+  "Paste a 96/384-well grid from Excel and get a tidy table.":"Cole uma grade de 96/384 poços do Excel e receba uma tabela organizada.",
+  "Ct value (column)":"Valor de Ct (coluna)",
+  "Gene / target (column)":"Gene / alvo (coluna)",
+  "Sample ID (column)":"ID da amostra (coluna)",
+  "Group / condition (column)":"Grupo / condição (coluna)",
+  "Housekeeping gene (a value)":"Gene housekeeping (um valor)",
+  "Reference group (a value)":"Grupo de referência (um valor)",
+  "Known concentration (column)":"Concentração conhecida (coluna)",
+  "Signal / absorbance (column)":"Sinal / absorbância (coluna)",
+  "Curve model":"Modelo da curva",
+  "New column name":"Nome da coluna nova",
+  "Value to normalize (column)":"Valor a normalizar (coluna)",
+  "Group column":"Coluna de grupo",
+  "Which level is the control":"Qual nível é o controle",
+  "Divide by (loading control column)":"Dividir por (coluna do controle de carga)",
+  "Value to compare (numeric column)":"Valor a comparar (coluna numérica)",
+  "Group column (categorical)":"Coluna de grupo (categórica)",
+  "Measured value (numeric column)":"Valor medido (coluna numérica)",
+  "Factor A (categorical)":"Fator A (categórico)",
+  "Factor B (categorical)":"Fator B (categórico)",
+  "Condition / time (categorical)":"Condição / tempo (categórico)",
+  "Subject ID (repeated unit)":"ID do sujeito (unidade repetida)",
+  "Effect size to detect (Cohen's d)":"Tamanho de efeito a detectar (d de Cohen)",
+  "Alpha (false positive rate)":"Alpha (taxa de falso-positivo)",
+  "Target power":"Poder desejado",
+  "n per group (optional)":"n por grupo (opcional)",
+  "Value to scan (numeric column)":"Valor a varrer (coluna numérica)",
+  "Within group (optional)":"Dentro do grupo (opcional)",
+  "Numeric columns to correlate (pick 2 or more)":"Colunas numéricas a correlacionar (escolha 2 ou mais)",
+  "Correlation method":"Método de correlação",
+  "Numeric columns to show":"Colunas numéricas a mostrar",
+  "Name for the value column":"Nome da coluna de valor",
+  "Name for the condition column":"Nome da coluna de condição",
+  // --- gating: folded sub-menus ---
+  "Editing options":"Opções de edição","Save / load regions":"Salvar / carregar regiões",
+  "Export gating (data by region)":"Exportar gating (dados por região)",
+  "⬡ Merge same-named":"⬡ Mesclar de mesmo nome",
 };
 
 // Rich hints (contain markup), keyed by id.
@@ -936,6 +1299,42 @@ const HTML_HINTS = {
   "analysis.exportGatingHint":{
     en:'<b>Export gating</b> — each cell is assigned to <b>a single</b> region (the one it fits best: deeper "inside" wins; on the line goes to the nearest). The <b>Region</b> column shows which. Keeps all columns.',
     pt:'<b>Exportar gating</b> — cada célula é atribuída a <b>uma única</b> região (a que mais se enquadra: mais "para dentro" vence; sobre a linha vai à mais próxima). A coluna <b>Region</b> mostra qual. Mantém todas as colunas.'},
+  "tool.qpcr":{
+    en:'<b>Your table must be LONG:</b> one row per Ct reading. Technical replicates are simply repeated rows with the same sample+gene — do not average them yourself.<br><b>Needs 4 columns:</b> the <b>Ct</b> value, the <b>gene/target</b> name, the <b>sample ID</b> (one biological sample), and the <b>group/condition</b>.<br>The last two pickers are <b>values</b>, not columns: which gene is the housekeeping normaliser (GAPDH, ACTB…) and which condition is the reference/control.<br><b>Maths:</b> mean of technical replicates → ΔCt = Ct(target) − Ct(housekeeping) → ΔΔCt vs. the mean ΔCt of the reference group (per gene) → fold change = 2^-ΔΔCt.<br><b>Notes:</b> non-numeric Ct values ("Undetermined") are ignored; samples missing the target or the housekeeping are dropped; n becomes the number of biological samples. Run your statistics on <b>log2_fold</b> (symmetric), not on fold change. Assumes 100% efficiency (classic 2^-ΔΔCt, no Pfaffl correction).',
+    pt:'<b>Sua tabela precisa estar em formato LONGO:</b> uma linha por leitura de Ct. Réplicas técnicas são só linhas repetidas com a mesma amostra+gene — não faça a média antes.<br><b>Precisa de 4 colunas:</b> o valor de <b>Ct</b>, o nome do <b>gene/alvo</b>, o <b>ID da amostra</b> (uma amostra biológica) e o <b>grupo/condição</b>.<br>Os dois últimos seletores são <b>valores</b>, não colunas: qual gene é o normalizador housekeeping (GAPDH, ACTB…) e qual condição é a referência/controle.<br><b>Conta:</b> média das réplicas técnicas → ΔCt = Ct(alvo) − Ct(housekeeping) → ΔΔCt contra a média do ΔCt do grupo de referência (por gene) → fold change = 2^-ΔΔCt.<br><b>Observações:</b> valores de Ct não numéricos ("Undetermined") são ignorados; amostras sem o alvo ou sem o housekeeping são descartadas; o n vira o número de amostras biológicas. Faça a estatística no <b>log2_fold</b> (simétrico), não no fold change. Assume 100% de eficiência (2^-ΔΔCt clássico, sem correção de Pfaffl).'},
+  "tool.stdcurve":{
+    en:'<b>Standards</b> are the rows that have a known concentration AND a signal (at least 3). <b>Unknowns</b> are rows with a signal but the concentration cell left empty.<br>Pick the <b>concentration</b> column, the <b>signal/absorbance</b> column, and the model: <b>linear</b> for BCA/Bradford, <b>4PL</b> for sigmoidal ELISA.<br>It fits the standards and writes the interpolated concentration of EVERY row into the new column you name.<br>It warns if R² &lt; 0.98 and if a value falls outside the standard range (extrapolation is unreliable — dilute and re-read instead).',
+    pt:'Os <b>padrões</b> são as linhas que têm concentração conhecida E sinal (no mínimo 3). Os <b>desconhecidos</b> são linhas com sinal mas a célula de concentração vazia.<br>Escolha a coluna de <b>concentração</b>, a de <b>sinal/absorbância</b> e o modelo: <b>linear</b> para BCA/Bradford, <b>4PL</b> para ELISA sigmoidal.<br>Ele ajusta os padrões e escreve a concentração interpolada de TODAS as linhas na coluna nova que você nomear.<br>Avisa se o R² &lt; 0,98 e se algum valor cair fora da faixa dos padrões (extrapolação não é confiável — melhor diluir e reler).'},
+  "tool.normalize":{
+    en:'<b>divide by column</b> = the Western blot case: your band signal ÷ the loading control (actin/GAPDH) measured in the same lane. Pick both columns.<br><b>% of control / fold of control / subtract control</b> need a <b>group column</b> and which <b>level</b> of it is the control; each value is compared with the MEAN of that control level.<br><b>z-score / min-max</b> rescale within each group (or over everything if you leave the group empty).<br>The original column is never touched — the result goes into a new column you name.',
+    pt:'<b>dividir por coluna</b> = o caso do Western blot: o sinal da sua banda ÷ o controle de carga (actina/GAPDH) medido na mesma canaleta. Escolha as duas colunas.<br><b>% do controle / fold do controle / subtrair controle</b> precisam de uma <b>coluna de grupo</b> e de qual <b>nível</b> dela é o controle; cada valor é comparado com a MÉDIA desse nível.<br><b>z-score / min-max</b> reescalam dentro de cada grupo (ou sobre tudo, se deixar o grupo vazio).<br>A coluna original nunca é alterada — o resultado vai para uma coluna nova que você nomeia.'},
+  "tool.whichtest":{
+    en:'Pick the <b>numeric value</b> you want to compare and the <b>categorical column</b> that defines the groups. Tick <b>paired</b> if the same subject/sample appears in every condition (pre/post, same animal treated twice).<br>It then checks how many groups there are, the n of each, normality (Shapiro) and equal variance (Levene), and tells you the test to use, why, and where to run it in the app.<br>Small groups (n &lt; 8) push the recommendation to the non-parametric side, because normality simply cannot be judged there.',
+    pt:'Escolha o <b>valor numérico</b> que quer comparar e a <b>coluna categórica</b> que define os grupos. Marque <b>pareado</b> se o mesmo sujeito/amostra aparece em todas as condições (pré/pós, mesmo animal tratado duas vezes).<br>Ele checa quantos grupos existem, o n de cada, normalidade (Shapiro) e igualdade de variâncias (Levene), e diz qual teste usar, por quê, e onde rodar no app.<br>Grupos pequenos (n &lt; 8) puxam a recomendação para o lado não-paramétrico, porque ali simplesmente não dá para julgar normalidade.'},
+  "tool.anova2":{
+    en:'For designs with <b>two factors at once</b>, e.g. treatment (ctrl/drug) × time (0h/24h).<br><b>Your table must be LONG:</b> one row per observation, with one column for the measured value and one column for EACH factor.<br>You need <b>replication</b> inside each combination (more than one row per treatment×time cell) — otherwise the error cannot be estimated and it will say so.<br>Type II sums of squares, so unbalanced groups are fine. Read the <b>interaction</b> line first: if it is significant, the effect of one factor depends on the other and the main effects must be interpreted with care.',
+    pt:'Para desenhos com <b>dois fatores ao mesmo tempo</b>, ex.: tratamento (ctrl/droga) × tempo (0h/24h).<br><b>Sua tabela precisa estar em formato LONGO:</b> uma linha por observação, com uma coluna para o valor medido e uma coluna para CADA fator.<br>Você precisa de <b>replicação</b> dentro de cada combinação (mais de uma linha por célula tratamento×tempo) — senão o erro não pode ser estimado e ele avisa.<br>Somas de quadrados do Tipo II, então grupos desbalanceados não são problema. Leia primeiro a linha da <b>interação</b>: se for significativa, o efeito de um fator depende do outro e os efeitos principais precisam ser interpretados com cuidado.'},
+  "tool.rm":{
+    en:'Use when the <b>same subject</b> is measured in several conditions (pre/post, a time course on the same animal/plate/culture).<br><b>Needs 3 columns:</b> the measured value, the condition/time, and a <b>subject ID</b> that repeats across conditions — that ID is what pairs the measurements.<br>Only subjects present in EVERY condition are used; the rest are dropped and the count is reported.<br>It reports the RM-ANOVA and the matching non-parametric test: <b>Wilcoxon</b> with 2 conditions, <b>Friedman</b> with 3 or more.',
+    pt:'Use quando o <b>mesmo sujeito</b> é medido em várias condições (pré/pós, um curso temporal no mesmo animal/placa/cultura).<br><b>Precisa de 3 colunas:</b> o valor medido, a condição/tempo, e um <b>ID de sujeito</b> que se repete entre as condições — é esse ID que pareia as medidas.<br>Só entram sujeitos presentes em TODAS as condições; os demais são descartados e a contagem é informada.<br>Reporta a ANOVA de medidas repetidas e o não-paramétrico correspondente: <b>Wilcoxon</b> com 2 condições, <b>Friedman</b> com 3 ou mais.'},
+  "tool.power":{
+    en:'Answers "how many replicates do I need?" for a two-sample t-test.<br><b>Effect size (Cohen\'s d)</b> is the difference you care about, in standard deviations: 0.2 small, 0.5 medium, 0.8 large. If you have pilot data, d = (mean1 − mean2) / pooled SD.<br><b>Alpha</b> is the false-positive rate (0.05) and <b>power</b> the chance of detecting a real effect (0.8 is the usual target).<br>Leave n empty to get the required n per group; fill n to get the power you actually have.<br><b>n is the independent unit</b> — animals, cultures, biological replicates — never the number of cells or wells.',
+    pt:'Responde "de quantas réplicas eu preciso?" para um teste t de duas amostras.<br><b>Tamanho de efeito (d de Cohen)</b> é a diferença que te importa, em desvios-padrão: 0,2 pequeno, 0,5 médio, 0,8 grande. Se tiver dados-piloto, d = (média1 − média2) / DP combinado.<br><b>Alpha</b> é a taxa de falso-positivo (0,05) e <b>poder</b> a chance de detectar um efeito real (0,8 é o alvo usual).<br>Deixe o n vazio para obter o n necessário por grupo; preencha o n para saber o poder que você realmente tem.<br><b>n é a unidade independente</b> — animais, culturas, réplicas biológicas — nunca o número de células ou poços.'},
+  "tool.outliers":{
+    en:'Choose the numeric column to scan and, optionally, a group column so each group is scanned on its own (recommended — a value that is extreme overall may be perfectly normal inside its condition).<br><b>Grubbs</b> assumes roughly normal data and removes one point at a time; <b>IQR</b> (1.5×) and <b>MAD</b> (3.5) are distribution-free and safer on skewed data.<br>Nothing is ever deleted. Tick "create flag column" to write a true/false column, so the decision is visible in the data instead of hidden.<br>Being flagged is not proof a point is wrong: justify any removal and report it.',
+    pt:'Escolha a coluna numérica a varrer e, opcionalmente, uma coluna de grupo para varrer cada grupo separadamente (recomendado — um valor extremo no geral pode ser perfeitamente normal dentro da sua condição).<br><b>Grubbs</b> assume dados aproximadamente normais e remove um ponto por vez; <b>IQR</b> (1,5×) e <b>MAD</b> (3,5) não dependem de distribuição e são mais seguros com dados assimétricos.<br>Nada é apagado. Marque "criar coluna de marcação" para gravar uma coluna verdadeiro/falso, deixando a decisão visível no dado em vez de escondida.<br>Estar marcado não prova que o ponto está errado: justifique qualquer remoção e relate-a.'},
+  "tool.corr":{
+    en:'Tick <b>2 or more numeric columns</b> (the All / None bar selects them all at once) and it correlates every pair.<br><b>Pearson</b> measures a straight-line relationship and assumes roughly normal data; <b>Spearman</b> works on ranks and handles curved or skewed relationships and outliers.<br>The p-values are corrected across all pairs with Benjamini-Hochberg, because testing many pairs inflates false positives. Stars: * p&lt;0.05, ** p&lt;0.01, *** p&lt;0.001.<br>Pairs with fewer than 3 complete rows are left blank. For the figure, use the "Heatmap (correlation)" plot with "significance stars" on.',
+    pt:'Marque <b>2 ou mais colunas numéricas</b> (a barra Todas / Nenhuma seleciona tudo de uma vez) e ele correlaciona todos os pares.<br><b>Pearson</b> mede relação em linha reta e assume dados aproximadamente normais; <b>Spearman</b> trabalha com postos e lida com relações curvas ou assimétricas e com outliers.<br>Os p são corrigidos entre todos os pares por Benjamini-Hochberg, porque testar muitos pares infla os falso-positivos. Estrelas: * p&lt;0,05, ** p&lt;0,01, *** p&lt;0,001.<br>Pares com menos de 3 linhas completas ficam em branco. Para a figura, use o gráfico "Heatmap (correlação)" com "estrelas de significância" ligado.'},
+  "tool.health":{
+    en:'Run this right after importing a file, before trusting any figure.<br>It reports, per column: the detected type, how many values are missing, how many distinct values there are, and whether the column is constant.<br>It also warns about fully duplicated rows, empty or constant columns, and — the classic trap — columns that <b>look</b> numeric but do not fully parse, which usually means a decimal comma, a thousands separator, or stray text like "Undetermined" or "N/A". Those columns are typed as text, which is why they may not show up where a numeric column is expected.',
+    pt:'Rode isso logo depois de importar um arquivo, antes de confiar em qualquer figura.<br>Ele informa, por coluna: o tipo detectado, quantos valores estão faltando, quantos valores distintos existem e se a coluna é constante.<br>Também avisa sobre linhas totalmente duplicadas, colunas vazias ou constantes e — a armadilha clássica — colunas que <b>parecem</b> numéricas mas não convertem por completo, o que costuma ser vírgula decimal, separador de milhar, ou texto solto como "Undetermined" ou "N/A". Essas colunas ficam tipadas como texto, e é por isso que podem não aparecer onde se espera uma coluna numérica.'},
+  "tool.overview":{
+    en:'Tick the numeric columns you want (the All / None bar takes them all) and it draws one small panel per column in a single figure.<br>Without a grouping column each panel is a <b>histogram</b> (shape, spread, outliers at a glance). With one, each panel becomes a <b>box + points per group</b>, so you can spot which variables separate your conditions before choosing a plot.<br>The number of missing values appears in each panel title. The figure is saved with "Export this figure".',
+    pt:'Marque as colunas numéricas que quiser (a barra Todas / Nenhuma pega todas) e ele desenha um painelzinho por coluna numa figura só.<br>Sem coluna de agrupamento, cada painel é um <b>histograma</b> (forma, dispersão e outliers de relance). Com uma, cada painel vira um <b>box + pontos por grupo</b>, para você ver quais variáveis separam suas condições antes de escolher um gráfico.<br>O número de valores faltantes aparece no título de cada painel. A figura é salva com "Exportar esta figura".'},
+  "tool.plate":{
+    en:'Select the block of wells in Excel and paste it here — columns must be separated by tabs, which is what Excel copies by default.<br>Row letters (A, B, C…) and column numbers (1, 2, 3…) are detected and stripped automatically, so you can paste the plate with or without its labels.<br>The <b>condition map</b> is optional: paste a grid of the SAME shape holding the name of each well\'s condition, and it is matched well by well.<br>The result replaces your working data with a tidy table — one row per non-empty well, with columns well, row, col, value (and condition). Empty wells are skipped.',
+    pt:'Selecione o bloco de poços no Excel e cole aqui — as colunas precisam estar separadas por tab, que é o que o Excel copia por padrão.<br>As letras das linhas (A, B, C…) e os números das colunas (1, 2, 3…) são detectados e removidos automaticamente, então você pode colar a placa com ou sem os rótulos.<br>O <b>mapa de condições</b> é opcional: cole uma grade do MESMO formato com o nome da condição de cada poço, que ele casa poço a poço.<br>O resultado substitui seus dados de trabalho por uma tabela organizada — uma linha por poço não vazio, com as colunas poço, linha, coluna, valor (e condição). Poços vazios são ignorados.'},
   "adv.panelHint":{
     en:'Build the plot in the "Plot" tab, then add it as a panel frame. Each frame keeps the <b>title and axis labels</b> you typed for it. After building, <b>drag the dividers on the panel</b> to resize the plots; the mm size in the Style tab applies to the panel too.',
     pt:'Monte o gráfico na aba "Gráfico", depois adicione-o como um quadro do painel. Cada quadro mantém o <b>título e os rótulos dos eixos</b> que você digitou. Depois de montar, <b>arraste os divisores no painel</b> para redimensionar os gráficos; o tamanho em mm da aba Estilo também vale para o painel.'},
@@ -953,6 +1352,8 @@ const PT_SPEC = {
   superplot:"SuperPlot (células + médias por réplica)", qq:"Q-Q plot (normalidade)",
   km:"Kaplan-Meier (sobrevivência + log-rank)", traj:"Trajetórias (tracks XY)",
   msd:"MSD (deslocamento quadrático médio)", stacked:"Composição empilhada (+ qui²/Fisher)",
+  michaelis:"Michaelis-Menten (Km / Vmax)", growth:"Curva de crescimento (tempo de duplicação)",
+  stdcurve:"Curva-padrão (+ R²)",
 };
 const PT_PARAM = {
   alpha:"alpha", palette:"paleta", bins:"bins", kde:"kde", fill:"preencher",
@@ -973,16 +1374,23 @@ const PT_PARAM = {
   "mark censored (ticks)":"marcar censurados (ticks)", "equal aspect":"proporção igual",
   "log-log axes":"eixos log-log", "proportion (else count)":"proporção (senão contagem)",
   "chi-square p in title":"p do qui² no título",
+  "significance stars (BH)":"estrelas de significância (BH)", method:"método",
+  "mark Km":"marcar Km", "log Y":"Y log", "fit from time":"ajustar do tempo",
+  "fit to time":"ajustar até o tempo", model:"modelo",
 };
 const PT_CHOICE = { bar:"barra", point:"ponto", mean:"média", median:"mediana",
-                    SD:"DP", SEM:"EPM", CI95:"IC95", none:"nenhum" };
+                    SD:"DP", SEM:"EPM", CI95:"IC95", none:"nenhum",
+                    pearson:"Pearson", spearman:"Spearman", linear:"linear", "4pl":"4PL" };
 const PT_CHANNEL = { x:"X", y:"Y", hue:"Hue", size:"Tamanho", style:"Estilo",
                      dose:"dose", response:"resposta", "sample (id)":"amostra (id)",
                      "p-value":"p-valor", log2FC:"log2FC",
                      replicate:"réplica", condition:"condição", value:"valor",
                      "time / duration":"tempo / duração", "event (status)":"evento (status)",
                      group:"grupo", "pos x":"pos x", "pos y":"pos y", "track id":"id da track",
-                     "time (order)":"tempo (ordem)", category:"categoria" };
+                     "time (order)":"tempo (ordem)", category:"categoria",
+                     "[S] substrate":"[S] substrato", "v (rate)":"v (velocidade)",
+                     time:"tempo", "OD / signal":"OD / sinal",
+                     "known concentration":"concentração conhecida", signal:"sinal" };
 const PT_THEME = {
   "Light · grid":"Claro · grade", "Light · ticks":"Claro · ticks", "Light · clean":"Claro · limpo",
   "Dark · grid":"Escuro · grade", "Dark · plain":"Escuro · liso", "Slate":"Ardósia",
@@ -1061,14 +1469,14 @@ function hideTip(){
 function setupHelp(){
   if(helpReady) return; helpReady=true;
   const tip=document.createElement('div'); tip.id='helptip'; document.body.appendChild(tip);
-  document.querySelectorAll('.sectile').forEach(tile=>{
+  document.querySelectorAll('.sectile,.toolpane').forEach(tile=>{
     const hints=[...tile.children].filter(el=>el.matches('p.hint'));
     if(!hints.length) return;
     hints.forEach(h=>h.classList.add('tucked'));
     const badge=document.createElement('button');
     badge.type='button'; badge.className='helpbtn'; badge.textContent='?';
     badge.setAttribute('aria-label','help'); badge._hints=hints;
-    const h3=[...tile.children].find(el=>el.tagName==='H3');
+    const h3=[...tile.children].find(el=>el.tagName==='H3'||el.tagName==='H4');
     if(h3){ h3.appendChild(badge); }
     else{                                        // a tile that is nothing but a hint
       const head=document.createElement('div'); head.className='helphead';
@@ -1159,7 +1567,12 @@ function onData(r){
     : '<option value="">—</option>';
   buildConfig(); buildNumCols(); fillTestSelects(); buildAdvanced(); renderGateList(); resetHistory();
   fillFilterCols(); fillAnalysisCols(); fillAggCols(); renderDatasets(r.datasets||[], r.active);
-  fillWideCols(); maybeWideBanner();
+  fillWideCols(); maybeWideBanner(); fillFacetCol(); addSelectAll();
+}
+function fillFacetCol(){
+  const cur=$('facetCol').value;
+  $('facetCol').innerHTML='<option value="">—</option>'+COLS.category.map(c=>`<option>${c}</option>`).join('');
+  if(cur && [...$('facetCol').options].some(o=>o.value===cur)) $('facetCol').value=cur;
 }
 function fillWideCols(){
   $('wideCols').innerHTML = COLS.numeric.length
@@ -1320,6 +1733,9 @@ function gather(){
     legend:{show:$('legShow').checked, pos:$('legPos').value, x:LEG.x, y:LEG.y,
             fontsize:parseFloat($('legSize').value), ncol:parseInt($('legCol').value), frame:$('legFrame').checked,
             fit:$('legFit').checked, title:$('legTitle').value, relabel:LEGREL},
+    facet: $('facetCol').value,
+    facet_ncols: parseInt($('facetCols').value)||2,
+    facet_share: $('facetShare').checked,
     ncols: parseInt($('ncols').value)||2,
     export_dpi: Math.max(300, parseInt($('dpi').value)||300),
     transparent: $('exportTransparent').checked,
@@ -1353,7 +1769,12 @@ async function render(){
   }
   PANELRENDER=null; hidePanelLayer();       // leaving panel view: drop its drag handles
   const img=$('plot'); img.src=r.img; img.style.display='block'; $('empty').style.display='none';
-  img.onload=()=>{ placeLegend(r); placeGates(r); placeSizeHandles(); };
+  img.onload=()=>{
+    // a faceted figure has many axes: the legend/gate overlays (single-axes) are off
+    if(r.faceted){ $('legendBox').style.display='none'; $('gateLayer').style.display='none'; }
+    else { placeLegend(r); placeGates(r); }
+    placeSizeHandles();
+  };
   maybeLive(); scheduleCommit();
 }
 // Continuous render (slider): while a render runs, flag that another is wanted; when it
@@ -2156,6 +2577,157 @@ function buildAdvanced(){
 }
 function advSelectedCols(){ return [...$('advCols').querySelectorAll('input:checked')].map(i=>i.value); }
 
+/* ===================== tool modal (bench / stats / data) ===================== */
+const TOOL_TITLES={bench:'🧪 Bench math', stats:'📊 Statistics', data:'🩺 Data tools'};
+function openTool(group){
+  if(!Object.keys(COLS.kinds).length){ toast(t('Load a CSV first'),'bad'); return; }
+  fillToolSelects();
+  $('toolTitle').textContent=t(TOOL_TITLES[group]||'Tools');
+  const panes=[...document.querySelectorAll(`.toolpane[data-group="${group}"]`)];
+  document.querySelectorAll('.toolpane').forEach(p=>p.classList.remove('on'));
+  $('toolNav').innerHTML = panes.map((p,i)=>
+    `<button class="btn sm ${i?'ghost':''}" onclick="showPane('${group}',${i})">${t(p.dataset.name)}</button>`).join('');
+  if(panes.length) panes[0].classList.add('on');
+  $('toolModal').classList.add('show');
+  addSelectAll();
+}
+function showPane(group,i){
+  const panes=[...document.querySelectorAll(`.toolpane[data-group="${group}"]`)];
+  panes.forEach(p=>p.classList.remove('on'));
+  panes[i].classList.add('on');
+  [...$('toolNav').children].forEach((b,j)=>b.classList.toggle('ghost', j!==i));
+}
+function closeTool(){ $('toolModal').classList.remove('show'); }
+function gotoPlot(key){ closeTool(); $('plotType').value=key; buildConfig(); tab('g'); }
+
+/* One "All / None" bar injected into EVERY checkbox list, current and future. */
+function ckAll(btn,on){
+  btn.closest('.scrollbox,#gateExportList').querySelectorAll('input[type=checkbox]')
+     .forEach(c=>{ c.checked=on; });
+}
+function addSelectAll(){
+  document.querySelectorAll('.scrollbox,#gateExportList').forEach(box=>{
+    if(box.querySelector('.selall') || !box.querySelector('input[type=checkbox]')) return;
+    const bar=document.createElement('div'); bar.className='selall';
+    bar.innerHTML=`<button class="btn sm" onclick="ckAll(this,true)">${t('All')}</button>`+
+                  `<button class="btn sm ghost" onclick="ckAll(this,false)">${t('None')}</button>`;
+    box.insertBefore(bar, box.firstChild);
+  });
+}
+function fillToolSelects(){
+  const allCols=Object.keys(COLS.kinds);
+  // A column can hold numbers and still be typed as text (qPCR "Undetermined",
+  // decimal comma...). The backend coerces with to_numeric anyway, so never leave a
+  // dropdown empty: fall back to every column instead of blocking the user.
+  const numCols=COLS.numeric.length?COLS.numeric:allCols;
+  const opt=arr=>arr.map(c=>`<option>${c}</option>`).join('');
+  const num=opt(numCols), cat=opt(COLS.category), all=opt(allCols);
+  const none='<option value="">—</option>';
+  const set=(id,html)=>{ const e=$(id); if(e) e.innerHTML=html; };
+  // bench — Ct accepts ANY column ("Undetermined" rows are dropped on compute)
+  set('qCt',all); set('qGene',all); set('qSample',all); set('qGroup',all);
+  set('scConc',num); set('scSignal',num);
+  set('nzCol',num); set('nzGroup',none+cat); set('nzBy',none+num);
+  // stats
+  set('wtVal',num); set('wtGrp',cat||all);
+  set('a2Val',num); set('a2A',cat||all); set('a2B',cat||all);
+  set('rmVal',num); set('rmWithin',cat||all); set('rmSubj',all);
+  set('olVal',num); set('olGrp',none+cat);
+  set('ovGroup',none+cat);
+  const cks=arr=>arr.map(c=>`<label class="check"><input type="checkbox" value="${c}"> ${c}</label>`).join('');
+  set('corrCols',cks(numCols)); set('ovCols',cks(numCols));
+  fillGeneAndRef(); nzUI();
+}
+// the housekeeping gene and the reference group are VALUES of a column, not columns
+async function fillGeneAndRef(){
+  const g=$('qGene').value, gr=$('qGroup').value;
+  if(g){ const v=await window.pywebview.api.categories(g); $('qHK').innerHTML=(v||[]).map(x=>`<option>${x}</option>`).join(''); }
+  if(gr){ const v=await window.pywebview.api.categories(gr); $('qRef').innerHTML=(v||[]).map(x=>`<option>${x}</option>`).join(''); }
+}
+async function fillNzControl(){
+  const g=$('nzGroup').value;
+  $('nzControl').innerHTML = g ? ((await window.pywebview.api.categories(g))||[]).map(x=>`<option>${x}</option>`).join('') : '<option value="">—</option>';
+}
+function nzUI(){
+  const m=$('nzMethod').value;
+  const needCtrl=['percent_control','fold_control','baseline_subtract'].includes(m);
+  // hide the whole labelled field, caption included
+  $('nzGroupL').style.display=(needCtrl||['zscore','minmax'].includes(m))?'':'none';
+  $('nzControlL').style.display=needCtrl?'':'none';
+  $('nzByL').style.display=(m==='divide_by')?'':'none';
+}
+const toolOut=(id,txt)=>{ $(id).textContent=txt||'—'; };
+
+/* ---- bench handlers ---- */
+async function runDdct(){
+  const r=await window.pywebview.api.qpcr_ddct($('qCt').value,$('qGene').value,$('qSample').value,
+            $('qGroup').value,$('qHK').value,$('qRef').value);
+  if(!r) return; if(r.error){ toolOut('qOut',r.error); return; }
+  onData(r); toolOut('qOut',t('Done: fold_change / ddCt columns created. This tidy table is now your data — plot fold_change by group.'));
+  toast(t('ΔΔCt computed'),'good');
+}
+async function runStdCurve(){
+  const r=await window.pywebview.api.std_curve($('scConc').value,$('scSignal').value,$('scModel').value,null,$('scName').value);
+  if(!r) return; if(r.error){ toolOut('scOut',r.error); return; }
+  onData(r); toolOut('scOut',r.text||'ok'); toast(t('Column created: ')+(r.created||''),'good');
+}
+async function runNormalize(){
+  const r=await window.pywebview.api.normalize_column($('nzCol').value,$('nzMethod').value,
+            $('nzGroup').value,$('nzControl').value,$('nzBy').value,$('nzName').value);
+  if(!r) return; if(r.error){ toolOut('nzOut',r.error); return; }
+  onData(r); toolOut('nzOut',t('Column created: ')+(r.created||'')); toast(t('Column created: ')+(r.created||''),'good');
+}
+/* ---- stats handlers ---- */
+async function runWhichTest(){ toolOut('wtOut', await window.pywebview.api.which_test($('wtVal').value,$('wtGrp').value,$('wtPaired').checked)); }
+async function runAnova2(){ toolOut('a2Out', await window.pywebview.api.anova_two_way($('a2Val').value,$('a2A').value,$('a2B').value)); }
+async function runRm(){ toolOut('rmOut', await window.pywebview.api.anova_rm($('rmVal').value,$('rmWithin').value,$('rmSubj').value)); }
+async function runPower(){ toolOut('pwOut', await window.pywebview.api.power_calc($('pwD').value,$('pwAlpha').value,$('pwPower').value,$('pwN').value||null)); }
+async function runOutliers(){
+  const r=await window.pywebview.api.outlier_scan($('olVal').value,$('olGrp').value,$('olMethod').value,$('olCol').checked);
+  if(!r) return; if(r.error){ toolOut('olOut',r.error); return; }
+  toolOut('olOut',r.text);
+  if(r.created){ onData(r); toast(t('Column created: ')+r.created,'good'); }
+}
+async function runCorr(){
+  const cols=[...$('corrCols').querySelectorAll('input:checked')].map(i=>i.value);
+  if(cols.length<2){ toolOut('corrOut',t('Select at least 2 columns')); return; }
+  const r=await window.pywebview.api.corr_table(cols,$('corrMethod').value);
+  if(!r) return; if(r.error){ toolOut('corrOut',r.error); return; }
+  toolOut('corrOut', r.rows.map(x=>x.join('\t')).join('\n'));
+  showTable(t('Correlation (BH-corrected)'), r);
+}
+/* ---- data tools handlers ---- */
+async function runHealth(){
+  const r=await window.pywebview.api.health_check();
+  if(!r) return; if(r.error){ toolOut('hcOut',r.error); return; }
+  toolOut('hcOut',r.text); showTable(t('Data health'), r);
+}
+async function runOverview(){
+  const cols=[...$('ovCols').querySelectorAll('input:checked')].map(i=>i.value);
+  if(!cols.length){ toast(t('Select at least one column'),'bad'); return; }
+  const r=await window.pywebview.api.render_overview(cols,$('ovGroup').value,gather());
+  if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+  closeTool(); showImage(r.img); toast(t('Overview ready — "Export this figure" saves it'),'good');
+}
+function gridFromText(txt){
+  return (txt||'').split(/\r?\n/).filter(l=>l.trim()!=='').map(l=>l.split('\t'));
+}
+async function runPlate(){
+  const vals=gridFromText($('plVals').value), map=gridFromText($('plMap').value);
+  if(!vals.length){ toolOut('plOut',t('Paste the plate grid first')); return; }
+  const r=await window.pywebview.api.plate_import(vals, map.length?map:null, $('plValName').value, $('plCondName').value);
+  if(!r) return; if(r.error){ toolOut('plOut',r.error); return; }
+  onData(r); toolOut('plOut',t('Imported ')+r.n+t(' wells')); toast(t('Plate imported'),'good');
+}
+/* shared: send a {columns,rows} result to the figure table area */
+function showTable(title,r){
+  $('rowinfo').style.display='block';
+  $('rowinfo').querySelector('h4').textContent=title;
+  let h='<tr>'+r.columns.map(c=>`<td style="color:var(--mut)"><b>${c}</b></td>`).join('')+'</tr>';
+  h+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${v}</td>`).join('')+'</tr>').join('');
+  $('rowtable').innerHTML=h;
+}
+
 /* ---------- datasets / aggregation / formula / template / new analyses ---------- */
 function fillAnalysisCols(){
   const cat=COLS.category.map(c=>`<option>${c}</option>`).join('');
@@ -2307,11 +2879,6 @@ document.addEventListener('pointermove',e=>{
 });
 document.addEventListener('pointerup',()=>{ if(sizeDrag){ sizeDrag=null; render(); } });
 function resetShape(){ $('figwmm').value=''; $('fighmm').value=''; render(); toast(t('Shape reset to auto'),'good'); }
-function selectAllNumCols(on){
-  const boxes=$('numCols').querySelectorAll('input[type=checkbox]');
-  if(!boxes.length){ toast(t('Load a CSV first'),'bad'); return; }
-  boxes.forEach(b=>b.checked=!!on);
-}
 
 /* ---------- multi-figure panel (per-frame labels + draggable sizes) ---------- */
 let PANEL=[], PANEL_W=[], PANEL_H=[], PANELRENDER=null, panelDrag=null;

@@ -403,7 +403,100 @@ def _r_ridge(ax, df, m, p):
 
 def _r_heatmap(ax, df, m, p):
     num = df.select_dtypes("number")
-    sns.heatmap(num.corr(numeric_only=True), annot=p["annot"], cmap=p["palette"], ax=ax)
+    if not p.get("stars"):
+        sns.heatmap(num.corr(numeric_only=True), annot=p["annot"], cmap=p["palette"], ax=ax)
+        return
+    from .stats import corr_with_p                 # r + BH-corrected significance stars
+    r, _pv, stars = corr_with_p(df, list(num.columns), p.get("method", "pearson"))
+    labels = r.round(2).astype(str) + "\n" + stars if p["annot"] else stars
+    sns.heatmap(r, annot=labels.to_numpy(), fmt="", cmap=p["palette"],
+                vmin=-1, vmax=1, annot_kws={"fontsize": 7}, ax=ax)
+
+
+def _r_michaelis(ax, df, m, p):
+    """Michaelis-Menten fit: v = Vmax*[S]/(Km+[S]), with Km/Vmax annotated per group."""
+    from .stats import michaelis_menten
+    x, y, hue = m["x"], m["y"], m.get("hue")
+    groups = list(df.groupby(hue)) if hue else [(None, df)]
+    colors = _group_colors([g for g, _ in groups], p) if hue else ["#3a6ea5"]
+    txt = []
+    for (name, sub), col in zip(groups, colors):
+        s = pd.to_numeric(sub[x], errors="coerce"); v = pd.to_numeric(sub[y], errors="coerce")
+        ax.scatter(s, v, s=22, alpha=p["alpha"], color=col, label=str(name) if hue else None)
+        try:
+            fit = michaelis_menten(s, v)
+            xx = np.linspace(0, float(np.nanmax(s)) * 1.05, 200)
+            ax.plot(xx, fit["predict"](xx), color=col, lw=1.6)
+            txt.append(f"{(str(name)+': ') if hue else ''}Vmax={fit['Vmax']:.3g}  "
+                       f"Km={fit['Km']:.3g}  R²={fit['r2']:.3f}")
+            if p.get("show_km"):
+                ax.axvline(fit["Km"], ls=":", color=col, lw=1)
+        except Exception as e:
+            txt.append(f"{(str(name)+': ') if hue else ''}no fit ({e})")
+    ax.set_xlabel(x); ax.set_ylabel(y)
+    ax.text(0.98, 0.03, "\n".join(txt), transform=ax.transAxes, ha="right", va="bottom",
+            fontsize=8, bbox=dict(fc="white", alpha=0.75, ec="none"))
+    if hue:
+        ax.legend()
+
+
+def _r_growth(ax, df, m, p):
+    """Growth curve with an exponential fit and the doubling time per group."""
+    from .stats import growth_fit
+    x, y, hue = m["x"], m["y"], m.get("hue")
+    groups = list(df.groupby(hue)) if hue else [(None, df)]
+    colors = _group_colors([g for g, _ in groups], p) if hue else ["#3a6ea5"]
+    lo, hi = p.get("t_min"), p.get("t_max")
+    txt = []
+    for (name, sub), col in zip(groups, colors):
+        t = pd.to_numeric(sub[x], errors="coerce"); v = pd.to_numeric(sub[y], errors="coerce")
+        d = pd.DataFrame({"t": t, "v": v}).dropna().groupby("t", as_index=False)["v"].mean()
+        ax.plot(d["t"], d["v"], "o-", ms=4, lw=1.2, color=col,
+                label=str(name) if hue else None)
+        win = d
+        if lo not in (None, "") or hi not in (None, ""):     # fit only the chosen window
+            if lo not in (None, ""):
+                win = win[win["t"] >= float(lo)]
+            if hi not in (None, ""):
+                win = win[win["t"] <= float(hi)]
+        try:
+            g = growth_fit(win["t"], win["v"])
+            xx = np.linspace(win["t"].min(), win["t"].max(), 100)
+            ax.plot(xx, g["y0"] * np.exp(g["mu"] * xx), "--", lw=1.4, color=col)
+            txt.append(f"{(str(name)+': ') if hue else ''}td={g['doubling_time']:.3g}  "
+                       f"µ={g['mu']:.3g}  R²={g['r2']:.3f}")
+        except Exception as e:
+            txt.append(f"{(str(name)+': ') if hue else ''}no fit ({e})")
+    if p.get("log_y"):
+        ax.set_yscale("log")
+    ax.set_xlabel(x); ax.set_ylabel(y)
+    ax.text(0.02, 0.97, "\n".join(txt), transform=ax.transAxes, ha="left", va="top",
+            fontsize=8, bbox=dict(fc="white", alpha=0.75, ec="none"))
+    if hue:
+        ax.legend()
+
+
+def _r_stdcurve(ax, df, m, p):
+    """Standard curve: the standards, the fit and R². Unknowns are interpolated in the
+    Bench math panel (this is the picture of that fit)."""
+    from .stats import standard_curve
+    x, y = m["x"], m["y"]
+    d = df[[x, y]].apply(pd.to_numeric, errors="coerce").dropna()
+    ax.scatter(d[x], d[y], s=30, color="#3a6ea5", zorder=3, label="standards")
+    try:
+        r = standard_curve(df, x, y, p.get("model", "linear"))
+        xx = np.linspace(float(d[x].min()), float(d[x].max()), 200)
+        if p.get("model") == "4pl":
+            a, b, c, dd = (r["params"][k] for k in ("a", "b", "c", "d"))
+            yy = dd + (a - dd) / (1.0 + (xx / c) ** b)
+        else:
+            yy = r["params"]["slope"] * xx + r["params"]["intercept"]
+        ax.plot(xx, yy, color="#e2683b", lw=1.6, zorder=2)
+        ax.text(0.02, 0.97, r["text"], transform=ax.transAxes, ha="left", va="top",
+                fontsize=8, bbox=dict(fc="white", alpha=0.75, ec="none"))
+    except Exception as e:
+        ax.text(0.5, 0.5, f"no fit: {e}", transform=ax.transAxes, ha="center")
+    ax.set_xlabel(x); ax.set_ylabel(y)
 
 
 def _r_volcano(ax, df, m, p):
@@ -672,7 +765,27 @@ REGISTRY: dict[str, PlotSpec] = {s.key: s for s in [
              channels=[Channel("x", True, (NUMBER,)), Channel("hue", True, (CATEGORY,))],
              params=[Param("overlap", "float", 1.1, 0.3, 3.0, label="overlap"), _ALPHA, _PAL]),
     PlotSpec("heatmap", "Heatmap (correlation)", "axes", _r_heatmap,
-             channels=[], params=[Param("annot", "bool", True), _CMAP]),
+             channels=[], params=[Param("annot", "bool", True),
+                                  Param("stars", "bool", False, label="significance stars (BH)"),
+                                  Param("method", "choice", "pearson", choices=("pearson", "spearman")),
+                                  _CMAP]),
+    PlotSpec("michaelis", "Michaelis-Menten (Km / Vmax)", "axes", _r_michaelis,
+             channels=[Channel("x", True, (NUMBER,), "[S] substrate"),
+                       Channel("y", True, (NUMBER,), "v (rate)"),
+                       Channel("hue", accepts=(CATEGORY,), label="group")],
+             params=[Param("show_km", "bool", True, label="mark Km"),
+                     Param("alpha", "float", 0.85, 0.0, 1.0), _PAL]),
+    PlotSpec("growth", "Growth curve (doubling time)", "axes", _r_growth,
+             channels=[Channel("x", True, (NUMBER,), "time"),
+                       Channel("y", True, (NUMBER,), "OD / signal"),
+                       Channel("hue", accepts=(CATEGORY,), label="group")],
+             params=[Param("log_y", "bool", False, label="log Y"),
+                     Param("t_min", "text", "", label="fit from time"),
+                     Param("t_max", "text", "", label="fit to time"), _PAL]),
+    PlotSpec("stdcurve", "Standard curve (+ R²)", "axes", _r_stdcurve,
+             channels=[Channel("x", True, (NUMBER,), "known concentration"),
+                       Channel("y", True, (NUMBER,), "signal")],
+             params=[Param("model", "choice", "linear", choices=("linear", "4pl"))]),
     PlotSpec("volcano", "Volcano Plot", "axes", _r_volcano, pickable=True,
              channels=[Channel("x", True, (NUMBER,), "log2FC"), Channel("y", True, (NUMBER,), "p-value")],
              params=[Param("fc_thr", "float", 1.0, 0.0, 10.0, label="|log2FC| threshold"),

@@ -945,3 +945,521 @@ def methods_sentence(df, value_col, group_col):
     npairs = f"; {len(pw)} pairwise comparison(s), Holm-corrected" if pw else ""
     return (f"{value_col} was compared across {len(names)} groups ({ns}) with a "
             f"Kruskal-Wallis test (H={H:.2f}, df={len(names)-1}, p={p:.3g}){npairs}.")
+
+
+# ============================ statistical rigor =============================== #
+def _design(series):
+    """Dummy-coded (drop-first) indicator matrix for one categorical factor."""
+    s = series.astype(str).to_numpy()
+    cats = sorted(pd.unique(s))
+    if len(cats) < 2:
+        return np.empty((len(s), 0)), cats
+    return np.column_stack([(s == c).astype(float) for c in cats[1:]]), cats
+
+
+def _rss(X, y):
+    """Residual sum of squares and rank of the design matrix (with intercept)."""
+    X = np.column_stack([np.ones(len(y)), X]) if X.size else np.ones((len(y), 1))
+    beta, _, rank, _ = np.linalg.lstsq(X, y, rcond=None)
+    resid = y - X @ beta
+    return float(resid @ resid), int(rank)
+
+
+def two_way_anova(df, value_col, factor_a, factor_b):
+    """Two-way ANOVA with interaction (Type II sums of squares, via model
+    comparison). Handles unbalanced designs. Returns display-ready text."""
+    from scipy.stats import f as fdist
+    d = df[[value_col, factor_a, factor_b]].copy()
+    d[value_col] = pd.to_numeric(d[value_col], errors="coerce")
+    d = d.dropna()
+    if len(d) < 4:
+        raise ValueError("Too few complete rows for a two-way ANOVA.")
+    y = d[value_col].to_numpy(float)
+    A, ca = _design(d[factor_a])
+    B, cb = _design(d[factor_b])
+    if A.shape[1] == 0 or B.shape[1] == 0:
+        raise ValueError("Each factor needs at least 2 levels.")
+    AB = np.column_stack([A[:, i] * B[:, j]
+                          for i in range(A.shape[1]) for j in range(B.shape[1])])
+    rss_ab, rk_ab = _rss(np.column_stack([A, B, AB]), y)      # full model
+    rss_add, rk_add = _rss(np.column_stack([A, B]), y)        # A + B
+    rss_a, rk_a = _rss(A, y)
+    rss_b, rk_b = _rss(B, y)
+    n = len(y)
+    df_err = n - rk_ab
+    if df_err <= 0:
+        raise ValueError("Not enough replication to estimate the error (add replicates).")
+    mse = rss_ab / df_err
+
+    def term(ss, ddf, name):
+        if ddf <= 0 or mse <= 0:
+            return f"{name:<28} (not estimable)"
+        F = (ss / ddf) / mse
+        p = float(fdist.sf(F, ddf, df_err))
+        return f"{name:<28} SS={ss:>10.4g}  df={ddf:<3d} F={F:>8.3f}  p={p:.3g}"
+
+    lines = [f"Two-way ANOVA on {value_col}   (n={n})",
+             f"Factors: {factor_a} ({len(ca)} levels) x {factor_b} ({len(cb)} levels)",
+             "",
+             term(rss_b - rss_add, rk_add - rk_b, factor_a),          # SS(A|B)
+             term(rss_a - rss_add, rk_add - rk_a, factor_b),          # SS(B|A)
+             term(rss_add - rss_ab, rk_ab - rk_add, f"{factor_a} x {factor_b}"),
+             f"{'Residual':<28} SS={rss_ab:>10.4g}  df={df_err:<3d} MS={mse:.4g}",
+             "",
+             "Type II SS. A significant interaction means the effect of one factor",
+             "depends on the other - interpret main effects with care."]
+    return "\n".join(lines)
+
+
+def rm_anova(df, value_col, within_col, subject_col):
+    """One-way repeated-measures ANOVA (within-subject) + Friedman as the
+    non-parametric alternative. Uses only subjects with complete data."""
+    from scipy.stats import f as fdist, friedmanchisquare
+    d = df[[value_col, within_col, subject_col]].copy()
+    d[value_col] = pd.to_numeric(d[value_col], errors="coerce")
+    d = d.dropna()
+    wide = d.pivot_table(index=subject_col, columns=within_col,
+                         values=value_col, aggfunc="mean")
+    wide = wide.dropna()                       # complete cases only
+    n, k = wide.shape
+    if n < 2 or k < 2:
+        raise ValueError("Need >=2 subjects with complete data and >=2 conditions.")
+    Y = wide.to_numpy(float)
+    grand = Y.mean()
+    ss_cond = n * np.sum((Y.mean(axis=0) - grand) ** 2)
+    ss_subj = k * np.sum((Y.mean(axis=1) - grand) ** 2)
+    ss_tot = np.sum((Y - grand) ** 2)
+    ss_err = ss_tot - ss_cond - ss_subj
+    df_c, df_e = k - 1, (k - 1) * (n - 1)
+    F = (ss_cond / df_c) / (ss_err / df_e) if ss_err > 0 and df_e > 0 else float("nan")
+    p = float(fdist.sf(F, df_c, df_e)) if np.isfinite(F) else float("nan")
+    # non-parametric partner: Friedman needs 3+ conditions; with exactly 2 the
+    # correct paired test is Wilcoxon signed-rank (pre/post is the common case).
+    if k >= 3:
+        chi, pf = friedmanchisquare(*[Y[:, j] for j in range(k)])
+        np_line = f"Friedman (non-parametric): chi2 = {chi:.3f}, p = {pf:.3g}"
+    else:
+        from scipy.stats import wilcoxon
+        try:
+            w, pf = wilcoxon(Y[:, 0], Y[:, 1])
+            np_line = f"Wilcoxon signed-rank (non-parametric): W = {w:.3f}, p = {pf:.3g}"
+        except Exception as e:
+            np_line = f"Wilcoxon signed-rank: not computable ({e})"
+    return "\n".join([
+        f"Repeated-measures ANOVA on {value_col}",
+        f"Within: {within_col} ({k} conditions) | Subjects: {n} complete",
+        f"F({df_c},{df_e}) = {F:.3f}, p = {p:.3g}",
+        np_line,
+        "",
+        "Dropped subjects with missing conditions. If sphericity is doubtful,",
+        "prefer the Friedman result or a corrected (Greenhouse-Geisser) test."])
+
+
+def power_ttest(n_per_group, d, alpha=0.05):
+    """Power of a two-sided, two-sample t-test for effect size d (Cohen)."""
+    from scipy.stats import t as tdist, nct
+    n = int(n_per_group)
+    if n < 2:
+        return 0.0
+    dfree = 2 * n - 2
+    nc = d * np.sqrt(n / 2.0)
+    tc = tdist.ppf(1 - alpha / 2.0, dfree)
+    return float(1 - nct.cdf(tc, dfree, nc) + nct.cdf(-tc, dfree, nc))
+
+
+def sample_size_ttest(d, alpha=0.05, power=0.80):
+    """Smallest n PER GROUP reaching the target power (two-sample, two-sided)."""
+    if not d or not np.isfinite(d) or d == 0:
+        raise ValueError("Give a non-zero effect size (Cohen's d).")
+    for n in range(2, 100001):
+        if power_ttest(n, abs(d), alpha) >= power:
+            return n
+    return None
+
+
+def power_report(d, alpha=0.05, power=0.80, n=None):
+    """Sample size for the target power, plus the achieved power at a given n."""
+    lines = [f"Two-sample t-test, two-sided, alpha={alpha}, effect size d={d:g}"]
+    need = sample_size_ttest(d, alpha, power)
+    if need:
+        lines.append(f"For {power*100:.0f}% power you need n = {need} PER GROUP "
+                     f"({2*need} total).")
+    if n:
+        lines.append(f"With n = {int(n)} per group the power is "
+                     f"{power_ttest(int(n), d, alpha)*100:.1f}%.")
+    lines += ["", "Cohen's d rule of thumb: 0.2 small, 0.5 medium, 0.8 large.",
+              "n is the INDEPENDENT unit (replicates/animals), not the number of cells."]
+    return "\n".join(lines)
+
+
+def find_outliers(df, value_col, group_col=None, method="grubbs", alpha=0.05):
+    """Flag outliers by Grubbs (one at a time, iterated), IQR (1.5x) or MAD (3.5).
+    Returns (flag_series aligned to df.index, display text)."""
+    from scipy.stats import t as tdist
+    v = pd.to_numeric(df[value_col], errors="coerce")
+    flag = pd.Series(False, index=df.index)
+
+    def flag_block(idx):
+        x = v.loc[idx].dropna()
+        if len(x) < 3:
+            return []
+        if method == "iqr":
+            q1, q3 = x.quantile(0.25), x.quantile(0.75)
+            iqr = q3 - q1
+            return list(x[(x < q1 - 1.5 * iqr) | (x > q3 + 1.5 * iqr)].index)
+        if method == "mad":
+            med = x.median()
+            mad = (x - med).abs().median() * 1.4826
+            if mad == 0:
+                return []
+            return list(x[((x - med).abs() / mad) > 3.5].index)
+        out, cur = [], x.copy()          # grubbs, iterated
+        while len(cur) >= 3:
+            sd = cur.std(ddof=1)
+            if not sd or not np.isfinite(sd):
+                break
+            G = (cur - cur.mean()).abs() / sd
+            i = G.idxmax()
+            N = len(cur)
+            tcrit = tdist.ppf(1 - alpha / (2 * N), N - 2)
+            gcrit = ((N - 1) / np.sqrt(N)) * np.sqrt(tcrit ** 2 / (N - 2 + tcrit ** 2))
+            if G[i] > gcrit:
+                out.append(i); cur = cur.drop(i)
+            else:
+                break
+        return out
+
+    if group_col and group_col in df.columns:
+        for _, idx in df.groupby(group_col).groups.items():
+            flag.loc[flag_block(idx)] = True
+    else:
+        flag.loc[flag_block(df.index)] = True
+    n = int(flag.sum())
+    lines = [f"Outlier scan on {value_col} ({method}"
+             + (f", within {group_col}" if group_col else "") + f") - {n} flagged",
+             ""]
+    if n:
+        show = df.loc[flag, [c for c in [group_col, value_col] if c]].head(30)
+        lines.append(show.to_string())
+        if n > 30:
+            lines.append(f"... and {n-30} more")
+    lines += ["", "Flagged != invalid. Removing points changes your result: justify it,",
+              "and report that you did. The new column records the flag."]
+    return flag, "\n".join(lines)
+
+
+def corr_with_p(df, cols, method="pearson"):
+    """Correlation matrix with p-values (BH-corrected across the unique pairs).
+    Returns (r DataFrame, p DataFrame, stars DataFrame)."""
+    from scipy.stats import pearsonr, spearmanr
+    cols = [c for c in cols if c in df.columns]
+    if len(cols) < 2:
+        raise ValueError("Select at least 2 numeric columns.")
+    X = df[cols].apply(pd.to_numeric, errors="coerce")
+    k = len(cols)
+    r = pd.DataFrame(np.eye(k), index=cols, columns=cols)
+    p = pd.DataFrame(np.zeros((k, k)), index=cols, columns=cols)
+    raw = []
+    for i in range(k):
+        for j in range(i + 1, k):
+            s = X[[cols[i], cols[j]]].dropna()
+            if len(s) < 3:
+                rv, pv = np.nan, np.nan
+            else:
+                fn = pearsonr if method == "pearson" else spearmanr
+                rv, pv = fn(s[cols[i]], s[cols[j]])
+            r.iloc[i, j] = r.iloc[j, i] = rv
+            raw.append(((i, j), pv))
+    ps = [pv for _, pv in raw]
+    adj = bh_correct([0 if not np.isfinite(x) else x for x in ps])
+    for ((i, j), _), pa in zip(raw, adj):
+        p.iloc[i, j] = p.iloc[j, i] = pa
+    def star(x):
+        return "***" if x < 0.001 else "**" if x < 0.01 else "*" if x < 0.05 else ""
+    stars = p.map(lambda x: star(x) if np.isfinite(x) else "")
+    for c in cols:
+        stars.loc[c, c] = ""
+    return r, p, stars
+
+
+# ============================== bench math ==================================== #
+def ddct(df, ct_col, gene_col, sample_col, group_col, housekeeping, reference_group):
+    """qPCR relative quantification (2^-ddCt).
+    Averages technical replicates per (sample, gene), computes dCt = Ct_target -
+    Ct_housekeeping within each sample, ddCt against the mean dCt of the reference
+    group, and fold change 2^-ddCt. Returns a tidy DataFrame."""
+    d = df[[ct_col, gene_col, sample_col, group_col]].copy()
+    d[ct_col] = pd.to_numeric(d[ct_col], errors="coerce")
+    d = d.dropna()
+    for c, nm in ((gene_col, "gene"), (sample_col, "sample"), (group_col, "group")):
+        d[c] = d[c].astype(str)
+    if housekeeping not in set(d[gene_col]):
+        raise ValueError(f"Housekeeping gene '{housekeeping}' not found in {gene_col}.")
+    if reference_group not in set(d[group_col]):
+        raise ValueError(f"Reference group '{reference_group}' not found in {group_col}.")
+    mean_ct = d.groupby([sample_col, group_col, gene_col], as_index=False)[ct_col].mean()
+    hk = mean_ct[mean_ct[gene_col] == housekeeping][[sample_col, ct_col]]
+    hk = hk.rename(columns={ct_col: "Ct_hk"})
+    tgt = mean_ct[mean_ct[gene_col] != housekeeping]
+    if tgt.empty:
+        raise ValueError("No target gene besides the housekeeping gene.")
+    m = tgt.merge(hk, on=sample_col, how="inner")
+    if m.empty:
+        raise ValueError("No sample has both the target and the housekeeping gene.")
+    m["dCt"] = m[ct_col] - m["Ct_hk"]
+    ref = (m[m[group_col] == reference_group]
+           .groupby(gene_col)["dCt"].mean().rename("dCt_ref"))
+    m = m.merge(ref, on=gene_col, how="left")
+    m["ddCt"] = m["dCt"] - m["dCt_ref"]
+    m["fold_change"] = 2.0 ** (-m["ddCt"])
+    m["log2_fold"] = -m["ddCt"]
+    return m.rename(columns={ct_col: "Ct_target"})[
+        [sample_col, group_col, gene_col, "Ct_target", "Ct_hk",
+         "dCt", "ddCt", "fold_change", "log2_fold"]]
+
+
+def standard_curve(df, conc_col, signal_col, model="linear", unknown_signals=None):
+    """Fit a standard curve on the rows that have a concentration, then read the
+    unknowns back off the curve. model='linear' or '4pl'.
+    Returns dict(text, r2, predict_conc, params)."""
+    d = df[[conc_col, signal_col]].copy()
+    d[conc_col] = pd.to_numeric(d[conc_col], errors="coerce")
+    d[signal_col] = pd.to_numeric(d[signal_col], errors="coerce")
+    std = d.dropna()
+    if len(std) < 3:
+        raise ValueError("Need at least 3 standards (rows with concentration AND signal).")
+    x = std[conc_col].to_numpy(float); y = std[signal_col].to_numpy(float)
+    if model == "4pl":
+        fit = fit_4pl(x, y)
+        a, b, c, dd, r2 = fit["a"], fit["b"], fit["c"], fit["d"], fit["r2"]
+
+        def predict_conc(sig):
+            sig = np.asarray(sig, float)
+            with np.errstate(all="ignore"):
+                ratio = (a - dd) / (sig - dd) - 1.0
+                out = c * np.power(ratio, 1.0 / b)
+            return np.where(np.isfinite(out), out, np.nan)
+        params = dict(a=a, b=b, c=c, d=dd)
+        eq = f"y = {dd:.4g} + ({a:.4g} - {dd:.4g}) / (1 + (x/{c:.4g})^{b:.4g})"
+    else:
+        slope, intercept = np.polyfit(x, y, 1)
+        yhat = slope * x + intercept
+        ss_res = float(np.sum((y - yhat) ** 2)); ss_tot = float(np.sum((y - y.mean()) ** 2))
+        r2 = 1 - ss_res / ss_tot if ss_tot else float("nan")
+
+        def predict_conc(sig):
+            sig = np.asarray(sig, float)
+            return (sig - intercept) / slope if slope else np.full(sig.shape, np.nan)
+        params = dict(slope=slope, intercept=intercept)
+        eq = f"y = {slope:.6g}x + {intercept:.6g}"
+    lines = [f"Standard curve ({model}) - {len(std)} standards",
+             eq, f"R2 = {r2:.5f}"]
+    if r2 < 0.98:
+        lines.append("Warning: R2 < 0.98 - check the standards before using this curve.")
+    if unknown_signals is not None:
+        vals = predict_conc(unknown_signals)
+        lines.append(f"Interpolated {int(np.isfinite(vals).sum())} unknown(s).")
+        lo, hi = float(np.nanmin(x)), float(np.nanmax(x))
+        out_of_range = int(np.sum((vals < lo) | (vals > hi)))
+        if out_of_range:
+            lines.append(f"Warning: {out_of_range} value(s) fall OUTSIDE the standard "
+                         f"range [{lo:g}, {hi:g}] - extrapolation, treat with care.")
+    return dict(text="\n".join(lines), r2=r2, predict_conc=predict_conc, params=params)
+
+
+def michaelis_menten(s, v):
+    """Fit v = Vmax*S/(Km+S). Returns dict(Km, Vmax, r2, predict)."""
+    from scipy.optimize import curve_fit
+    s = np.asarray(s, float); v = np.asarray(v, float)
+    ok = np.isfinite(s) & np.isfinite(v)
+    s, v = s[ok], v[ok]
+    if len(s) < 3:
+        raise ValueError("Need at least 3 points to fit Michaelis-Menten.")
+
+    def f(x, vmax, km):
+        return vmax * x / (km + x)
+    p0 = [max(v.max(), 1e-9), max(np.median(s[s > 0]) if np.any(s > 0) else 1.0, 1e-9)]
+    popt, _ = curve_fit(f, s, v, p0=p0, bounds=([0, 1e-12], [np.inf, np.inf]), maxfev=20000)
+    vmax, km = float(popt[0]), float(popt[1])
+    yhat = f(s, vmax, km)
+    ss_res = float(np.sum((v - yhat) ** 2)); ss_tot = float(np.sum((v - v.mean()) ** 2))
+    r2 = 1 - ss_res / ss_tot if ss_tot else float("nan")
+    return dict(Km=km, Vmax=vmax, r2=r2, predict=lambda xx: f(np.asarray(xx, float), vmax, km))
+
+
+def growth_fit(t, y):
+    """Exponential growth fit on log scale: y = y0*exp(mu*t).
+    Returns dict(mu, doubling_time, r2, y0)."""
+    t = np.asarray(t, float); y = np.asarray(y, float)
+    ok = np.isfinite(t) & np.isfinite(y) & (y > 0)
+    t, y = t[ok], y[ok]
+    if len(t) < 3:
+        raise ValueError("Need at least 3 positive points in the selected window.")
+    ly = np.log(y)
+    mu, b = np.polyfit(t, ly, 1)
+    yhat = mu * t + b
+    ss_res = float(np.sum((ly - yhat) ** 2)); ss_tot = float(np.sum((ly - ly.mean()) ** 2))
+    r2 = 1 - ss_res / ss_tot if ss_tot else float("nan")
+    td = float(np.log(2) / mu) if mu > 0 else float("nan")
+    return dict(mu=float(mu), doubling_time=td, r2=r2, y0=float(np.exp(b)))
+
+
+def normalize_series(df, value_col, method, group_col=None, control=None, by_col=None):
+    """Common bench normalisations. Returns a new Series.
+    percent_control / fold_control / baseline_subtract use the mean of `control`
+    (a level of group_col); divide_by divides row-wise by `by_col` (loading control);
+    zscore and minmax are computed within group when group_col is given."""
+    v = pd.to_numeric(df[value_col], errors="coerce")
+    if method == "divide_by":
+        den = pd.to_numeric(df[by_col], errors="coerce")
+        return v / den.replace(0, np.nan)
+    if method in ("percent_control", "fold_control", "baseline_subtract"):
+        if not group_col or control is None:
+            raise ValueError("Choose the group column and which level is the control.")
+        g = df[group_col].astype(str)
+        ref = v[g == str(control)].mean()
+        if not np.isfinite(ref) or (ref == 0 and method != "baseline_subtract"):
+            raise ValueError("The control mean is empty or zero.")
+        if method == "percent_control":
+            return v / ref * 100.0
+        if method == "fold_control":
+            return v / ref
+        return v - ref
+    if method in ("zscore", "minmax"):
+        if group_col:
+            g = df[group_col].astype(str)
+            if method == "zscore":
+                return v.groupby(g).transform(lambda s: (s - s.mean()) / s.std(ddof=1))
+            return v.groupby(g).transform(lambda s: (s - s.min()) / (s.max() - s.min()))
+        if method == "zscore":
+            return (v - v.mean()) / v.std(ddof=1)
+        return (v - v.min()) / (v.max() - v.min())
+    raise ValueError(f"Unknown normalisation: {method}")
+
+
+# ============================= quality of life ================================ #
+def data_health(df):
+    """Import sanity check: missing values, duplicates, constant columns, types."""
+    rows = []
+    n = len(df)
+    for c in df.columns:
+        s = df[c]
+        miss = int(s.isna().sum())
+        rows.append([str(c), str(s.dtype), f"{miss} ({miss/n*100:.1f}%)" if n else "0",
+                     int(s.nunique(dropna=True)),
+                     "yes" if s.nunique(dropna=True) <= 1 else ""])
+    tbl = pd.DataFrame(rows, columns=["column", "dtype", "missing", "unique", "constant"])
+    dups = int(df.duplicated().sum())
+    warn = []
+    if dups:
+        warn.append(f"{dups} fully duplicated row(s).")
+    allna = [c for c in df.columns if df[c].isna().all()]
+    if allna:
+        warn.append(f"Empty column(s): {', '.join(map(str, allna))}.")
+    const = [c for c in df.columns if df[c].nunique(dropna=True) <= 1]
+    if const:
+        warn.append(f"Constant column(s): {', '.join(map(str, const))}.")
+    for c in df.select_dtypes("object").columns:
+        conv = pd.to_numeric(df[c], errors="coerce")
+        frac = conv.notna().mean()
+        if 0.6 <= frac < 1.0:
+            warn.append(f"'{c}' looks numeric but {(1-frac)*100:.0f}% of the values "
+                        f"do not parse (decimal comma? stray text?).")
+    text = f"{n} rows x {len(df.columns)} columns\n" + \
+           ("\n".join("- " + w for w in warn) if warn else "- No obvious problems found.")
+    return dict(text=text, columns=list(tbl.columns), rows=tbl.astype(str).values.tolist())
+
+
+def plate_to_tidy(values_grid, map_grid=None, value_name="value", cond_name="condition"):
+    """Turn a plate-reader grid (list of rows) into tidy rows: well, row, col, value
+    (+ condition when a same-shaped map grid is given). Accepts 96 (8x12), 384 or any
+    rectangular block; a leading header row/column of labels is ignored."""
+    def clean(grid):
+        g = [list(r) for r in grid if any(str(c).strip() != "" for c in r)]
+        if not g:
+            return []
+        # drop a leading column-label row (1,2,3...) and a leading row-label column (A,B..)
+        if all(str(c).strip().isdigit() or str(c).strip() == "" for c in g[0]):
+            g = g[1:]
+        if g and all(str(r[0]).strip().isalpha() or str(r[0]).strip() == "" for r in g):
+            g = [r[1:] for r in g]
+        return g
+    V = clean(values_grid)
+    M = clean(map_grid) if map_grid else None
+    if not V:
+        raise ValueError("Empty plate.")
+    out = []
+    for i, row in enumerate(V):
+        for j, cell in enumerate(row):
+            txt = str(cell).strip()
+            if txt == "":
+                continue
+            val = pd.to_numeric(pd.Series([txt.replace(",", ".")]), errors="coerce").iloc[0]
+            rec = {"well": f"{chr(65+i)}{j+1}", "row": chr(65 + i), "col": j + 1,
+                   value_name: val}
+            if M is not None and i < len(M) and j < len(M[i]):
+                c = str(M[i][j]).strip()
+                if c:
+                    rec[cond_name] = c
+            out.append(rec)
+    if not out:
+        raise ValueError("No non-empty wells found.")
+    return pd.DataFrame(out)
+
+
+def recommend_test(df, value_col, group_col, paired=False, subject_col=None):
+    """Guided 'which test should I use?': inspects the design and the data
+    (group count, n, normality, equal variance) and names the test, with the reason."""
+    from scipy import stats as st
+    d = df[[value_col, group_col]].copy()
+    d[value_col] = pd.to_numeric(d[value_col], errors="coerce")
+    d = d.dropna()
+    d[group_col] = d[group_col].astype(str)
+    arrs = {g: s[value_col].to_numpy(float) for g, s in d.groupby(group_col)}
+    arrs = {g: v for g, v in arrs.items() if len(v) > 0}
+    k = len(arrs)
+    if k < 2:
+        return "Need at least two non-empty groups."
+    ns = {g: len(v) for g, v in arrs.items()}
+    small = min(ns.values()) < 8
+    nonnormal, notes = [], []
+    for g, v in arrs.items():
+        if 3 <= len(v) <= 5000:
+            try:
+                if st.shapiro(v).pvalue < 0.05:
+                    nonnormal.append(g)
+            except Exception:
+                pass
+    try:
+        eqvar = st.levene(*arrs.values()).pvalue >= 0.05
+    except Exception:
+        eqvar = True
+    use_np = bool(nonnormal) or small
+    if k == 2:
+        test = ("Wilcoxon signed-rank" if use_np else "paired t-test") if paired else \
+               ("Mann-Whitney U" if use_np else ("Student t-test" if eqvar else "Welch t-test"))
+    else:
+        test = ("Friedman" if use_np else "repeated-measures ANOVA") if paired else \
+               ("Kruskal-Wallis" if use_np else "one-way ANOVA")
+    notes.append(f"{k} groups, n = " + ", ".join(f"{g}:{n}" for g, n in ns.items()))
+    notes.append("Design: " + ("paired / repeated measures" if paired else "independent groups"))
+    notes.append("Normality (Shapiro): " +
+                 (f"rejected for {', '.join(nonnormal)}" if nonnormal else "not rejected"))
+    if small:
+        notes.append("Smallest group < 8 - normality cannot really be judged; "
+                     "the non-parametric route is safer.")
+    notes.append("Equal variances (Levene): " + ("ok" if eqvar else "rejected -> Welch"))
+    where = {"Mann-Whitney U": "Analysis > Compare groups (robust)",
+             "Kruskal-Wallis": "Analysis > Compare groups (robust)",
+             "Welch t-test": "Analysis > Compare groups (robust) (reports both)",
+             "Student t-test": "Analysis > Compare groups (robust) (reports both)",
+             "repeated-measures ANOVA": "Statistics > Repeated measures",
+             "Friedman": "Statistics > Repeated measures (reported alongside)",
+             }.get(test, "Analysis > Compare groups (robust)")
+    if k > 2 and not paired:
+        notes.append("3+ groups: run the omnibus test first, then corrected pairwise "
+                     "comparisons (the app applies Benjamini-Hochberg).")
+    return ("RECOMMENDED: " + test + "\nWhere: " + where + "\n\nWhy:\n"
+            + "\n".join("- " + s for s in notes)
+            + "\n\nTwo factors (e.g. treatment x time)? Use Statistics > Two-way ANOVA."
+            + "\nRows not independent (many cells per replicate)? Aggregate first.")

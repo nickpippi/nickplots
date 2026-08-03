@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import pandas as pd
 import seaborn as sns
 
 from .data_loader import column_kinds, CATEGORY
@@ -432,6 +433,72 @@ def render(layers, df, *, fig=None, figsize=(7, 5), dpi=110, title="", xlabel=""
     _draw_threshold_lines(ax, lines)
     _draw_annotations(ax, annotations)
     ax.set_xlim(_xl); ax.set_ylim(_yl)            # polygons/lines/annotations don't shift it
+    return fig
+
+
+def render_facets(layers, df, facet_col, *, fig=None, ncols=2, figsize=(10, 7), dpi=110,
+                  title="", xlabel="", ylabel="", style=None, legend=None,
+                  annotations=None, aliases=None, lines=None, gates=None, share=True):
+    """Split by: the SAME plot drawn once per level of facet_col, in a grid.
+    Axis limits are shared by default so the panels are actually comparable."""
+    import string
+    if not layers:
+        raise PlotConfigError("No layer to draw.")
+    if facet_col not in df.columns:
+        raise PlotConfigError(f"Column '{facet_col}' does not exist in the data.")
+    style = style or Style()
+    t = THEMES.get(style.theme, THEMES[DEFAULT_THEME])
+    sns.set_theme(style=t["base"], context=style.context, font_scale=style.font_scale)
+    lv = df[facet_col].astype(str)
+    levels = sorted(pd.unique(lv))
+    if not levels:
+        raise PlotConfigError(f"'{facet_col}' has no values to split by.")
+    ncols = max(1, int(ncols))
+    nrows = -(-len(levels) // ncols)
+    if style.fig_w_mm and style.fig_h_mm:
+        figsize = (style.fig_w_mm / 25.4, style.fig_h_mm / 25.4)
+    if fig is None:
+        fig = plt.figure(figsize=figsize, dpi=dpi)
+    else:
+        fig.set_size_inches(*figsize); fig.clear()
+    gs = fig.add_gridspec(nrows, ncols)
+    aliases = aliases or {}
+    disp = lambda c: aliases.get(c, c)
+    base = layers[0].mapping
+    axes = []
+    for i, level in enumerate(levels):
+        ax = fig.add_subplot(gs[i // ncols, i % ncols])
+        sub = df[lv == level]
+        for layer in layers:
+            validate(layer.spec, sub, layer.mapping)
+            if style.colors:
+                layer.params["__colors__"] = style.colors
+            try:
+                layer.spec.render(ax, sub, layer.mapping, layer.params)
+            except Exception:
+                ax.text(0.5, 0.5, "no data", transform=ax.transAxes, ha="center", va="center")
+        _strip_auto_legend(ax)
+        _apply_theme(fig, ax, style)
+        _apply_axes(ax, style)
+        ax.set_title(f"{disp(facet_col)} = {level}", color=t["fg"], loc="left", fontsize=10)
+        if xlabel or base.get("x"):
+            ax.set_xlabel(xlabel or disp(base.get("x", "")), color=t["fg"])
+        if ylabel or base.get("y"):
+            ax.set_ylabel(ylabel or disp(base.get("y", "")), color=t["fg"])
+        _draw_gates(ax, gates); _draw_threshold_lines(ax, lines); _draw_annotations(ax, annotations)
+        axes.append(ax)
+    if share and len(axes) > 1:      # comparable panels: one common scale
+        try:
+            xl = (min(a.get_xlim()[0] for a in axes), max(a.get_xlim()[1] for a in axes))
+            yl = (min(a.get_ylim()[0] for a in axes), max(a.get_ylim()[1] for a in axes))
+            for a in axes:
+                a.set_xlim(xl); a.set_ylim(yl)
+        except Exception:
+            pass
+    if title:
+        fig.suptitle(title, color=t["fg"])
+    fig.patch.set_facecolor(style.fig_bg or t["fig"])
+    fig.tight_layout()
     return fig
 
 

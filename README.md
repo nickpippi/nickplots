@@ -6,7 +6,7 @@ the rigor (and the reproducible Python) of writing code.**
 Nickplots is a desktop app for researchers. You load a table, pick a plot, map your
 columns to the plot's channels, style it, run the right statistical test, and export a
 vector/TIFF figure at 300+ DPI (or the exact Python script that reproduces it). It ships
-with 26 plot types, robust non‑parametric statistics, survival analysis, cell‑tracking
+with 29 plot types, robust non‑parametric statistics, survival analysis, cell‑tracking
 plots, gating/regions, and tools that steer you away from common mistakes such as
 pseudo‑replication.
 
@@ -25,7 +25,11 @@ pseudo‑replication.
 - [Legend tab](#legend-tab)
 - [Annotations](#annotations)
 - [Reshaping the figure (drag handles / mm size)](#reshaping-the-figure)
+- [Split by (facet)](#split-by-facet)
 - [Analysis tab](#analysis-tab)
+- [Bench math panel](#bench-math-panel)
+- [Statistics panel](#statistics-panel)
+- [Data tools panel](#data-tools-panel)
 - [Advanced tab](#advanced-tab)
 - [Export & session](#export--session)
 - [Reproducibility & good‑practice notes](#reproducibility--good-practice-notes)
@@ -306,6 +310,28 @@ exactly like setting the mm size, just hands‑on. The final shape is what gets 
 
 ---
 
+### Enzyme kinetics, growth and calibration
+
+- **Michaelis-Menten (Km / Vmax)** `key=michaelis` — `*x([S] substrate) *y(v rate) hue(group)` ·
+  params `show_km`, `alpha`. Fits `v = Vmax·[S]/(Km+[S])` per group and annotates Km, Vmax, R².
+- **Growth curve (doubling time)** `key=growth` — `*x(time) *y(OD/signal) hue(group)` ·
+  params `log_y`, `fit from time`, `fit to time`. Fits the exponential phase and annotates
+  the **doubling time**, µ and R². Restrict the fit window to the log phase with the two
+  time parameters.
+- **Standard curve (+ R²)** `key=stdcurve` — `*x(known concentration) *y(signal)` ·
+  param `model` (linear / 4PL). Draws the standards and the fit; interpolate unknowns in
+  the [Bench math panel](#bench-math-panel).
+
+---
+
+## Split by (facet)
+
+In the Plot tab, **Split by (facet)** draws the *same* plot once per level of a categorical
+column, in a grid — one click instead of building a panel frame by frame. Choose the number
+of columns, and keep **same scale** on so the panels are actually comparable (all facets
+share one axis range). Works with every plot type. Faceted figures have many axes, so point
+picking and the legend/region overlays are turned off (as in a panel).
+
 ## Analysis tab
 
 - **Dimensionality reduction** — pick numeric columns and run **PCA / t‑SNE / UMAP**; the
@@ -332,6 +358,65 @@ exactly like setting the mm size, just hands‑on. The final shape is what gets 
   region into a new categorical column; **save/load** regions to reuse on another sheet;
   **export gating** assigns each observation to a single best‑fit region and writes CSV/Excel
   (one file or one per region).
+
+---
+
+Three toolboxes open as their own window from the buttons under the tabs. Each has its own
+left-hand menu, so the sidebar stays uncluttered.
+
+## Bench math panel
+
+**🧪 Bench math** — the arithmetic that otherwise sends you back to Excel.
+
+- **qPCR (ΔΔCt)** — pick the Ct, gene, sample and group columns, then the housekeeping gene
+  and the reference group. Averages technical replicates per sample+gene, computes
+  ΔCt (target − housekeeping), ΔΔCt vs. the reference group and **fold change 2^-ΔΔCt**.
+  The tidy result becomes your working data — plot `fold_change` by group straight away.
+- **Standard curve** — fits the rows that carry a known concentration (BCA / Bradford /
+  ELISA), then **interpolates every row's signal back to a concentration** in a new column.
+  Warns when R² < 0.98 and when a value falls outside the standard range (extrapolation).
+- **Normalize** — `% of control`, `fold of control`, `subtract control` (all relative to
+  the mean of the control level you choose), **`divide by column`** (the Western blot case:
+  signal ÷ loading control), `z-score` and `min-max` (optionally within group).
+- **Kinetics & growth** — shortcuts to the three fits that are *pictures*: Michaelis-Menten,
+  growth curve and standard curve.
+
+## Statistics panel
+
+**📊 Statistics** — the rigor that one-way comparisons don't cover.
+
+- **Which test?** — inspects the design and the data (group count, n, Shapiro normality,
+  Levene equal variance, paired or not) and **names the test with the reasoning** and where
+  to run it. Start here if you are unsure.
+- **Two-way ANOVA** — two factors + interaction (e.g. `treatment × time`), Type II sums of
+  squares, unbalanced-safe. A significant interaction means one factor's effect depends on
+  the other.
+- **Repeated measures** — within-subject ANOVA plus the right non-parametric partner
+  (**Wilcoxon** for 2 conditions, **Friedman** for 3+). Subjects missing a condition are
+  dropped and reported.
+- **Power / sample size** — two-sample t-test: an effect size (Cohen's d) gives the **n per
+  group** for your target power; an n gives the achieved power. (d = 0.8 → n = 26/group.)
+- **Outliers** — Grubbs (iterated), IQR (1.5×) or MAD (3.5), optionally within group.
+  It **never deletes**: it can write a true/false column so the decision is documented.
+- **Correlation + p** — pairwise r with p-values **BH-corrected across all pairs**, as an
+  exportable table. For the figure, use the `Heatmap (correlation)` plot with
+  **significance stars** on (and Pearson/Spearman selectable).
+
+## Data tools panel
+
+**🩺 Data tools** — before and around the analysis.
+
+- **Data health** — missing values per column, duplicated rows, constant/empty columns, and
+  columns that *look* numeric but do not fully parse (decimal comma, stray text). Run it
+  right after importing.
+- **Data overview** — small multiples of every selected numeric column in one figure: a
+  histogram, or a box + points per group when you pick a grouping column; each title shows
+  the missing count. The fastest way to see a whole table at once.
+- **Plate import** — paste a 96/384-well grid straight from Excel (tab-separated); row and
+  column labels are stripped automatically. Paste an optional same-shaped **condition map**
+  and you get a tidy table (`well, row, col, value, condition`).
+
+> Every checkbox list of columns in the app has an **All / None** bar.
 
 ## Advanced tab
 

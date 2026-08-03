@@ -258,12 +258,18 @@ class Api:
             # physical size (inches) from the preview reference (DPI); dpi only changes
             # pixel density — used only for the live preview (WYSIWYG).
             figsize = (max(3, w / DPI), max(2.2, h / DPI))
-        E.render(self._layers(state), self._view, fig=fig,
-                 figsize=figsize, dpi=dpi,
-                 title=state["title"], xlabel=state["xlabel"], ylabel=state["ylabel"],
-                 style=self._style(state["style"]), legend=self._legend(state["legend"]),
-                 annotations=state.get("annotations"), aliases=state.get("aliases"),
-                 lines=state.get("threshold_lines"), gates=state.get("gates"))
+        common = dict(figsize=figsize, dpi=dpi, title=state["title"],
+                      xlabel=state["xlabel"], ylabel=state["ylabel"],
+                      style=self._style(state["style"]), legend=self._legend(state["legend"]),
+                      annotations=state.get("annotations"), aliases=state.get("aliases"),
+                      lines=state.get("threshold_lines"), gates=state.get("gates"))
+        facet = (state.get("facet") or "").strip()
+        if facet:      # split by: the same plot once per level of the column
+            E.render_facets(self._layers(state), self._view, facet, fig=fig,
+                            ncols=int(state.get("facet_ncols") or 2),
+                            share=bool(state.get("facet_share", True)), **common)
+        else:
+            E.render(self._layers(state), self._view, fig=fig, **common)
 
     # ------------------------------- render -------------------------------- #
     def render(self, state):
@@ -291,7 +297,10 @@ class Api:
         leg = ax.get_legend()
         base = REGISTRY[state["layers"][0]["spec_key"]]
         m = state["layers"][0]["mapping"]
-        self._pick = (m.get("x"), m.get("y")) if base.pickable else None
+        faceted = bool((state.get("facet") or "").strip())
+        # faceted figures have many axes: point picking and the legend/gate overlays
+        # (which assume a single axes) are turned off, like a panel.
+        self._pick = None if faceted else ((m.get("x"), m.get("y")) if base.pickable else None)
         # categorical axis (strip/swarm/box...): store label->position for reproducible gating
         self._gate_pos = {"x": None, "y": None}
         try:
@@ -307,9 +316,9 @@ class Api:
         xl, yl = ax.get_xlim(), ax.get_ylim()
         return dict(img="data:image/png;base64," + img,
                     imgW=float(self._fig.get_size_inches()[0] * DPI), imgH=float(self._Hpx),
-                    axes=rect(ax.get_window_extent()),
+                    axes=rect(ax.get_window_extent()), faceted=faceted,
                     xlim=[float(xl[0]), float(xl[1])], ylim=[float(yl[0]), float(yl[1])],
-                    legend=rect(leg.get_window_extent()) if leg else None)
+                    legend=None if faceted else (rect(leg.get_window_extent()) if leg else None))
 
     def pick(self, px, py):
         """px/py in NATURAL image pixels (origin at top-left)."""
@@ -708,6 +717,171 @@ class Api:
         obs = ", ".join(f"{g}: {int(o)} events" for g, o in lr["observed"].items())
         return (f"Log-rank test: chi-square = {lr['chi2']:.2f}, df = {lr['df']}, "
                 f"p = {lr['p']:.3g}\nObserved events -> {obs}")
+
+    # ---------------------- statistics (Statistics panel) ------------------ #
+    def _txt(self, fn, *a, **k):
+        """Run an analysis that returns text, turning errors into a readable message."""
+        if self._view is None:
+            return "Load data first."
+        try:
+            return fn(self._view, *a, **k)
+        except Exception as e:
+            return f"Error: {e}"
+
+    def anova_two_way(self, value_col, factor_a, factor_b):
+        return self._txt(S.two_way_anova, value_col, factor_a, factor_b)
+
+    def anova_rm(self, value_col, within_col, subject_col):
+        return self._txt(S.rm_anova, value_col, within_col, subject_col)
+
+    def which_test(self, value_col, group_col, paired=False):
+        return self._txt(S.recommend_test, value_col, group_col, bool(paired))
+
+    def power_calc(self, d, alpha=0.05, power=0.8, n=None):
+        try:
+            return S.power_report(float(d), float(alpha), float(power),
+                                  int(n) if n else None)
+        except Exception as e:
+            return f"Error: {e}"
+
+    def outlier_scan(self, value_col, group_col=None, method="grubbs", make_column=False):
+        """Flag outliers; optionally write the flag into a new column (never deletes)."""
+        if self._view is None:
+            return dict(error="Load data first.")
+        try:
+            flag, text = S.find_outliers(self._view, value_col, group_col or None, method)
+        except Exception as e:
+            return dict(error=str(e))
+        created = None
+        if make_column:
+            col = f"outlier_{value_col}"
+            self._df = self._df.copy()
+            self._df[col] = flag.reindex(self._df.index).fillna(False)
+            self._view = self._view.copy()
+            self._view[col] = flag
+            created = col
+        # key is n_outliers, not n: _info() also carries an "n" (row count) and would
+        # overwrite it when the flag column is created.
+        d = dict(text=text, n_outliers=int(flag.sum()))
+        if created:
+            d.update(self._info(extra={"created": created}))
+        return d
+
+    def corr_table(self, cols, method="pearson"):
+        """Correlation matrix with BH-corrected p-values, as an exportable table."""
+        if self._view is None:
+            return None
+        try:
+            r, p, stars = S.corr_with_p(self._view, cols, method)
+        except Exception as e:
+            return dict(error=str(e))
+        rows = []
+        names = list(r.columns)
+        for i, a in enumerate(names):
+            for b in names[i + 1:]:
+                rows.append([a, b, round(float(r.loc[a, b]), 4),
+                             f"{float(p.loc[a, b]):.3g}", stars.loc[a, b]])
+        import pandas as _pd
+        tbl = _pd.DataFrame(rows, columns=["A", "B", "r", "p (BH)", ""])
+        self._table = tbl
+        return dict(columns=list(tbl.columns), rows=tbl.astype(str).values.tolist())
+
+    # ------------------------ bench math (Bench panel) --------------------- #
+    def qpcr_ddct(self, ct_col, gene_col, sample_col, group_col, housekeeping, reference):
+        """qPCR 2^-ddCt. The tidy result becomes the working data, ready to plot."""
+        if self._view is None:
+            return dict(error="Load data first.")
+        try:
+            out = S.ddct(self._view, ct_col, gene_col, sample_col, group_col,
+                         housekeeping, reference)
+        except Exception as e:
+            return dict(error=str(e))
+        self._df = self._view = out
+        return self._info(extra={"created": "fold_change"})
+
+    def std_curve(self, conc_col, signal_col, model="linear", target_col=None, newname="conc_calc"):
+        """Fit the standards, then interpolate every row's signal back to concentration
+        into a new column (rows without a known concentration are the unknowns)."""
+        if self._view is None:
+            return dict(error="Load data first.")
+        try:
+            src = target_col or signal_col
+            res = S.standard_curve(self._view, conc_col, signal_col, model)
+            vals = res["predict_conc"](pd.to_numeric(self._view[src], errors="coerce"))
+        except Exception as e:
+            return dict(error=str(e))
+        name = (newname or "conc_calc").strip() or "conc_calc"
+        self._view = self._view.copy()
+        self._view[name] = vals
+        if self._df is not self._view:
+            self._df = self._df.copy()
+            try:
+                self._df[name] = pd.Series(vals, index=self._view.index).reindex(self._df.index)
+            except Exception:
+                self._df = self._view
+        else:
+            self._df = self._view
+        d = self._info(extra={"created": name})
+        d["text"] = res["text"]
+        return d
+
+    def normalize_column(self, value_col, method, group_col=None, control=None,
+                         by_col=None, newname=None):
+        """Bench normalisations (% of control, fold, baseline, /loading control, z, min-max)."""
+        if self._view is None:
+            return dict(error="Load data first.")
+        try:
+            vals = S.normalize_series(self._view, value_col, method, group_col or None,
+                                      control, by_col or None)
+        except Exception as e:
+            return dict(error=str(e))
+        name = (newname or f"{value_col}_{method}").strip()
+        self._view = self._view.copy(); self._view[name] = vals
+        if self._df is not self._view:
+            self._df = self._df.copy()
+            try:
+                self._df[name] = vals.reindex(self._df.index)
+            except Exception:
+                self._df = self._view
+        else:
+            self._df = self._view
+        return self._info(extra={"created": name})
+
+    # -------------------------- data tools (QoL) --------------------------- #
+    def health_check(self):
+        if self._view is None:
+            return dict(error="Load data first.")
+        try:
+            r = S.data_health(self._view)
+        except Exception as e:
+            return dict(error=str(e))
+        import pandas as _pd
+        self._table = _pd.DataFrame(r["rows"], columns=r["columns"])
+        return r
+
+    def plate_import(self, values_grid, map_grid=None, value_name="value", cond_name="condition"):
+        """Turn a pasted 96/384-well grid (+ optional condition map) into tidy rows."""
+        try:
+            out = S.plate_to_tidy(values_grid, map_grid, value_name or "value",
+                                  cond_name or "condition")
+        except Exception as e:
+            return dict(error=str(e))
+        self._df = self._view = out
+        self._csv_path = None
+        return self._info("plate")
+
+    def render_overview(self, cols, group=None, state=None):
+        """Small multiples of the selected numeric columns (one glance at the table)."""
+        if self._view is None:
+            return dict(error="Load data first.")
+        try:
+            st = self._style((state or {}).get("style", {})) if state else None
+            fig = F.overview(self._view, cols, group or None, style=st)
+        except Exception as e:
+            return dict(error=str(e))
+        self._pick = None
+        self._adv_fig = fig                      # reuses the existing "export this figure"
+        return dict(img=self._png(fig))
 
     def save_template(self, state):
         """Save the plot 'recipe' (type + channel mapping + params + labels) to a file,

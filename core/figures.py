@@ -39,3 +39,42 @@ def pairplot(df, cols, hue=None, style=None):
                      plot_kws=dict(s=18, alpha=0.6))
     g.figure.patch.set_facecolor(t["fig"])
     return g.figure
+
+
+def overview(df, cols, group=None, style=None, ncols=4):
+    """Small multiples of every selected numeric column: a histogram when there is no
+    group, a box + points per group when there is. One glance at the whole table."""
+    import numpy as np
+    from matplotlib.figure import Figure
+    t = _theme(style)
+    cols = [c for c in (cols or []) if c in df.columns]
+    if not cols:
+        raise ValueError("Select at least one numeric column.")
+    n = len(cols)
+    ncols = max(1, min(int(ncols), n))
+    nrows = -(-n // ncols)
+    fig = Figure(figsize=(3.1 * ncols, 2.5 * nrows), dpi=110)
+    for i, c in enumerate(cols):
+        ax = fig.add_subplot(nrows, ncols, i + 1)
+        v = pd.to_numeric(df[c], errors="coerce")
+        if group and group in df.columns:
+            d = pd.DataFrame({c: v, group: df[group].astype(str)}).dropna()
+            if not d.empty:
+                sns.boxplot(data=d, x=group, y=c, hue=group, legend=False,
+                            showfliers=False, ax=ax)
+                sns.stripplot(data=d, x=group, y=c, color="#1f1f1f", size=2.5,
+                              alpha=0.45, jitter=0.25, ax=ax)
+            ax.tick_params(axis="x", rotation=45, labelsize=7)
+        else:
+            vv = v.dropna()
+            if len(vv):
+                ax.hist(vv, bins=min(30, max(5, int(np.sqrt(len(vv))))),
+                        color="#3a6ea5", alpha=0.85)
+        miss = int(v.isna().sum())
+        ax.set_title(f"{c}" + (f"  ({miss} NA)" if miss else ""), fontsize=8.5, loc="left")
+        ax.set_xlabel(""); ax.set_ylabel("")
+        ax.tick_params(labelsize=7)
+        ax.set_facecolor(t["ax"])
+    fig.patch.set_facecolor(t["fig"])
+    fig.tight_layout()
+    return fig
