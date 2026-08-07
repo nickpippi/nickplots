@@ -85,8 +85,11 @@ def _hue_kw(df, m, p, x_for_fallback=None):
 
 # ------------------------------- renderers ---------------------------------- #
 def _r_scatter(ax, df, m, p):
+    # colour-blind safety: mirror the hue on the marker shape too, so colour is not the
+    # only encoding (unless an explicit style column is set).
+    style_col = m.get("style") or (m.get("hue") if p.get("shape_hue") else None)
     sns.scatterplot(data=df, x=m["x"], y=m["y"], hue=m.get("hue"), size=m.get("size"),
-                    style=m.get("style"), alpha=p["alpha"],
+                    style=style_col, alpha=p["alpha"],
                     palette=_resolve_palette(df, m["hue"], p) if m.get("hue") else None, ax=ax)
     if p.get("regression") and m.get("x") and m.get("y"):
         _overlay_regression(ax, df, m["x"], m["y"])
@@ -105,12 +108,20 @@ def _r_bar(ax, df, m, p):
     sns.barplot(data=df, x=m["x"], y=m["y"], alpha=p["alpha"], ax=ax, **_hue_kw(df, m, p, m["x"]))
 
 
+def _sig_brackets(ax, df, m, p):
+    """Significance brackets between the x groups (only when there is no hue)."""
+    if p.get("sig") and m.get("x") and m.get("y") and not m.get("hue"):
+        _draw_sig(ax, df, m["x"], m["y"], list(pd.unique(df[m["x"]].dropna())))
+
+
 def _r_box(ax, df, m, p):
     sns.boxplot(data=df, x=m["x"], y=m["y"], ax=ax, **_hue_kw(df, m, p, m["x"]))
+    _sig_brackets(ax, df, m, p)
 
 
 def _r_violin(ax, df, m, p):
     sns.violinplot(data=df, x=m["x"], y=m["y"], ax=ax, **_hue_kw(df, m, p, m["x"]))
+    _sig_brackets(ax, df, m, p)
 
 
 def _group_colors(names, p):
@@ -321,6 +332,7 @@ def _r_scatter_density(ax, df, m, p):
 
 def _r_strip(ax, df, m, p):
     sns.stripplot(data=df, x=m["x"], y=m["y"], alpha=p["alpha"], ax=ax, **_hue_kw(df, m, p, m["x"]))
+    _sig_brackets(ax, df, m, p)
 
 
 def _r_box_points(ax, df, m, p):
@@ -337,6 +349,7 @@ def _r_box_points(ax, df, m, p):
                     showfliers=False, ax=ax)
         sns.stripplot(data=df, x=x, y=y, jitter=p["jitter"], size=p["size"],
                       alpha=p["alpha"], color="#1f1f1f", edgecolor="white", linewidth=0.4, ax=ax)
+    _sig_brackets(ax, df, m, p)
 
 
 def _r_violin_points(ax, df, m, p):
@@ -352,6 +365,7 @@ def _r_violin_points(ax, df, m, p):
         sns.violinplot(data=df, x=x, y=y, hue=x, palette=p["palette"], legend=False, inner=None, ax=ax)
         sns.stripplot(data=df, x=x, y=y, jitter=p["jitter"], size=p["size"],
                       alpha=p["alpha"], color="#1f1f1f", edgecolor="white", linewidth=0.4, ax=ax)
+    _sig_brackets(ax, df, m, p)
 
 
 def _r_hist(ax, df, m, p):
@@ -692,7 +706,8 @@ REGISTRY: dict[str, PlotSpec] = {s.key: s for s in [
              channels=[Channel("x", True, (NUMBER, DATETIME)), Channel("y", True, (NUMBER,)),
                        Channel("hue", accepts=(CATEGORY, NUMBER)),
                        Channel("size", accepts=(NUMBER,)), Channel("style", accepts=(CATEGORY,))],
-             params=[_ALPHA, _PAL, Param("regression", "bool", False, label="Regression + R²")]),
+             params=[_ALPHA, _PAL, Param("regression", "bool", False, label="Regression + R²"),
+                     Param("shape_hue", "bool", False, label="shape by hue (colour-blind safe)")]),
     PlotSpec("line", "Line", "axes", _r_line,
              channels=[Channel("x", True), Channel("y", True, (NUMBER,)), Channel("hue", accepts=(CATEGORY,))],
              params=[Param("linewidth", "float", 1.5, 0.5, 6.0),
@@ -703,22 +718,24 @@ REGISTRY: dict[str, PlotSpec] = {s.key: s for s in [
              params=[_ALPHA, _PAL]),
     PlotSpec("box", "Boxplot", "axes", _r_box,
              channels=[Channel("x", True, (CATEGORY,)), Channel("y", True, (NUMBER,)), Channel("hue", accepts=(CATEGORY,))],
-             params=[_PAL]),
+             params=[Param("sig", "bool", False, label="significance brackets (no hue)"), _PAL]),
     PlotSpec("violin", "Violin", "axes", _r_violin,
              channels=[Channel("x", True, (CATEGORY,)), Channel("y", True, (NUMBER,)), Channel("hue", accepts=(CATEGORY,))],
-             params=[_PAL]),
+             params=[Param("sig", "bool", False, label="significance brackets (no hue)"), _PAL]),
     PlotSpec("strip", "Stripplot", "axes", _r_strip,
              channels=[Channel("x", True, (CATEGORY,)), Channel("y", True, (NUMBER,)), Channel("hue", accepts=(CATEGORY,))],
-             params=[_ALPHA, _PAL]),
+             params=[Param("sig", "bool", False, label="significance brackets (no hue)"), _ALPHA, _PAL]),
     PlotSpec("box_points", "Box + points", "axes", _r_box_points,
              channels=[Channel("x", True, (CATEGORY,)), Channel("y", True, (NUMBER,)), Channel("hue", accepts=(CATEGORY,))],
              params=[Param("size", "float", 4, 1, 12, label="point size"),
                      Param("jitter", "float", 0.2, 0.0, 0.4, label="jitter"),
+                     Param("sig", "bool", False, label="significance brackets (no hue)"),
                      Param("alpha", "float", 0.7, 0.0, 1.0), _PAL]),
     PlotSpec("violin_points", "Violin + points", "axes", _r_violin_points,
              channels=[Channel("x", True, (CATEGORY,)), Channel("y", True, (NUMBER,)), Channel("hue", accepts=(CATEGORY,))],
              params=[Param("size", "float", 4, 1, 12, label="point size"),
                      Param("jitter", "float", 0.2, 0.0, 0.4, label="jitter"),
+                     Param("sig", "bool", False, label="significance brackets (no hue)"),
                      Param("alpha", "float", 0.7, 0.0, 1.0), _PAL]),
     PlotSpec("scatter_density", "Scatter + group background", "axes", _r_scatter_density, pickable=True,
              channels=[Channel("x", True, (NUMBER,)), Channel("y", True, (NUMBER,)),

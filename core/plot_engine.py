@@ -47,6 +47,9 @@ class Style:
     fig_h_mm: float | None = None
     colors: dict | None = None       # {category: color} hand-picked per-group colors
     show_n: bool = False             # append (n=k) to categorical x tick labels
+    font_family: str | None = None   # e.g. "Arial" (journal requirement)
+    base_pt: float | None = None     # absolute font size in points (axis/tick/legend)
+    line_pt: float | None = None     # axes/spine/tick line weight in points
 
 
 def _apply_axes(ax, st):
@@ -105,6 +108,24 @@ class Layer:
         self.spec = REGISTRY[spec_key]
         self.mapping = mapping
         self.params = _fill(self.spec, params)
+
+
+def _apply_font_rc(style: Style):
+    """Absolute font/line settings for journal specs. Applied AFTER sns.set_theme so it
+    wins; when the fields are None, set_theme's context defaults stand (self-resetting)."""
+    if style.font_family:
+        plt.rcParams["font.family"] = "sans-serif"
+        plt.rcParams["font.sans-serif"] = [style.font_family] + \
+            [f for f in plt.rcParams.get("font.sans-serif", []) if f != style.font_family]
+    if style.base_pt:
+        pt = float(style.base_pt)
+        plt.rcParams.update({"font.size": pt, "axes.labelsize": pt, "xtick.labelsize": pt,
+                             "ytick.labelsize": pt, "legend.fontsize": pt, "axes.titlesize": pt + 1})
+    if style.line_pt:
+        w = float(style.line_pt)
+        plt.rcParams.update({"axes.linewidth": w, "xtick.major.width": w, "ytick.major.width": w,
+                             "xtick.minor.width": w * 0.8, "ytick.minor.width": w * 0.8,
+                             "patch.linewidth": w})
 
 
 def _apply_theme(fig, ax, style: Style):
@@ -295,6 +316,9 @@ def _fit_free_legend(fig, ax, leg, pad=0.02):
     ax.set_position([x0, y0, x1 - x0, y1 - y0])
 
 
+_DASH = {"solid": "-", "dashed": "--", "dotted": ":", "dashdot": "-."}
+
+
 def _draw_gates(ax, gates):
     """Named regions (closed polygons with straight edges)."""
     import numpy as np
@@ -305,7 +329,8 @@ def _draw_gates(ax, gates):
             continue
         col = g.get("color") or "#e23b3b"
         ax.add_patch(Polygon(np.asarray(pts, float), closed=True, fill=False,
-                             edgecolor=col, lw=1.4, zorder=3.5))
+                             edgecolor=col, lw=float(g.get("lw") or 1.4),
+                             linestyle=_DASH.get(g.get("dash"), "-"), zorder=3.5))
         name = g.get("name")
         if name:
             lp = g.get("labelxy")
@@ -329,11 +354,13 @@ def _draw_threshold_lines(ax, lines):
         except (TypeError, ValueError):
             continue
         color = ln.get("color") or "#e23b3b"
+        ls = _DASH.get(ln.get("dash"), "--")           # default stays dashed
+        lw = float(ln.get("lw") or 1.3)
         if abs(ang - 90.0) < 1e-9:
-            ax.axvline(x0, color=color, ls="--", lw=1.3, zorder=3)
+            ax.axvline(x0, color=color, ls=ls, lw=lw, zorder=3)
         else:
             ax.axline((x0, y0), slope=math.tan(math.radians(ang)),
-                      color=color, ls="--", lw=1.3, zorder=3)
+                      color=color, ls=ls, lw=lw, zorder=3)
 
 
 def _append_group_n(ax, df, xcol):
@@ -382,6 +409,7 @@ def render(layers, df, *, fig=None, figsize=(7, 5), dpi=110, title="", xlabel=""
     legend = legend or Legend()
     t = THEMES.get(style.theme, THEMES[DEFAULT_THEME])
     sns.set_theme(style=t["base"], context=style.context, font_scale=style.font_scale)
+    _apply_font_rc(style)
     plt.rcParams.update({  # ensure legible text before creating the artists
         "text.color": t["fg"], "axes.labelcolor": t["fg"], "axes.titlecolor": t["fg"],
         "xtick.color": t["fg"], "ytick.color": t["fg"], "axes.edgecolor": t["fg"],
@@ -449,6 +477,7 @@ def render_facets(layers, df, facet_col, *, fig=None, ncols=2, figsize=(10, 7), 
     style = style or Style()
     t = THEMES.get(style.theme, THEMES[DEFAULT_THEME])
     sns.set_theme(style=t["base"], context=style.context, font_scale=style.font_scale)
+    _apply_font_rc(style)
     lv = df[facet_col].astype(str)
     levels = sorted(pd.unique(lv))
     if not levels:
@@ -513,15 +542,37 @@ def _ratios(values, n):
     return out
 
 
+def _draw_panel_item(fig, ax, it, df, style, disp, t, i):
+    """Draw one panel frame (its plot + labels + overlays) on a given axes."""
+    import string
+    lay = Layer(it["spec_key"], it["mapping"], it.get("params"))
+    validate(lay.spec, df, lay.mapping)
+    if style.colors:
+        lay.params["__colors__"] = style.colors
+    lay.spec.render(ax, df, lay.mapping, lay.params)
+    _strip_auto_legend(ax)
+    _apply_theme(fig, ax, style)
+    _apply_axes(ax, style)
+    ax.set_title(it.get("title") or f"({string.ascii_uppercase[i]})", color=t["fg"], loc="left", fontweight="bold")
+    xl, yl = it.get("xlabel"), it.get("ylabel")
+    if xl or lay.mapping.get("x"):
+        ax.set_xlabel(xl or disp(lay.mapping["x"]), color=t["fg"])
+    if yl or lay.mapping.get("y"):
+        ax.set_ylabel(yl or disp(lay.mapping["y"]), color=t["fg"])
+    _lx, _ly = ax.get_xlim(), ax.get_ylim()          # overlays must not shift the view
+    _draw_gates(ax, it.get("gates"))
+    _draw_threshold_lines(ax, it.get("lines"))
+    _draw_annotations(ax, it.get("annotations"))
+    ax.set_xlim(_lx); ax.set_ylim(_ly)
+
+
 def render_panel(items, dfs, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, style=None, aliases=None,
-                 width_ratios=None, height_ratios=None):
+                 width_ratios=None, height_ratios=None, mosaic=None):
     """Multi-figure panel (A/B/C): each item is a layer drawn in its own subplot, from its
     OWN dataframe (dfs[i]) -- so frames can come from different CSVs.
-    item = {spec_key, mapping, params, title, xlabel, ylabel, annotations, lines, gates}.
-    The title/axis labels typed for that plot are carried over, as are its annotations,
-    threshold lines and regions (drawn in that frame's own coordinates, so they scale with
-    it). width_ratios/height_ratios size the grid cells."""
-    import string
+    `mosaic` (e.g. "AC;BC") lays the frames out irregularly via subplot_mosaic: letters map
+    to items in order (A=1st, B=2nd...), and a letter repeated across cells spans them.
+    Without mosaic it's a uniform ncols grid (width_ratios/height_ratios size the cells)."""
     if not items:
         raise PlotConfigError("No panel to build.")
     style = style or Style()
@@ -529,8 +580,8 @@ def render_panel(items, dfs, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, sty
     disp = lambda c: aliases.get(c, c)
     t = THEMES.get(style.theme, THEMES[DEFAULT_THEME])
     sns.set_theme(style=t["base"], context=style.context, font_scale=style.font_scale)
+    _apply_font_rc(style)
     n = len(items)
-    nrows = -(-n // ncols)
     if style.fig_w_mm and style.fig_h_mm:
         figsize = (style.fig_w_mm / 25.4, style.fig_h_mm / 25.4)
     if fig is None:
@@ -538,31 +589,26 @@ def render_panel(items, dfs, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, sty
     else:
         fig.set_size_inches(*figsize)
         fig.clear()
+
+    mo = (mosaic or "").strip()
+    if mo:                                            # irregular / spanning layout
+        rows = [list(r.strip()) for r in mo.replace(";", "\n").splitlines() if r.strip()]
+        axd = fig.subplot_mosaic(rows, empty_sentinel=".")
+        letters = list(dict.fromkeys(c for r in rows for c in r if c != "."))
+        for i, it in enumerate(items):
+            if i >= len(letters):
+                break                                 # more frames than layout cells
+            _draw_panel_item(fig, axd[letters[i]], it, dfs[i], style, disp, t, i)
+        fig.patch.set_facecolor(style.fig_bg or t["fig"])
+        fig.tight_layout()
+        return fig
+
+    nrows = -(-n // ncols)
     gs = fig.add_gridspec(nrows, ncols,
                           width_ratios=_ratios(width_ratios, ncols),
                           height_ratios=_ratios(height_ratios, nrows))
     for i, it in enumerate(items):
-        df = dfs[i]
-        ax = fig.add_subplot(gs[i // ncols, i % ncols])
-        lay = Layer(it["spec_key"], it["mapping"], it.get("params"))
-        validate(lay.spec, df, lay.mapping)
-        if style.colors:
-            lay.params["__colors__"] = style.colors
-        lay.spec.render(ax, df, lay.mapping, lay.params)
-        _strip_auto_legend(ax)
-        _apply_theme(fig, ax, style)
-        _apply_axes(ax, style)
-        ax.set_title(it.get("title") or f"({string.ascii_uppercase[i]})", color=t["fg"], loc="left", fontweight="bold")
-        xl, yl = it.get("xlabel"), it.get("ylabel")
-        if xl or lay.mapping.get("x"):
-            ax.set_xlabel(xl or disp(lay.mapping["x"]), color=t["fg"])
-        if yl or lay.mapping.get("y"):
-            ax.set_ylabel(yl or disp(lay.mapping["y"]), color=t["fg"])
-        _lx, _ly = ax.get_xlim(), ax.get_ylim()      # overlays must not shift the view
-        _draw_gates(ax, it.get("gates"))
-        _draw_threshold_lines(ax, it.get("lines"))
-        _draw_annotations(ax, it.get("annotations"))
-        ax.set_xlim(_lx); ax.set_ylim(_ly)
+        _draw_panel_item(fig, fig.add_subplot(gs[i // ncols, i % ncols]), it, dfs[i], style, disp, t, i)
     fig.patch.set_facecolor(style.fig_bg or t["fig"])
     fig.tight_layout()
     return fig

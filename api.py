@@ -22,6 +22,33 @@ from core.plot_registry import REGISTRY
 
 DPI = 110
 
+# Colour-vision-deficiency simulation matrices (sRGB approximation) + grayscale.
+_CVD = {
+    "deuteranopia": [[0.625, 0.375, 0.0], [0.70, 0.30, 0.0], [0.0, 0.30, 0.70]],
+    "protanopia":   [[0.567, 0.433, 0.0], [0.558, 0.442, 0.0], [0.0, 0.242, 0.758]],
+    "tritanopia":   [[0.95, 0.05, 0.0], [0.0, 0.433, 0.567], [0.0, 0.475, 0.525]],
+}
+
+
+def _simulate_cvd(png, mode):
+    """Transform a rendered PNG to preview it as a colour-blind reader (or grayscale)
+    sees it — the check journals increasingly require."""
+    from PIL import Image
+    im = Image.open(io.BytesIO(png)).convert("RGBA")
+    a = np.asarray(im).astype(float)
+    rgb = a[..., :3]
+    if mode == "grayscale":
+        g = rgb @ np.array([0.299, 0.587, 0.114])
+        rgb = np.stack([g, g, g], axis=-1)
+    elif mode in _CVD:
+        rgb = rgb @ np.asarray(_CVD[mode]).T
+    else:
+        return png
+    a[..., :3] = np.clip(rgb, 0, 255)
+    out = io.BytesIO()
+    Image.fromarray(a.astype("uint8"), "RGBA").save(out, "PNG")
+    return out.getvalue()
+
 
 def _catalog():
     out = []
@@ -199,7 +226,9 @@ class Api:
                      ymin=self._f(d.get("ymin")), ymax=self._f(d.get("ymax")),
                      despine=bool(d.get("despine")), tick_size=float(d.get("tick_size") or 0),
                      fig_w_mm=self._f(d.get("fig_w_mm")), fig_h_mm=self._f(d.get("fig_h_mm")),
-                     colors=(d.get("colors") or None), show_n=bool(d.get("show_n")))
+                     colors=(d.get("colors") or None), show_n=bool(d.get("show_n")),
+                     font_family=(d.get("font_family") or None), base_pt=self._f(d.get("base_pt")),
+                     line_pt=self._f(d.get("line_pt")))
 
     def _legend(self, d):
         return Legend(show=bool(d["show"]), pos=d["pos"], x=float(d["x"]), y=float(d["y"]),
@@ -285,7 +314,10 @@ class Api:
         self._fig.canvas.draw()
         buf = io.BytesIO()
         self._fig.savefig(buf, format="png", dpi=DPI, facecolor=self._fig.get_facecolor())
-        img = base64.b64encode(buf.getvalue()).decode()
+        raw = buf.getvalue()
+        if state.get("cvd"):                 # colour-blindness / grayscale preview
+            raw = _simulate_cvd(raw, state["cvd"])
+        img = base64.b64encode(raw).decode()
 
         ax = self._fig.axes[0]
         self._Hpx = self._fig.get_size_inches()[1] * DPI
@@ -973,7 +1005,8 @@ class Api:
                        figsize=figsize, dpi=dpi, style=self._style(state["style"]),
                        aliases=state.get("aliases"),
                        width_ratios=state.get("panel_wratios"),
-                       height_ratios=state.get("panel_hratios"))
+                       height_ratios=state.get("panel_hratios"),
+                       mosaic=state.get("panel_mosaic"))
 
     def render_panel(self, items, state):
         if self._view is None or not items:

@@ -25,3 +25,7 @@ exports/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Brand source images (embedded as base64 in web/index.html)
+logo_wide.png
+logotype.png
