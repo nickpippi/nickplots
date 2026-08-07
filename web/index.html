@@ -160,6 +160,21 @@
     display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0}
   .previewcard img{max-width:100%;max-height:100%;display:none;border-radius:8px}
   .empty{color:var(--faint);text-align:center;padding:30px}
+  .errcard{position:absolute;inset:0;margin:auto;width:max-content;max-width:82%;height:max-content;
+    align-self:center;text-align:center;color:var(--mut);background:var(--panel2);border:1px solid var(--line);
+    border-radius:var(--radius);padding:18px 22px;box-shadow:0 20px 60px -20px #000}
+  .errcard .big{font-size:30px;color:#e0a03a;margin-bottom:6px}
+  .errcard h4{margin:0 0 6px;color:var(--txt);font-size:14px}
+  .errcard p{margin:0 0 8px;font-size:12px;color:var(--mut)}
+  .errcard ul{margin:0;padding-left:16px;text-align:left;font-size:12px;color:var(--mut)}
+  .errcard li{margin:2px 0}
+  table.peek{border-collapse:collapse;font-size:11px}
+  table.peek td,table.peek th{border:1px solid var(--line);padding:2px 7px;white-space:nowrap;text-align:left}
+  table.peek th{color:var(--mut);background:var(--panel3);position:sticky;top:0}
+  .reco{border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin-bottom:6px;background:var(--panel3)}
+  .reco b{color:var(--txt);font-size:12px}
+  .reco .chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}
+  .reco .note{color:#8bd; font-size:11px;margin-top:5px}
   .empty .big{font-size:34px;opacity:.5;margin-bottom:8px}
   #legendBox{position:absolute;cursor:grab;border:1.5px dashed transparent;border-radius:6px;display:none}
   #legendBox:hover{border-color:#7c5cff88;background:#7c5cff11}
@@ -282,6 +297,17 @@
           <button class="btn sm" style="flex:0 0 auto" onclick="gotoWideHelper()" data-i18n="Tidy columns">Tidy columns</button>
           <button class="btn sm ghost" style="flex:0 0 auto" onclick="$('wideBanner').style.display='none'">✕</button>
         </div>
+        <details class="menu" id="dataPeek" style="display:none;margin-bottom:8px">
+          <summary><span id="peekSummary" data-i18n="Data preview">Data preview</span></summary>
+          <div class="menubody">
+            <div id="peekHealth" class="hint" style="margin:0 0 6px"></div>
+            <div style="overflow:auto;max-height:190px"><table id="peekTable" class="peek"></table></div>
+          </div>
+        </details>
+        <details class="menu" id="recoBox" style="display:none;margin-bottom:8px">
+          <summary data-i18n="✨ Recommended plots">✨ Recommended plots</summary>
+          <div class="menubody" id="recoList"></div>
+        </details>
         <label class="lbl" data-i18n="Filter — build a condition">Filter — build a condition</label>
         <div class="row3">
           <select id="fCol"><option value="">column</option></select>
@@ -307,6 +333,7 @@
         </div>
         <label class="lbl" data-i18n="Plot type">Plot type</label>
         <select id="plotType" onchange="buildConfig()"></select>
+        <p id="plotDesc" class="hint" style="margin:3px 0 0"></p>
         <div id="plotConfig"></div>
         <label class="lbl" data-i18n="Split by (facet) — one panel per level">Split by (facet) — one panel per level</label>
         <div class="row3">
@@ -779,6 +806,12 @@
     </div>
     <div class="previewcard" id="card">
       <div class="empty" id="empty"><div class="big">📈</div><span data-i18n="Your figure appears here">Your figure appears here</span></div>
+      <div class="errcard" id="errCard" style="display:none">
+        <div class="big">⚠</div>
+        <h4 id="errTitle"></h4>
+        <p id="errWhy"></p>
+        <ul id="errTips"></ul>
+      </div>
       <img id="plot" alt="figure">
       <div id="legendBox"></div>
       <svg id="gateLayer" style="position:absolute;left:0;top:0;display:none;pointer-events:none"></svg>
@@ -1330,6 +1363,8 @@ const PT = {
   "⬡ Merge same-named":"⬡ Mesclar de mesmo nome",
   // --- line / edge styles ---
   "solid":"contínua","dashed":"tracejada","dotted":"pontilhada","dash-dot":"traço-ponto","width":"espessura","color":"cor",
+  "Data preview":"Prévia dos dados","✨ Recommended plots":"✨ Gráficos recomendados",
+  "Could not build this plot":"Não foi possível montar este gráfico",
   // --- journal preset / fonts / accessibility / mosaic ---
   "Journal preset":"Preset de revista",
   "One click sets the column width (mm), font family, absolute font size (pt) and line weight (pt) to a journal's spec. Fine-tune below. Height stays yours — set it in Plot size, or drag the plot handles.":"Um clique ajusta a largura da coluna (mm), a fonte, o tamanho absoluto (pt) e a espessura de linha (pt) para a norma da revista. Ajuste fino abaixo. A altura fica com você — defina em Tamanho do gráfico, ou arraste as alças.",
@@ -1667,7 +1702,47 @@ function onData(r){
   buildConfig(); buildNumCols(); fillTestSelects(); buildAdvanced(); renderGateList(); resetHistory();
   fillFilterCols(); fillAnalysisCols(); fillAggCols(); renderDatasets(r.datasets||[], r.active);
   fillWideCols(); maybeWideBanner(); fillFacetCol(); addSelectAll();
+  loadDataPeek(); loadReco();
 }
+async function loadDataPeek(){
+  const box=$('dataPeek'); if(!box) return;
+  const r=await window.pywebview.api.preview_rows(8);
+  if(!r){ box.style.display='none'; return; }
+  box.style.display='block';
+  $('peekSummary').textContent = t('Data preview')+` — ${r.n} × ${r.ncols}`;
+  const h=await window.pywebview.api.health_check();
+  $('peekHealth').textContent = (h&&h.text) ? h.text.split('\n').slice(1).filter(Boolean).join(' · ') : '';
+  const esc=v=>String(v).replace(/</g,'&lt;');
+  let html='<tr>'+r.columns.map(c=>`<th>${esc(c)}<br><span style="color:var(--faint);font-weight:400">${r.kinds[c]||''}</span></th>`).join('')+'</tr>';
+  html+=r.rows.map(row=>'<tr>'+row.map(v=>`<td>${esc((v||'').slice(0,22))}</td>`).join('')+'</tr>').join('');
+  $('peekTable').innerHTML=html;
+}
+async function loadReco(){
+  const box=$('recoBox'); if(!box) return;
+  const r=await window.pywebview.api.recommend_plots();
+  if(!r||!r.recs||!r.recs.length){ box.style.display='none'; return; }
+  box.style.display='block';
+  const lbl=k=>{ const s=CATALOG.find(x=>x.key===k); return s?tSpec(s):k; };
+  $('recoList').innerHTML = r.recs.map(rec=>{
+    const chips=rec.plots.map(k=>`<button class="btn sm" onclick="applyReco('${k}','${rec.x}','${rec.y}','${rec.rep||''}')">${lbl(k)}</button>`).join('');
+    return `<div class="reco"><b>${rec.title.replace(/</g,'&lt;')}</b><div class="chips">${chips}</div>`+
+           (rec.note?`<div class="note">💡 ${rec.note.replace(/</g,'&lt;')}</div>`:'')+`</div>`;
+  }).join('');
+}
+function applyReco(key,x,y,rep){
+  $('plotType').value=key; buildConfig();
+  const set=(ch,v)=>{ if(!v)return; const s=$('plotConfig').querySelector('[data-ch="'+ch+'"]'); if(s&&[...s.options].some(o=>o.value===v)) s.value=v; };
+  set('x',x); set('y',y); if(rep) set('rep',rep);
+  tab('g'); plotBase();
+}
+function showError(r){
+  $('plot').style.display='none'; $('empty').style.display='none'; hidePanelLayer();
+  $('errCard').style.display='block';
+  $('errTitle').textContent = r.error || t('Could not build this plot');
+  $('errWhy').textContent = r.why||''; $('errWhy').style.display = r.why?'block':'none';
+  $('errTips').innerHTML = (r.tips||[]).map(x=>`<li>${x}</li>`).join('');
+}
+function hideError(){ const e=$('errCard'); if(e) e.style.display='none'; }
 function fillFacetCol(){
   const cur=$('facetCol').value;
   $('facetCol').innerHTML='<option value="">—</option>'+COLS.category.map(c=>`<option>${c}</option>`).join('');
@@ -1734,9 +1809,46 @@ function colOptions(accepts){
   const all = Object.keys(COLS.kinds).filter(c=>accepts.includes(COLS.kinds[c]));
   return '<option value="">—</option>'+all.map(c=>`<option>${c}</option>`).join('');
 }
+// one-line description per plot key (shown under the picker). EN + PT.
+const PLOT_DESC = {
+  scatter:{en:"Relationship between two numeric variables.",pt:"Relação entre duas variáveis numéricas."},
+  line:{en:"A value over an ordered X (time, dose).",pt:"Um valor ao longo de um X ordenado (tempo, dose)."},
+  bar:{en:"A value per category as bars.",pt:"Um valor por categoria em barras."},
+  box:{en:"Compare distributions between groups (median, quartiles, range).",pt:"Compara distribuições entre grupos (mediana, quartis, amplitude)."},
+  violin:{en:"Compare distribution shape between groups.",pt:"Compara a forma da distribuição entre grupos."},
+  strip:{en:"Every observation as a jittered dot, by group.",pt:"Cada observação como um ponto disperso, por grupo."},
+  box_points:{en:"Box plus the individual observations on top.",pt:"Box mais as observações individuais em cima."},
+  violin_points:{en:"Violin plus the individual observations.",pt:"Violino mais as observações individuais."},
+  scatter_density:{en:"Scatter tinted by which group dominates each region.",pt:"Dispersão tingida por qual grupo domina cada região."},
+  dose4pl:{en:"Dose-response 4PL fit with IC50.",pt:"Ajuste dose-resposta 4PL com IC50."},
+  bar_err:{en:"Mean/median ± error bar, optional points and significance.",pt:"Média/mediana ± erro, com pontos e significância opcionais."},
+  heatmap_matrix:{en:"The numeric matrix as a heatmap (optional z-score).",pt:"A matriz numérica como heatmap (z-score opcional)."},
+  ecdf:{en:"Cumulative distribution — compare groups without binning.",pt:"Distribuição acumulada — compara grupos sem binning."},
+  regband:{en:"Regression line with a confidence band, per group.",pt:"Reta de regressão com banda de confiança, por grupo."},
+  paired:{en:"Connect the same subject across conditions (before-after).",pt:"Liga o mesmo sujeito entre condições (antes-depois)."},
+  hist:{en:"Distribution of one numeric variable as bars.",pt:"Distribuição de uma variável numérica em barras."},
+  kde:{en:"Smoothed distribution curve of one variable.",pt:"Curva suavizada da distribuição de uma variável."},
+  ridge:{en:"One stacked distribution per group (reveals bimodality).",pt:"Uma distribuição empilhada por grupo (revela bimodalidade)."},
+  heatmap:{en:"Correlation matrix of all numeric columns.",pt:"Matriz de correlação de todas as colunas numéricas."},
+  volcano:{en:"log2 fold-change vs -log10 p, with thresholds.",pt:"log2 fold-change vs -log10 p, com limiares."},
+  superplot:{en:"Cells faint + one big dot per replicate mean — avoids pseudo-replication.",pt:"Células fracas + um ponto por média de réplica — evita pseudorreplicação."},
+  qq:{en:"Q-Q plot: points on the line ⇒ normal distribution.",pt:"Q-Q plot: pontos na linha ⇒ distribuição normal."},
+  km:{en:"Kaplan-Meier survival curves with log-rank test.",pt:"Curvas de sobrevivência de Kaplan-Meier com log-rank."},
+  traj:{en:"XY trajectories, one path per track.",pt:"Trajetórias XY, um caminho por track."},
+  msd:{en:"Mean squared displacement vs lag, per group.",pt:"Deslocamento quadrático médio vs lag, por grupo."},
+  stacked:{en:"Composition of one category within another (+ chi²/Fisher).",pt:"Composição de uma categoria dentro de outra (+ qui²/Fisher)."},
+  michaelis:{en:"Enzyme kinetics fit: Km and Vmax.",pt:"Ajuste de cinética enzimática: Km e Vmax."},
+  growth:{en:"Growth curve with the doubling time.",pt:"Curva de crescimento com o tempo de duplicação."},
+  stdcurve:{en:"Calibration curve; interpolate unknowns in Bench math.",pt:"Curva de calibração; interpole desconhecidos em Cálculos de bancada."},
+};
+function updatePlotDesc(){
+  const d=PLOT_DESC[$('plotType').value];
+  $('plotDesc').textContent = d ? (LANG==='pt'?d.pt:d.en) : '';
+}
 function buildConfig(){
   SPEC = CATALOG.find(s=>s.key===$('plotType').value) || CATALOG[0];
   if(!SPEC) return;
+  updatePlotDesc();
   const prev = {}; // keep the current selection when only the language changed
   $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>prev['c:'+s.dataset.ch]=s.value);
   $('plotConfig').querySelectorAll('[data-pp]').forEach(w=>prev['p:'+w.dataset.pp]=(w.type==='checkbox'?w.checked:w.value));
@@ -1869,7 +1981,8 @@ async function render(){
   catch(err){ console.error('render failed:', err); toast(t('Render error'),'bad'); }
   finally{ busy=false; }                         // make sure busy never sticks at true
   if(!r){ pendingGateFrac=null; maybeLive(); return; }
-  if(r.error){ pendingGateFrac=null; toast(r.error,'bad'); maybeLive(); return; }
+  if(r.error){ pendingGateFrac=null; showError(r); maybeLive(); return; }
+  hideError();
   LASTRENDER=r;
   if(pendingGateFrac){                 // locked regions: put them back at the same plot fraction
     const xl=r.xlim,yl=r.ylim;

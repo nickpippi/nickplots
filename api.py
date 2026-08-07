@@ -151,6 +151,55 @@ class Api:
         self._csv_path = None
         return self._info("(combined)")
 
+    def preview_rows(self, n=8):
+        """First rows + shape + detected types, for the on-load data preview."""
+        if self._view is None:
+            return None
+        head = self._view.head(int(n))
+        return dict(columns=[str(c) for c in head.columns],
+                    rows=[["" if pd.isna(v) else str(v) for v in row] for row in head.values],
+                    kinds=DL.column_kinds(self._view),
+                    n=int(len(self._view)), ncols=int(len(self._view.columns)))
+
+    @staticmethod
+    def _detect_id(df):
+        """A likely replicate/observation-id column (name-based + repeats but not constant)."""
+        import re
+        pat = re.compile(r'(?:^|[_\s])(id|cell|track|well|replicate|rep|sample|subject|roi)s?(?:$|[_\s])', re.I)
+        for c in df.columns:
+            if pat.search(str(c)) and 1 < df[c].nunique(dropna=True) < len(df):
+                return str(c)
+        return None
+
+    def recommend_plots(self):
+        """Suggest plots from the column types (categorical vs numeric, and whether the
+        data looks nested inside replicates -> SuperPlot to avoid pseudo-replication)."""
+        if self._view is None:
+            return None
+        df = self._view
+        num = DL.columns_by_kind(df, DL.NUMBER)
+        cat = [c for c in DL.columns_by_kind(df, DL.CATEGORY)
+               if 2 <= df[c].nunique(dropna=True) <= 20]
+        idcol = self._detect_id(df)
+        recs = []
+        for c in cat[:2]:                          # a numeric value across groups
+            for n in [x for x in num if x != idcol][:3]:
+                r = dict(title=f"{n} by {c}", x=c, y=n, plots=["box_points", "violin_points", "ecdf"])
+                if idcol:
+                    r["plots"] = ["superplot", "box_points", "violin_points"]
+                    r["rep"] = idcol
+                    r["note"] = ("Multiple observations nested within replicates "
+                                 f"('{idcol}') — a SuperPlot tests replicate means, avoiding "
+                                 "pseudo-replication.")
+                recs.append(r)
+        for i in range(min(len(num), 3)):          # numeric vs numeric
+            for j in range(i + 1, min(len(num), 3)):
+                if idcol in (num[i], num[j]):
+                    continue
+                recs.append(dict(title=f"{num[i]} vs {num[j]}", x=num[i], y=num[j],
+                                 plots=["scatter", "regband"]))
+        return dict(recs=recs[:8], id_col=idcol)
+
     def set_filter(self, expr):
         if self._df is None:
             return None
@@ -273,6 +322,44 @@ class Api:
     def _layers(self, state):
         return [Layer(l["spec_key"], l["mapping"], l["params"]) for l in state["layers"]]
 
+    def _explain_error(self, msg):
+        """Turn an engine error into {error(title), why, tips[]}: what went wrong, why this
+        plot needs it, and concrete next steps (with the columns actually available)."""
+        import re
+        view = self._view
+        has_cat = bool(view is not None and DL.columns_by_kind(view, DL.CATEGORY))
+        num_cols = DL.columns_by_kind(view, DL.NUMBER) if view is not None else []
+        d = dict(error=msg, why=None, tips=[])
+        m = re.search(r"requires the '([^']+)'", msg)
+        if m:                                       # a required channel is empty
+            ch = m.group(1)
+            d["error"] = f"This plot needs a {ch}."
+            d["why"] = f"It maps '{ch}' to build the figure, and that box is empty."
+            if ch.lower() in ("x", "hue", "group", "condition") and not has_cat:
+                d["why"] = "This plot compares groups but no categorical column was found."
+                d["tips"] = ["Pick a text/grouping column as X in the Plot tab,",
+                             "or turn a numeric column into a category (Advanced → Numeric → categorical)."]
+            else:
+                d["tips"] = [f"Choose a column for '{ch}' in the Plot tab."]
+            return d
+        m = re.search(r"'([^']+)' of .* expects a ([^ ]+) column.* but '([^']+)' is (\w+)", msg)
+        if m:                                       # wrong column type
+            ch, want, col, got = m.groups()
+            d["error"] = f"'{col}' is the wrong type for {ch}."
+            d["why"] = f"{ch} needs a {want.replace('/', ' or ')} column, but '{col}' is {got}."
+            d["tips"] = [f"Pick a {want.replace('/', ' or ')} column for {ch},"]
+            if "category" in want and got == "number":
+                d["tips"].append(f"or convert '{col}' with Advanced → Numeric → categorical.")
+            return d
+        if "does not exist" in msg:
+            d["error"] = "A selected column is missing."
+            d["tips"] = ["Re-pick the columns in the Plot tab (the data may have changed)."]
+            return d
+        if not num_cols and view is not None:
+            d["why"] = "No numeric column was detected — values may contain text or a decimal comma."
+            d["tips"] = ["Run Data tools → Data health to see which columns did not parse."]
+        return d
+
     # Fixed physical size (inches) for export without explicit mm — export must not
     # depend on the window/preview size at click time (a maximized or smaller window
     # must produce the same file).
@@ -307,9 +394,9 @@ class Api:
         try:
             self._render_into(self._fig, state, DPI)
         except E.PlotConfigError as e:
-            return dict(error=str(e))
+            return self._explain_error(str(e))
         except Exception as e:
-            return dict(error=str(e))
+            return self._explain_error(str(e))
 
         self._fig.canvas.draw()
         buf = io.BytesIO()
