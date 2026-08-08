@@ -200,6 +200,26 @@ class Api:
                                  plots=["scatter", "regband"]))
         return dict(recs=recs[:8], id_col=idcol)
 
+    def load_csv_text(self, name, text):
+        """Load a CSV from its raw text (drag-and-drop / clipboard) — no file path."""
+        try:
+            df = pd.read_csv(io.StringIO(text), sep=None, engine="python")
+            df.columns = [str(c).strip() for c in df.columns]
+        except Exception as e:
+            return dict(error=f"Failed to load: {e}")
+        if df.empty:
+            return dict(error="The dropped file has no rows.")
+        self._df = self._view = df
+        self._csv_path = None
+        self._xlsx = None
+        name = name or "dropped.csv"
+        base = name; i = 2
+        while name in self._datasets:
+            name = f"{base} ({i})"; i += 1
+        self._datasets[name] = self._df
+        self._active = name
+        return self._info(name)
+
     def set_filter(self, expr):
         if self._df is None:
             return None
@@ -432,10 +452,35 @@ class Api:
                                        zip(ax.get_yticks(), ax.get_yticklabels()) if t.get_text()}
         except Exception:
             self._gate_pos = {"x": None, "y": None}
+        def txtrect(artist):                 # bbox of a text artist, or None if empty
+            try:
+                return rect(artist.get_window_extent()) if artist.get_text() else None
+            except Exception:
+                return None
+        texts = None if faceted else dict(title=txtrect(ax.title),
+                                          xlabel=txtrect(ax.xaxis.label),
+                                          ylabel=txtrect(ax.yaxis.label))
+        # per-legend-entry boxes (+ each series' ORIGINAL label, so relabels are stable)
+        leg_items, leg_title = [], None
+        if leg is not None and not faceted:
+            try:
+                origs = ax.get_legend_handles_labels()[1]
+                tobjs = leg.get_texts()
+                if len(origs) == len(tobjs):        # simple hue legend: 1 text per handle
+                    for orig, tob in zip(origs, tobjs):
+                        b = txtrect(tob)
+                        if b:
+                            leg_items.append(dict(orig=str(orig), box=b))
+                tt = leg.get_title()
+                if tt and tt.get_text():
+                    leg_title = txtrect(tt)
+            except Exception:
+                leg_items, leg_title = [], None
         xl, yl = ax.get_xlim(), ax.get_ylim()
         return dict(img="data:image/png;base64," + img,
                     imgW=float(self._fig.get_size_inches()[0] * DPI), imgH=float(self._Hpx),
-                    axes=rect(ax.get_window_extent()), faceted=faceted,
+                    axes=rect(ax.get_window_extent()), faceted=faceted, texts=texts,
+                    legend_items=leg_items, legend_title=leg_title,
                     xlim=[float(xl[0]), float(xl[1])], ylim=[float(yl[0]), float(yl[1])],
                     legend=None if faceted else (rect(leg.get_window_extent()) if leg else None))
 

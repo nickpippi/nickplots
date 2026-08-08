@@ -160,6 +160,35 @@
     display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0}
   .previewcard img{max-width:100%;max-height:100%;display:none;border-radius:8px}
   .empty{color:var(--faint);text-align:center;padding:30px}
+  /* visual editor: clickable hotspots over title / axis labels */
+  .edithot{position:absolute;z-index:4;border:1px dashed transparent;border-radius:5px;cursor:text;
+    pointer-events:auto;transition:background .1s,border-color .1s}
+  .edithot:hover{border-color:#7c5cff88;background:#7c5cff14}
+  input.edithot.editing{background:var(--panel);color:var(--txt);border:1px solid var(--accent);
+    font-size:12px;padding:1px 4px;box-shadow:0 6px 20px -6px #000;min-width:70px}
+  .editmenu{position:fixed;z-index:40;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    box-shadow:0 16px 44px -16px #000;padding:4px;display:flex;flex-direction:column;min-width:150px}
+  .editmenu button{appearance:none;border:0;background:none;color:var(--txt);text-align:left;
+    padding:6px 10px;border-radius:6px;font:inherit;font-size:12px;cursor:pointer}
+  .editmenu button:hover{background:var(--panel3)}
+  .pointpop{position:fixed;z-index:46;background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    box-shadow:0 20px 60px -18px #000;max-width:250px;max-height:300px;overflow:auto;font-size:12px}
+  .pointpop .pophead{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:6px;
+    padding:6px 6px 6px 10px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  .pointpop .pophead b{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px}
+  .pointpop .pophead .btn.sm{width:auto;padding:2px 7px}
+  .pointpop table{width:100%;border-collapse:collapse}
+  .pointpop td{padding:3px 9px;border-bottom:1px solid var(--panel3);user-select:text;cursor:text}
+  .pointpop td:first-child{color:var(--mut);width:42%}
+  input.floatedit{position:fixed;z-index:45;background:var(--panel);color:var(--txt);
+    border:1px solid var(--accent);border-radius:6px;font-size:12px;padding:3px 6px;min-width:120px;
+    box-shadow:0 10px 30px -8px #000}
+  #dropZone{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    background:#0b0e14dd;backdrop-filter:blur(2px);pointer-events:none}
+  #dropZone.on{display:flex}
+  #dropZone .inner{border:3px dashed var(--accent);border-radius:18px;padding:60px 80px;text-align:center;
+    color:var(--txt);font-size:20px;background:#12151d}
+  #dropZone .sub{color:var(--faint);font-size:13px;margin-top:8px}
   .errcard{position:absolute;inset:0;margin:auto;width:max-content;max-width:82%;height:max-content;
     align-self:center;text-align:center;color:var(--mut);background:var(--panel2);border:1px solid var(--line);
     border-radius:var(--radius);padding:18px 22px;box-shadow:0 20px 60px -20px #000}
@@ -824,6 +853,7 @@
   </main>
 </div>
 <div class="toast" id="toast"></div>
+<div id="dropZone"><div class="inner">⬇ <span data-i18n="Drop your CSV here">Drop your CSV here</span><div class="sub" data-i18n="CSV — for Excel use the ⬆ Excel button">CSV — for Excel use the ⬆ Excel button</div></div></div>
 
 <div id="toolModal" class="modal">
   <div class="modal-card toolcard">
@@ -1365,6 +1395,13 @@ const PT = {
   "solid":"contínua","dashed":"tracejada","dotted":"pontilhada","dash-dot":"traço-ponto","width":"espessura","color":"cor",
   "Data preview":"Prévia dos dados","✨ Recommended plots":"✨ Gráficos recomendados",
   "Could not build this plot":"Não foi possível montar este gráfico",
+  // --- visual editor ---
+  "Double-click to edit · right-click for options":"Duplo-clique para editar · botão-direito para opções",
+  "(auto)":"(automático)","Edit text":"Editar texto","Reset to default":"Voltar ao padrão",
+  "Font & size (Style tab)":"Fonte & tamanho (aba Estilo)",
+  "Drag to move · double-click an entry to rename":"Arraste para mover · duplo-clique num item para renomear",
+  "Drop your CSV here":"Solte seu CSV aqui","CSV — for Excel use the ⬆ Excel button":"CSV — para Excel use o botão ⬆ Excel",
+  "For Excel, use the ⬆ Excel button":"Para Excel, use o botão ⬆ Excel","Drop a CSV file":"Solte um arquivo CSV",
   // --- journal preset / fonts / accessibility / mosaic ---
   "Journal preset":"Preset de revista",
   "One click sets the column width (mm), font family, absolute font size (pt) and line weight (pt) to a journal's spec. Fine-tune below. Height stays yours — set it in Plot size, or drag the plot handles.":"Um clique ajusta a largura da coluna (mm), a fonte, o tamanho absoluto (pt) e a espessura de linha (pt) para a norma da revista. Ajuste fino abaixo. A altura fica com você — defina em Tamanho do gráfico, ou arraste as alças.",
@@ -1642,6 +1679,7 @@ window.addEventListener('pywebviewready', async () => {
   fillPlotTypes(); fillThemes(); buildConfig();
   setupHelp();                 // must run before applyLang: it adds the "Tip" caption
   setupAccordion();            // collapsible tiles (declutter dense tabs)
+  setupDrop();                 // drag-and-drop a CSV onto the window
   applyLang();
 });
 
@@ -1736,7 +1774,7 @@ function applyReco(key,x,y,rep){
   tab('g'); plotBase();
 }
 function showError(r){
-  $('plot').style.display='none'; $('empty').style.display='none'; hidePanelLayer();
+  $('plot').style.display='none'; $('empty').style.display='none'; hidePanelLayer(); clearEditors();
   $('errCard').style.display='block';
   $('errTitle').textContent = r.error || t('Could not build this plot');
   $('errWhy').textContent = r.why||''; $('errWhy').style.display = r.why?'block':'none';
@@ -1998,7 +2036,7 @@ async function render(){
     // a faceted figure has many axes: the legend/gate overlays (single-axes) are off
     if(r.faceted){ $('legendBox').style.display='none'; $('gateLayer').style.display='none'; }
     else { placeLegend(r); placeGates(r); }
-    placeSizeHandles();
+    placeSizeHandles(); placeEditors(r);
   };
   maybeLive(); scheduleCommit();
 }
@@ -2060,6 +2098,109 @@ function updLayers(){
 }
 
 /* ----- legend: position overlay + drag ----- */
+/* ---------- visual editor: edit title / X label / Y label on the plot ---------- */
+function clearEditors(){ document.querySelectorAll('.edithot').forEach(e=>e.remove()); closeEditMenu(); }
+function placeEditors(r){
+  clearEditors();
+  if(!r || !r.texts || r.faceted) return;
+  const img=$('plot'); if(!img.clientWidth) return;
+  const scale=img.clientWidth/r.imgW, ox=img.offsetLeft, oy=img.offsetTop;
+  ['title','xlabel','ylabel'].forEach(key=>{
+    const b=r.texts[key]; if(!b) return;
+    const h=document.createElement('div'); h.className='edithot'; h.dataset.key=key;
+    h.style.left=(ox+b.left*scale-4)+'px'; h.style.top=(oy+b.top*scale-3)+'px';
+    h.style.width=((b.right-b.left)*scale+8)+'px'; h.style.height=((b.bottom-b.top)*scale+6)+'px';
+    h.title=t('Double-click to edit · right-click for options');
+    h.addEventListener('dblclick',e=>{ e.stopPropagation(); editText(key); });
+    h.addEventListener('contextmenu',e=>{ e.preventDefault(); e.stopPropagation(); editMenu(key,e); });
+    $('card').appendChild(h);
+  });
+}
+function editText(key){
+  closeEditMenu();
+  const h=[...document.querySelectorAll('.edithot')].find(x=>x.dataset.key===key);
+  if(!h) return;
+  const inp=document.createElement('input'); inp.type='text'; inp.className='edithot editing'; inp.dataset.key=key;
+  inp.style.left=h.style.left; inp.style.top=h.style.top;
+  inp.style.width=Math.max(90,parseFloat(h.style.width)||90)+'px';   // override the global input width:100%
+  inp.value=$(key).value; inp.placeholder=t('(auto)');
+  h.replaceWith(inp); inp.focus(); inp.select();
+  let done=false;
+  const commit=()=>{ if(done) return; done=true; $(key).value=inp.value; render(); };
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){ inp.blur(); }
+    else if(e.key==='Escape'){ done=true; if(LASTRENDER) placeEditors(LASTRENDER); }
+  });
+  inp.addEventListener('blur',commit);
+}
+function editMenu(key,e){
+  closeEditMenu();
+  const m=document.createElement('div'); m.className='editmenu'; m.id='editMenu';
+  m.innerHTML=`<button onclick="editText('${key}')">✎ ${t('Edit text')}</button>`+
+              `<button onclick="$('${key}').value='';render();closeEditMenu()">↺ ${t('Reset to default')}</button>`+
+              `<button onclick="goStyleFonts()">Aa ${t('Font & size (Style tab)')}</button>`;
+  m.style.left=Math.min(e.clientX,innerWidth-170)+'px'; m.style.top=e.clientY+'px';
+  document.body.appendChild(m);
+  // close on outside click, but NOT when clicking a menu button (that would eat the click)
+  const onDoc=ev=>{ if(!m.contains(ev.target)) closeEditMenu(); };
+  m._close=onDoc;
+  setTimeout(()=>document.addEventListener('pointerdown',onDoc),0);
+}
+function closeEditMenu(){ const m=$('editMenu'); if(m){ if(m._close) document.removeEventListener('pointerdown',m._close); m.remove(); } }
+function goStyleFonts(){ closeEditMenu(); tab('s'); }
+// a small floating text editor at (x,y); commit(value) runs on Enter/blur, Esc cancels
+function floatEdit(x,y,initial,commit){
+  document.querySelectorAll('.floatedit').forEach(e=>e.remove());
+  const inp=document.createElement('input'); inp.type='text'; inp.className='floatedit';
+  inp.value=initial||''; inp.style.left=Math.min(x,innerWidth-160)+'px'; inp.style.top=y+'px';
+  document.body.appendChild(inp); inp.focus(); inp.select();
+  let done=false;
+  const fin=save=>{ if(done)return; done=true; if(save) commit(inp.value); inp.remove(); };
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter')fin(true); else if(e.key==='Escape')fin(false); });
+  inp.addEventListener('blur',()=>fin(true));
+}
+// double-click the legend: rename the entry (or the title) under the cursor
+function legendDblEdit(e){
+  const box=$('legendBox'), m=box._meta; if(!m||!m.r) return;
+  e.stopPropagation();
+  const r=m.r, rc=$('card').getBoundingClientRect();
+  const px=(e.clientX-rc.left-m.ox)/m.scale, py=(e.clientY-rc.top-m.oy)/m.scale;
+  const inb=b=>b && px>=b.left && px<=b.right && py>=b.top && py<=b.bottom;
+  if(inb(r.legend_title)){ floatEdit(e.clientX,e.clientY,$('legTitle').value,v=>{ $('legTitle').value=v; render(); }); return; }
+  const it=(r.legend_items||[]).find(i=>inb(i.box));
+  if(it) floatEdit(e.clientX,e.clientY, (LEGREL[it.orig]!==undefined?LEGREL[it.orig]:it.orig), v=>{
+    if(v && v!==it.orig) LEGREL[it.orig]=v; else delete LEGREL[it.orig];
+    render();
+  });
+}
+// drag-and-drop a CSV onto the window
+function setupDrop(){
+  const dz=$('dropZone');
+  window.addEventListener('dragover',e=>{
+    if(e.dataTransfer && [...e.dataTransfer.types].includes('Files')){ e.preventDefault(); dz.classList.add('on'); }
+  });
+  window.addEventListener('dragleave',e=>{
+    if(e.clientX<=0||e.clientY<=0||e.clientX>=innerWidth||e.clientY>=innerHeight) dz.classList.remove('on');
+  });
+  window.addEventListener('drop',e=>{
+    e.preventDefault(); dz.classList.remove('on');
+    const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0]; if(!f) return;
+    const nm=f.name.toLowerCase();
+    if(/\.(csv|tsv|txt)$/.test(nm)){
+      const rd=new FileReader();
+      rd.onload=async()=>{
+        const r=await window.pywebview.api.load_csv_text(f.name, rd.result);
+        if(!r) return; if(r.error){ toast(r.error,'bad'); return; }
+        onData(r); toast(t('CSV loaded'),'good');
+      };
+      rd.readAsText(f);
+    } else if(/\.(xlsx|xls)$/.test(nm)){
+      toast(t('For Excel, use the ⬆ Excel button'),'bad');
+    } else {
+      toast(t('Drop a CSV file'),'bad');
+    }
+  });
+}
 function placeLegend(r){
   const box=$('legendBox'), img=$('plot');
   if(!r.legend || !$('legShow').checked){ box.style.display='none'; return; }
@@ -2070,28 +2211,37 @@ function placeLegend(r){
   box.style.left=(ox+L.left*scale)+'px'; box.style.top=(oy+L.top*scale)+'px';
   box.style.width=((L.right-L.left)*scale)+'px'; box.style.height=((L.bottom-L.top)*scale)+'px';
   box._meta={scale,ox,oy,r};
+  if(!box._editBound){ box._editBound=true; box.addEventListener('dblclick',legendDblEdit); box.title=t('Drag to move · double-click an entry to rename'); }
 }
 (function dragLegend(){
   const box=$('legendBox'); let st=null;
   box.addEventListener('pointerdown',e=>{
-    st={x:e.clientX,y:e.clientY,L:box.offsetLeft,T:box.offsetTop}; box.classList.add('drag');
+    st={x:e.clientX,y:e.clientY,L:box.offsetLeft,T:box.offsetTop,moved:false};
     box.setPointerCapture(e.pointerId); e.preventDefault();
   });
   box.addEventListener('pointermove',e=>{
-    if(!st)return; box.style.left=(st.L+e.clientX-st.x)+'px'; box.style.top=(st.T+e.clientY-st.y)+'px';
+    if(!st)return;
+    if(!st.moved){                       // small threshold so a double-click doesn't move it
+      if(Math.abs(e.clientX-st.x)+Math.abs(e.clientY-st.y)<4) return;
+      st.moved=true; box.classList.add('drag');
+    }
+    const card=$('card');
+    const L=Math.max(0, Math.min(card.clientWidth-box.offsetWidth,  st.L+e.clientX-st.x));
+    const T=Math.max(0, Math.min(card.clientHeight-box.offsetHeight, st.T+e.clientY-st.y));
+    box.style.left=L+'px'; box.style.top=T+'px';    // clamped inside the plot card
   });
-  box.addEventListener('pointerup',e=>{
-    if(!st)return; box.classList.remove('drag');
+  box.addEventListener('pointerup',()=>{
+    if(!st)return; const moved=st.moved; box.classList.remove('drag'); st=null;
+    if(!moved) return;                   // a click/double-click: leave the legend where it is
     const m=box._meta; if(m){
       const sc=m.scale;
       const leftNat=(box.offsetLeft-m.ox)/sc;
       const bottomNat=(box.offsetTop-m.oy)/sc + (box.offsetHeight/sc);
-      // FIGURE fraction (lower-left origin); the backend opens space for the legend
       LEG.x = Math.max(0, Math.min(0.98, +(leftNat/m.r.imgW).toFixed(3)));
       LEG.y = Math.max(0, Math.min(0.98, +((m.r.imgH-bottomNat)/m.r.imgH).toFixed(3)));
       $('legPos').value='free';
     }
-    st=null; render();
+    render();
   });
 })();
 
@@ -2114,12 +2264,34 @@ $('plot').addEventListener('click', async e=>{
     ANNOT.push({kind:annotMode, x:+fx.toFixed(3), y:+fy.toFixed(3), text:$('annText').value});
     setAnnot(null); render(); return;
   }
-  const row = await window.pywebview.api.pick(nx,ny);
-  if(!row) return;
-  $('rowinfo').style.display='block';
-  $('rowinfo').querySelector('h4').textContent=t('Selected point');
-  $('rowtable').innerHTML = Object.entries(row).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join('');
 });
+/* ----- double-click a point -> floating popup with its data row ----- */
+$('plot').addEventListener('dblclick', async e=>{
+  if(!LASTRENDER || annotMode || gateMode || linePick) return;
+  const img=$('plot'), scale=img.clientWidth/LASTRENDER.imgW;
+  const row = await window.pywebview.api.pick(e.offsetX/scale, e.offsetY/scale);
+  if(!row) return;
+  showPointPopup(row, e.clientX, e.clientY);
+});
+function showPointPopup(row, x, y){
+  closePointPop();
+  const p=document.createElement('div'); p.id='pointPop'; p.className='pointpop';
+  p.innerHTML=`<div class="pophead"><b data-i18n="Selected point">${t('Selected point')}</b>`+
+    `<span><button class="btn sm ghost" onclick="copyPop()">⧉</button>`+
+    `<button class="btn sm ghost" onclick="closePointPop()">✕</button></span></div>`+
+    `<table id="popTable">`+Object.entries(row).map(([k,v])=>`<tr><td>${k}</td><td>${(''+v).replace(/</g,'&lt;')}</td></tr>`).join('')+`</table>`;
+  p.style.left=Math.min(x+8, innerWidth-260)+'px';
+  p.style.top=Math.min(y+8, innerHeight-320)+'px';
+  document.body.appendChild(p);
+  setTimeout(()=>document.addEventListener('pointerdown',popOutside),0);
+}
+function popOutside(e){ const p=$('pointPop'); if(p && !p.contains(e.target)) closePointPop(); }
+function closePointPop(){ const p=$('pointPop'); if(p){ document.removeEventListener('pointerdown',popOutside); p.remove(); } }
+function copyPop(){
+  const rows=[...document.querySelectorAll('#popTable tr')];
+  const tsv=rows.map(tr=>[...tr.children].map(c=>c.innerText.trim()).join('\t')).join('\n');
+  navigator.clipboard.writeText(tsv).then(()=>toast(t('Copied'),'good'),()=>toast(t('Copy failed'),'bad'));
+}
 function setAnnot(mode){
   annotMode = (annotMode===mode)? null : mode;
   ['annTextBtn','annArrowBtn','annStarBtn'].forEach(id=>$(id).classList.remove('act'));
@@ -3083,7 +3255,7 @@ function showImage(dataUrl){
   const img=$('plot'); img.src=dataUrl; img.style.display='block'; $('empty').style.display='none';
   $('legendBox').style.display='none'; $('gateLayer').style.display='none';
   LASTRENDER=null;   // advanced/panel figures have no drag/pick
-  placeSizeHandles();               // hide the reshape handles (only for single plots)
+  placeSizeHandles(); clearEditors();   // hide the reshape handles + text editors (single plots only)
 }
 
 /* ---------- drag to flatten/stretch the single plot (sets fig mm size) ---------- */

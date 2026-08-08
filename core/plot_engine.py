@@ -594,7 +594,9 @@ def render_panel(items, dfs, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, sty
     if mo:                                            # irregular / spanning layout
         rows = [list(r.strip()) for r in mo.replace(";", "\n").splitlines() if r.strip()]
         axd = fig.subplot_mosaic(rows, empty_sentinel=".")
-        letters = list(dict.fromkeys(c for r in rows for c in r if c != "."))
+        # A=1st frame, B=2nd, C=3rd (alphabetical), matching the "(A)/(B)/(C)" titles —
+        # NOT the order letters happen to appear in the string.
+        letters = sorted(set(c for r in rows for c in r if c != "."))
         for i, it in enumerate(items):
             if i >= len(letters):
                 break                                 # more frames than layout cells
