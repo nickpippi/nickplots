@@ -7,7 +7,8 @@ Nickplots is a desktop app for researchers. You load a table, pick a plot, map y
 columns to the plot's channels, style it, run the right statistical test, and export a
 vector/TIFF figure at 300+ DPI (or the exact Python script that reproduces it). It ships
 with 29 plot types, robust non‑parametric statistics, survival analysis, cell‑tracking
-plots, gating/regions, and tools that steer you away from common mistakes such as
+plots, gating/regions, journal presets, a colour‑blindness check, an on‑canvas editor,
+multiple plot tabs, and tools that steer you away from common mistakes such as
 pseudo‑replication.
 
 ---
@@ -18,11 +19,13 @@ pseudo‑replication.
 - [Architecture](#architecture)
 - [Install & run](#install--run)
 - [Core concepts](#core-concepts-read-this-first)
+- [Plot tabs (several plots open)](#plot-tabs)
 - [Loading & managing data](#loading--managing-data)
 - [Preparing data (wide→long, formulas, aggregation)](#preparing-data)
 - [The plot catalog](#the-plot-catalog) — every plot and the columns it takes
-- [Style tab](#style-tab)
+- [Style tab (+ journal presets, accessibility check)](#style-tab)
 - [Legend tab](#legend-tab)
+- [Visual editor (edit on the canvas)](#visual-editor)
 - [Annotations](#annotations)
 - [Reshaping the figure (drag handles / mm size)](#reshaping-the-figure)
 - [Split by (facet)](#split-by-facet)
@@ -115,13 +118,44 @@ available in the top toolbar, next to the annotation tools, so you never have to
 with the friendly picker (column · operator · value) or type a raw pandas `query()`
 expression for full power.
 
+**Helpful errors.** When a plot can't be built (missing grouping column, wrong column type,
+no numeric data…), the canvas shows a plain‑language card — *what* went wrong, *why* this
+plot needs it, and concrete steps to fix it — instead of a raw error.
+
+---
+
+## Plot tabs
+
+A row of tabs above the figure keeps **several plots open at once** — like tabs in a
+browser. Each tab holds a whole plot (its layers, labels, style, legend, annotations,
+regions **and the dataset it uses**).
+
+- Click a tab to switch to it — if that plot used a different loaded CSV, it switches the
+  dataset for you before redrawing.
+- **＋** opens a new tab that **duplicates the current one** (a good starting point for a
+  variation).
+- **✕** closes a tab; **double‑click** a tab to rename it.
+- **Advanced → Multi‑figure panel → "Build panel from all open tabs"** turns every open
+  tab into a panel frame in one click (each frame keeps its own data and overlays).
+
+Tabs live for the session; `Save project` still stores the active plot.
+
 ---
 
 ## Loading & managing data
 
 - **⬆ CSV / ⬆ Excel** — load a file. For Excel you then pick the sheet.
+- **Drag‑and‑drop** a `.csv` anywhere onto the window to load it instantly (for Excel use
+  the ⬆ Excel button).
 - **⌨ Type data (Prism style)** — a spreadsheet you can paste into straight from
   Excel/Prism (tab = column, first row = header, optional comma‑decimal).
+- **Data preview** *(Plot tab, on load)* — a fold‑out showing the first rows, the detected
+  type per column, and a one‑line health summary (row × column count, duplicates, columns
+  that look numeric but don't parse). Run the full check in Data tools → Data health.
+- **✨ Recommended plots** *(Plot tab, on load)* — reads the column types and suggests plots
+  (e.g. *Area by Treatment → Box + points / Violin + points / ECDF*; *Area vs Speed →
+  Scatter / Regression*). When it detects an id/replicate column it recommends a
+  **SuperPlot** and warns about pseudo‑replication. Click a suggestion to apply it.
 - **Datasets (multiple files)** *(Advanced tab)* — every CSV you load is kept in a list.
   Click one to switch to it; **✕** removes it; **Combine all** concatenates them into a
   single table with a `dataset` source column — ideal for comparing files or building a
@@ -169,8 +203,9 @@ stay centred, not dodged).
 
 **Scatter** `key=scatter`
 `*x(number/datetime) *y(number) hue(category/number) size(number) style(category)` ·
-params: `alpha`, `regression` (adds a fit line + R²).
-Points are **clickable**: click one to see its full data row.
+params: `alpha`, `regression` (adds a fit line + R²), `shape_hue` (also encode the hue on the
+marker **shape** — colour‑blind safe).
+Points are **clickable**: double‑click one to see its full data row in a popup.
 *Example:* `x=area`, `y=speed`, `hue=treatment`, `regression=on`.
 
 **Scatter + group background** `key=scatter_density`
@@ -191,7 +226,9 @@ many‑points‑per‑x data — opt in deliberately.
 
 ### Group comparisons (a value across categories)
 
-All take `*x(category) *y(number) hue(category)`.
+All take `*x(category) *y(number) hue(category)`. Box / violin / strip / box+points /
+violin+points also take a **`sig`** param that draws **significance brackets** (`*/**/***`)
+between the x groups when there is no hue.
 
 - **Bar** `key=bar` — simple bars.
 - **Boxplot** `key=box`.
@@ -282,8 +319,16 @@ Ignoring censoring (e.g. a boxplot of `lifetime`) biases the result — use this
 - **Axes** — log X / log Y, manual X/Y limits, despine (hide top/right spines), tick size.
 - **Plot size / shape (mm)** — width × height in millimetres sets the exact physical shape
   (e.g. `180×70` flat, `80×160` tall) for preview, export and panels. Empty = default. You
-  can also set this **visually** by dragging the handles on the plot — see below. The font is
-  the system sans‑serif (Arial where available, else DejaVu Sans).
+  can also set this **visually** by dragging the handles on the plot — see below.
+- **Journal preset** — one click sets the column width (mm), font family, absolute font size
+  (pt) and line weight (pt) to a journal's spec: **Nature 1‑/2‑col** (89 / 183 mm),
+  **Cell 1‑col** (85 mm), **Science 1‑/2‑col** (55 / 120 mm). Height stays yours. Fine‑tune
+  with the explicit **Font family**, **Font size (pt)** and **Line weight (pt)** controls
+  right below (0 = automatic).
+- **Accessibility check** — preview the figure as a **colour‑blind** reader
+  (deuteranopia / protanopia / tritanopia) or in **grayscale** (the print test journals
+  increasingly require) sees it. This only changes the on‑screen preview, never the export.
+  Point plots also have a **"shape by hue"** option (scatter) so colour isn't the only cue.
 
 ## Legend tab
 
@@ -291,7 +336,24 @@ Show/hide; position (the named corners, **Outside** on the right, or **Free** �
 click‑drag the legend directly on the plot); font size; number of columns; frame on/off;
 "fit" (shrink the axes so an outside/free legend is never clipped); legend title; and
 per‑item **relabelling** (pretty names without touching the data). Column/axis pretty‑names
-are set via the aliases (visual only).
+are set via the aliases (visual only). You can also **double‑click a legend entry (or its
+title) directly on the plot** to rename it (see [Visual editor](#visual-editor)).
+
+## Visual editor
+
+Once a figure is drawn, edit the most‑changed elements **directly on the canvas** instead of
+hunting in the side panels:
+
+- **Double‑click the title, X label or Y label** → rename it inline. **Right‑click** them for
+  options (edit, reset to default, jump to the font settings).
+- **Double‑click a legend entry** → rename that series; **double‑click the legend title** →
+  rename it. The legend still **drags to move** (with a small threshold so a double‑click
+  doesn't nudge it) and is clamped inside the plot.
+- **Double‑click a point** (on pickable plots like scatter) → a floating popup shows that
+  observation's full data row, with copy/close — no bottom panel taking space.
+
+Individual points, tick numbers and gridlines are not yet click‑to‑edit (that needs an
+interactive‑SVG canvas); the side panels still cover those.
 
 ## Annotations
 
@@ -358,6 +420,8 @@ picking and the legend/region overlays are turned off (as in a panel).
   region into a new categorical column; **save/load** regions to reuse on another sheet;
   **export gating** assigns each observation to a single best‑fit region and writes CSV/Excel
   (one file or one per region).
+- Every line and region carries its own **style** (solid / dashed / dotted / dash‑dot),
+  **width** and **colour**, editable per item in the list at any time.
 
 ---
 
@@ -428,8 +492,14 @@ left-hand menu, so the sidebar stays uncluttered.
   *plot definition* itself.
 - **Multi‑figure panel (A/B/C)** — build a plot, **＋ Add current plot to the panel**, repeat
   (you can switch CSV between frames — each frame keeps its own data, title, axis labels,
-  **and its annotations/lines/regions**). Set **Panel columns**, **Build panel**, then **drag
-  the dividers** on the panel to resize each plot. Export the whole panel.
+  **and its annotations/lines/regions**). Or **Build panel from all open tabs** to turn every
+  [plot tab](#plot-tabs) into a frame in one click. Set **Panel columns**, **Build panel**,
+  then **drag the dividers** to resize each plot.
+  - **Irregular layout (mosaic)** — for uneven panels, type a layout where each **letter is a
+    frame** (A = 1st added, B = 2nd…) and rows are separated by `;`; a repeated letter
+    **spans** its cells. E.g. `AC;BC` = A and B stacked on the left, C filling the whole right
+    column; `ACD;BCD` = A,B left, C the middle column, D the right column. Use `.` for an empty
+    cell. Each letter must form a rectangle. Leave empty for the regular grid.
 - **Clustermap / Pairplot** — pick numeric columns; clustermap (optional z‑score) or pairplot
   (optional hue). Export the figure.
 - **Descriptive table** — per‑group summary statistics; view in the table area and export CSV.
