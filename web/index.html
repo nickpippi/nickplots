@@ -1248,6 +1248,7 @@ const PT = {
   "Open sheet":"Abrir aba", "no file":"nenhum arquivo",
   "Plot":"Gráfico","Style":"Estilo","Legend":"Legenda","Analysis":"Análise","Data":"Dados",
   "Filter rows":"Filtrar linhas",
+  "Double-click to rename this category":"Duplo clique para renomear esta categoria",
   "Put the markers on the plot":"Colocar os marcadores no gráfico",
   "Remove markers":"Remover marcadores",
   "Markers removed":"Marcadores removidos",
@@ -2327,6 +2328,31 @@ function placeEditors(r){
     h.addEventListener('dblclick',e=>{ e.stopPropagation(); editText(key); });
     h.addEventListener('contextmenu',e=>{ e.preventDefault(); e.stopPropagation(); editMenu(key,e); });
     $('card').appendChild(h);
+  });
+  // categorical X ticks: same inline editor as a legend entry, writing to the same
+  // rename map — so renaming here and in Style > Rename items is one single thing.
+  (r.xticks||[]).forEach(tk=>{
+    const b=tk.box;
+    const h=document.createElement('div'); h.className='edithot';
+    h.style.left=(ox+b.left*scale-4)+'px'; h.style.top=(oy+b.top*scale-3)+'px';
+    h.style.width=((b.right-b.left)*scale+8)+'px'; h.style.height=((b.bottom-b.top)*scale+6)+'px';
+    h.title=t('Double-click to rename this category');
+    h.addEventListener('dblclick',e=>{
+      e.stopPropagation();
+      floatEdit(e.clientX,e.clientY,(LEGREL[tk.orig]!==undefined?LEGREL[tk.orig]:tk.orig),v=>{
+        if(v && v!==tk.orig) LEGREL[tk.orig]=v; else delete LEGREL[tk.orig];
+        loadLegendLabelsIfOpen(); render();
+      });
+    });
+    $('card').appendChild(h);
+  });
+}
+// keep the Style > Rename items list in sync when the rename came from the canvas
+function loadLegendLabelsIfOpen(){
+  const box=$('legRelabel');
+  if(box && box.children.length) box.querySelectorAll('input').forEach(inp=>{
+    const orig=(inp.previousElementSibling||{}).textContent;
+    if(orig!==undefined) inp.value = LEGREL[orig]!==undefined ? LEGREL[orig] : '';
   });
 }
 function editText(key){

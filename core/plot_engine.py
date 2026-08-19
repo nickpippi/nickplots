@@ -363,19 +363,34 @@ def _draw_threshold_lines(ax, lines):
                       color=color, ls=ls, lw=lw, zorder=3)
 
 
-def _append_group_n(ax, df, xcol):
-    """Append (n=k) to each categorical x tick label, k = rows in that category."""
-    counts = df[xcol].astype(str).value_counts()
-    labs = ax.get_xticklabels()
+def _finish_cat_xaxis(ax, df, xcol, show_n=False, relabel=None):
+    """Rename categorical X ticks and/or append (n=k) - one pass, so the two compose.
+
+    Categorical X ticks are not legend entries, so _apply_legend never renames them.
+    The RAW category text is stashed on each artist (_np_raw): gating and point picking
+    look positions up by the value in the data, not by what the reader now sees.
+    """
+    labs = [tl for tl in ax.get_xticklabels() if tl.get_text()]
     if not labs:
         return
+    counts = {}
+    if show_n and xcol is not None and xcol in df.columns:
+        counts = {str(k): v for k, v in df[xcol].astype(str).value_counts().items()}
+    relabel = relabel or {}
+    if not counts and not relabel:
+        return
+    raws = [getattr(tl, "_np_raw", tl.get_text()) for tl in labs]
     new = []
-    for tl in labs:
-        key = tl.get_text()
-        n = counts.get(key)
-        new.append(f"{key}\n(n={int(n)})" if n is not None else key)
+    for raw in raws:
+        txt = relabel.get(raw, raw)
+        n = counts.get(raw)
+        new.append(f"{txt}\n(n={int(n)})" if n is not None else txt)
+    if new == [tl.get_text() for tl in labs]:
+        return
     ax.set_xticks(ax.get_xticks())            # pin ticks before relabel (avoids warning)
     ax.set_xticklabels(new)
+    for tl, raw in zip(ax.get_xticklabels(), raws):
+        tl._np_raw = raw                      # survives further passes and reaches api.render
 
 
 def _draw_annotations(ax, anns):
@@ -393,6 +408,21 @@ def _draw_annotations(ax, anns):
                         arrowprops=dict(arrowstyle="->", color="#333", lw=1.2), fontsize=9)
         else:
             ax.text(x, y, txt, transform=ax.transAxes, fontsize=10, ha="left", va="center")
+
+
+def _extra_params(params, style, legend=None, aliases=None):
+    """Render state that is not a plot parameter but that some renderers need.
+
+    Renames normally happen in _apply_legend, which only touches legend entries - so a
+    plot that puts its categories on an AXIS instead (ridgeline) never saw them. Same
+    for the colour picker. Hand them to the renderer alongside the params.
+    """
+    if style.colors:
+        params["__colors__"] = style.colors
+    if legend is not None and legend.relabel:
+        params["__relabel__"] = legend.relabel
+    if aliases:
+        params["__aliases__"] = aliases
 
 
 def render(layers, df, *, fig=None, figsize=(7, 5), dpi=110, title="", xlabel="", ylabel="",
@@ -425,8 +455,7 @@ def render(layers, df, *, fig=None, figsize=(7, 5), dpi=110, title="", xlabel=""
         ax = fig.add_subplot(111)
     for layer in layers:
         validate(layer.spec, df, layer.mapping)
-        if style.colors:                            # hand-picked per-group colors
-            layer.params["__colors__"] = style.colors
+        _extra_params(layer.params, style, legend, aliases)
         layer.spec.render(ax, df, layer.mapping, layer.params)
 
     auto_title, auto_handles, auto_labels = _strip_auto_legend(ax)  # strip BEFORE layout
@@ -442,8 +471,8 @@ def render(layers, df, *, fig=None, figsize=(7, 5), dpi=110, title="", xlabel=""
         ax.set_xlabel(xlabel or disp(base["x"]), color=fg)
     if ylabel or base.get("y"):
         ax.set_ylabel(ylabel or disp(base["y"]), color=fg)
-    if style.show_n and base.get("x") and column_kinds(df).get(base["x"]) == CATEGORY:
-        _append_group_n(ax, df, base["x"])
+    if base.get("x") and column_kinds(df).get(base["x"]) == CATEGORY:
+        _finish_cat_xaxis(ax, df, base["x"], style.show_n, legend.relabel)
 
     will_legend = legend.show and bool(ax.get_legend_handles_labels()[0] or auto_handles)
     if legend.pos == "outside" and will_legend:
@@ -500,8 +529,7 @@ def render_facets(layers, df, facet_col, *, fig=None, ncols=2, figsize=(10, 7), 
         sub = df[lv == level]
         for layer in layers:
             validate(layer.spec, sub, layer.mapping)
-            if style.colors:
-                layer.params["__colors__"] = style.colors
+            _extra_params(layer.params, style, legend, aliases)
             try:
                 layer.spec.render(ax, sub, layer.mapping, layer.params)
             except Exception:
@@ -509,6 +537,8 @@ def render_facets(layers, df, facet_col, *, fig=None, ncols=2, figsize=(10, 7), 
         _strip_auto_legend(ax)
         _apply_theme(fig, ax, style)
         _apply_axes(ax, style)
+        if legend is not None and base.get("x"):
+            _finish_cat_xaxis(ax, sub, base["x"], False, legend.relabel)
         ax.set_title(f"{disp(facet_col)} = {level}", color=t["fg"], loc="left", fontsize=10)
         if xlabel or base.get("x"):
             ax.set_xlabel(xlabel or disp(base.get("x", "")), color=t["fg"])
@@ -542,17 +572,18 @@ def _ratios(values, n):
     return out
 
 
-def _draw_panel_item(fig, ax, it, df, style, disp, t, i):
+def _draw_panel_item(fig, ax, it, df, style, disp, t, i, legend=None, aliases=None):
     """Draw one panel frame (its plot + labels + overlays) on a given axes."""
     import string
     lay = Layer(it["spec_key"], it["mapping"], it.get("params"))
     validate(lay.spec, df, lay.mapping)
-    if style.colors:
-        lay.params["__colors__"] = style.colors
+    _extra_params(lay.params, style, legend, aliases)
     lay.spec.render(ax, df, lay.mapping, lay.params)
     _strip_auto_legend(ax)
     _apply_theme(fig, ax, style)
     _apply_axes(ax, style)
+    if legend is not None and lay.mapping.get("x"):
+        _finish_cat_xaxis(ax, df, lay.mapping["x"], False, legend.relabel)
     ax.set_title(it.get("title") or f"({string.ascii_uppercase[i]})", color=t["fg"], loc="left", fontweight="bold")
     xl, yl = it.get("xlabel"), it.get("ylabel")
     if xl or lay.mapping.get("x"):
@@ -567,6 +598,7 @@ def _draw_panel_item(fig, ax, it, df, style, disp, t, i):
 
 
 def render_panel(items, dfs, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, style=None, aliases=None,
+                 legend=None,
                  width_ratios=None, height_ratios=None, mosaic=None):
     """Multi-figure panel (A/B/C): each item is a layer drawn in its own subplot, from its
     OWN dataframe (dfs[i]) -- so frames can come from different CSVs.
@@ -600,7 +632,7 @@ def render_panel(items, dfs, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, sty
         for i, it in enumerate(items):
             if i >= len(letters):
                 break                                 # more frames than layout cells
-            _draw_panel_item(fig, axd[letters[i]], it, dfs[i], style, disp, t, i)
+            _draw_panel_item(fig, axd[letters[i]], it, dfs[i], style, disp, t, i, legend, aliases)
         fig.patch.set_facecolor(style.fig_bg or t["fig"])
         fig.tight_layout()
         return fig
@@ -610,7 +642,8 @@ def render_panel(items, dfs, *, fig=None, ncols=2, figsize=(10, 7), dpi=110, sty
                           width_ratios=_ratios(width_ratios, ncols),
                           height_ratios=_ratios(height_ratios, nrows))
     for i, it in enumerate(items):
-        _draw_panel_item(fig, fig.add_subplot(gs[i // ncols, i % ncols]), it, dfs[i], style, disp, t, i)
+        _draw_panel_item(fig, fig.add_subplot(gs[i // ncols, i % ncols]), it, dfs[i], style, disp, t, i,
+                         legend, aliases)
     fig.patch.set_facecolor(style.fig_bg or t["fig"])
     fig.tight_layout()
     return fig

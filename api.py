@@ -445,7 +445,8 @@ class Api:
         try:
             kinds = DL.column_kinds(self._view)
             if m.get("x") and kinds.get(m["x"]) == DL.CATEGORY:
-                self._gate_pos["x"] = {t.get_text(): float(p) for p, t in
+                # _np_raw = the category as it is in the data; the visible text may be a rename
+                self._gate_pos["x"] = {getattr(t, "_np_raw", t.get_text()): float(p) for p, t in
                                        zip(ax.get_xticks(), ax.get_xticklabels()) if t.get_text()}
             if m.get("y") and kinds.get(m["y"]) == DL.CATEGORY:
                 self._gate_pos["y"] = {t.get_text(): float(p) for p, t in
@@ -476,8 +477,20 @@ class Api:
                     leg_title = txtrect(tt)
             except Exception:
                 leg_items, leg_title = [], None
+        # categorical X ticks: box + the ORIGINAL category, so a rename stays reversible
+        xticks = []
+        if not faceted:
+            try:
+                for tl in ax.get_xticklabels():
+                    if not tl.get_text():
+                        continue
+                    b = txtrect(tl)
+                    if b:
+                        xticks.append(dict(orig=str(getattr(tl, "_np_raw", tl.get_text())), box=b))
+            except Exception:
+                xticks = []
         xl, yl = ax.get_xlim(), ax.get_ylim()
-        return dict(img="data:image/png;base64," + img,
+        return dict(img="data:image/png;base64," + img, xticks=xticks,
                     imgW=float(self._fig.get_size_inches()[0] * DPI), imgH=float(self._Hpx),
                     axes=rect(ax.get_window_extent()), faceted=faceted, texts=texts,
                     legend_items=leg_items, legend_title=leg_title,
@@ -1340,6 +1353,7 @@ class Api:
         E.render_panel(items, dfs, fig=fig, ncols=int(state.get("ncols", 2)),
                        figsize=figsize, dpi=dpi, style=self._style(state["style"]),
                        aliases=state.get("aliases"),
+                       legend=self._legend(state["legend"]) if state.get("legend") else None,
                        width_ratios=state.get("panel_wratios"),
                        height_ratios=state.get("panel_hratios"),
                        mosaic=state.get("panel_mosaic"))

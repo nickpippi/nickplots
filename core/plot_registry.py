@@ -262,10 +262,54 @@ def _r_bar_err(ax, df, m, p):
     _sig_brackets(ax, df, m, p)
 
 
+def _annot_kws(p, auto=None):
+    """Font size of the numbers written inside heatmap cells.
+    0 (the default) keeps each heatmap's previous behaviour, so old projects and
+    templates render identically."""
+    sz = float(p.get("annot_size") or 0)
+    if sz > 0:
+        return {"fontsize": sz}
+    return {"fontsize": auto} if auto else {}
+
+
+def _r_heatmap_xy(ax, df, m, p):
+    """Heatmap of a value across two categorical axes (model x task, gene x sample...).
+
+    Pivots a tidy table: one row per (row, col) pair. Duplicated pairs are collapsed
+    with the chosen aggregation instead of silently keeping the last one.
+    """
+    row, col, val = m["row"], m["col"], m["value"]
+    d = df[[row, col, val]].copy()
+    d[val] = pd.to_numeric(d[val], errors="coerce")
+    d = d.dropna(subset=[val])
+    if d.empty:
+        raise ValueError(f"No numeric value left in '{val}' for these rows.")
+    agg = p.get("agg", "mean")
+    mat = d.pivot_table(index=d[row].astype(str), columns=d[col].astype(str),
+                        values=val, aggfunc=agg)
+    rl = p.get("__relabel__") or {}
+    al = p.get("__aliases__") or {}
+    mat.index = [rl.get(i, i) for i in mat.index]
+    mat.columns = [rl.get(c, c) for c in mat.columns]
+    dec = int(p.get("decimals", 1))
+    sns.heatmap(mat, cmap=p.get("palette", "viridis"), annot=bool(p.get("annot", True)),
+                fmt=f".{dec}f", annot_kws=_annot_kws(p, 8 if mat.shape[1] <= 12 else 6),
+                cbar=True, linewidths=float(p.get("gap", 0.0)), ax=ax)
+    ax.set_xlabel(al.get(col, col)); ax.set_ylabel(al.get(row, row))
+    ax.tick_params(axis="y", rotation=0)
+
+
 def _r_heatmap_matrix(ax, df, m, p):
     num = df.select_dtypes("number")
     data = (num - num.mean()) / num.std() if p["zscore"] else num
-    sns.heatmap(data, cmap=p["palette"], annot=p["annot"], cbar=True, ax=ax)
+    lab = m.get("labels")
+    if lab and lab in df.columns:          # name the rows instead of 0,1,2...
+        rl = p.get("__relabel__") or {}
+        data = data.set_axis([rl.get(str(v), str(v)) for v in df[lab]], axis=0)
+    sns.heatmap(data, cmap=p["palette"], annot=p["annot"], annot_kws=_annot_kws(p),
+                cbar=True, ax=ax)
+    if lab:
+        ax.tick_params(axis="y", rotation=0)
 
 
 def _r_ecdf(ax, df, m, p):
@@ -455,7 +499,9 @@ def _r_ridge(ax, df, m, p):
     n = len(cats)
     if n == 0:
         return
-    base = sns.color_palette(p.get("palette", "colorblind"), max(n, 1))
+    # honour hand-picked per-group colours like every other categorical plot
+    # (the UI always sends "palette", so _group_colors' own fallback never applies)
+    base = _group_colors(cats, p)
     overlap = float(p.get("overlap", 1.1)); alpha = float(p.get("alpha", 0.85))
     xs = d[x].to_numpy(float)
     lo, hi = float(np.nanmin(xs)), float(np.nanmax(xs))
@@ -472,21 +518,27 @@ def _r_ridge(ax, df, m, p):
         ax.fill_between(grid, off, off + dens, color=base[i], alpha=alpha,
                         lw=0, zorder=n - i)
         ax.plot(grid, off + dens, color="white", lw=0.8, zorder=n - i)
-    ax.set_yticks([n - 1 - i for i in range(n)]); ax.set_yticklabels(cats)
-    ax.set_xlabel(x); ax.set_ylabel(hue)
+    # this plot has no legend: its categories ARE the y ticks, so apply the renames
+    # (Style > Rename items) and the column aliases (Rename columns) here.
+    rl = p.get("__relabel__") or {}
+    al = p.get("__aliases__") or {}
+    ax.set_yticks([n - 1 - i for i in range(n)])
+    ax.set_yticklabels([rl.get(c, al.get(c, c)) for c in cats])
+    ax.set_xlabel(al.get(x, x)); ax.set_ylabel(al.get(hue, hue))
     ax.set_ylim(-0.2, n - 1 + overlap + 0.3)
 
 
 def _r_heatmap(ax, df, m, p):
     num = df.select_dtypes("number")
     if not p.get("stars"):
-        sns.heatmap(num.corr(numeric_only=True), annot=p["annot"], cmap=p["palette"], ax=ax)
+        sns.heatmap(num.corr(numeric_only=True), annot=p["annot"], cmap=p["palette"],
+                    annot_kws=_annot_kws(p), ax=ax)
         return
     from .stats import corr_with_p                 # r + BH-corrected significance stars
     r, _pv, stars = corr_with_p(df, list(num.columns), p.get("method", "pearson"))
     labels = r.round(2).astype(str) + "\n" + stars if p["annot"] else stars
     sns.heatmap(r, annot=labels.to_numpy(), fmt="", cmap=p["palette"],
-                vmin=-1, vmax=1, annot_kws={"fontsize": 7}, ax=ax)
+                vmin=-1, vmax=1, annot_kws=_annot_kws(p, 7), ax=ax)
 
 
 def _r_michaelis(ax, df, m, p):
@@ -759,6 +811,7 @@ _PAL = Param("palette", "palette", "colorblind",
                       "Set2", "magma", "rocket", "Set1", "tab10", "coolwarm", "Spectral"))
 # Heatmaps use the "palette" as a matplotlib colormap, so it must be a valid
 # colormap name (a categorical palette like "colorblind" is not a colormap).
+_ANNSZ = Param("annot_size", "float", 0, 0, 24, label="number size (0 = auto)")
 _CMAP = Param("palette", "palette", "viridis",
               choices=("viridis", "magma", "rocket", "mako", "crest", "flare",
                        "cividis", "coolwarm", "Spectral", "vlag", "icefire"))
@@ -834,9 +887,21 @@ REGISTRY: dict[str, PlotSpec] = {s.key: s for s in [
                        Channel("hue", accepts=(CATEGORY,))],
              params=[Param("psize", "float", 3.5, 1, 10, label="point size"),
                      _ALPHA, _PAL]),
+    PlotSpec("heatmap_xy", "Heatmap (rows x columns)", "axes", _r_heatmap_xy,
+             channels=[Channel("row", True, (CATEGORY,), "rows (Y)"),
+                       Channel("col", True, (CATEGORY,), "columns (X)"),
+                       Channel("value", True, (NUMBER,), "value in each cell")],
+             params=[Param("annot", "bool", True, label="write the value in each cell"),
+                     Param("decimals", "int", 1, 0, 3, label="decimals"),
+                     Param("agg", "choice", "mean",
+                           choices=("mean", "median", "sum", "max", "min", "count"),
+                           label="if a pair repeats"),
+                     Param("gap", "float", 0.0, 0.0, 2.0, label="gap between cells"),
+                     _ANNSZ, _CMAP]),
     PlotSpec("heatmap_matrix", "Matrix heatmap", "axes", _r_heatmap_matrix,
-             channels=[], params=[Param("zscore", "bool", True, label="z-score per column"),
-                                   Param("annot", "bool", False), _CMAP]),
+             channels=[Channel("labels", accepts=(CATEGORY,), label="row names (optional)")],
+             params=[Param("zscore", "bool", True, label="z-score per column"),
+                     Param("annot", "bool", False), _ANNSZ, _CMAP]),
     PlotSpec("ecdf", "ECDF (cumulative distribution)", "axes", _r_ecdf,
              channels=[Channel("x", True, (NUMBER,)), Channel("hue", accepts=(CATEGORY,))], params=[]),
     PlotSpec("regband", "Regression + CI band", "axes", _r_regband, pickable=True,
@@ -857,7 +922,7 @@ REGISTRY: dict[str, PlotSpec] = {s.key: s for s in [
              channels=[Channel("x", True, (NUMBER,)), Channel("hue", True, (CATEGORY,))],
              params=[Param("overlap", "float", 1.1, 0.3, 3.0, label="overlap"), _ALPHA, _PAL]),
     PlotSpec("heatmap", "Heatmap (correlation)", "axes", _r_heatmap,
-             channels=[], params=[Param("annot", "bool", True),
+             channels=[], params=[Param("annot", "bool", True), _ANNSZ,
                                   Param("stars", "bool", False, label="significance stars (BH)"),
                                   Param("method", "choice", "pearson", choices=("pearson", "spearman")),
                                   _CMAP]),

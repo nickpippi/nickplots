@@ -261,9 +261,17 @@ between the x groups when there is no hue.
 ### Correlation / matrices
 
 - **Heatmap (correlation)** `key=heatmap` — no channels; correlation matrix of all numeric
-  columns · params `annot`, `palette` (colormap).
-- **Matrix heatmap** `key=heatmap_matrix` — no channels; the numeric matrix itself ·
-  params `zscore` (per column), `annot`, `palette`.
+  columns · params `annot`, **`number size`**, `palette` (colormap).
+- **Heatmap (rows × columns)** `key=heatmap_xy` — `*row(category) *col(category)
+  *value(number)` · params `annot` (write the value in each cell), `decimals`,
+  `agg` (how to collapse a repeated row/column pair — mean by default, never a silent
+  "last one wins"), `gap`, **`number size`** (0 = auto), `palette`.
+  The model × task / gene × sample matrix: give it a **tidy** table (one row per pair)
+  and it pivots for you. Renames and column aliases apply to both axes.
+- **Matrix heatmap** `key=heatmap_matrix` — `labels(category, optional)`; the numeric
+  matrix itself · params `zscore` (per column), `annot`, **`number size`**, `palette`.
+  For an already-**wide** table (one row per subject, one column per measure). Map
+  `labels` to the text column that names the rows, otherwise the Y axis is 0, 1, 2…
 
 ### Categorical composition
 
@@ -355,6 +363,16 @@ click‑drag the legend directly on the plot); font size; number of columns; fra
 per‑item **relabelling** (pretty names without touching the data). Column/axis pretty‑names
 are set via the aliases (visual only). You can also **double‑click a legend entry (or its
 title) directly on the plot** to rename it (see [Visual editor](#visual-editor)).
+
+Relabelling reaches **every place a category is shown**, not just the legend: the
+ridgeline's Y ticks, and the categorical **X** ticks of box / violin / strip / bar. It
+composes with **Show n per group** — rename to `Control` with `show n` on and the tick
+reads `Control (n=30)`. Renaming is visual only: gating, point picking and the exported
+data still use the value as it is in the table.
+
+On the plot itself, **double-click an X tick label** to rename that category inline —
+the same editor as a legend entry, writing to the same list, so the Style tab and the
+canvas stay in sync.
 
 ## Visual editor
 
