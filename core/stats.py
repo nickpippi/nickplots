@@ -115,6 +115,7 @@ def fit_4pl(x, y):
     ss_tot = np.sum((y - y.mean()) ** 2)
     r2 = 1 - ss_res / ss_tot if ss_tot else float("nan")
     return dict(a=popt[0], b=popt[1], c=popt[2], d=popt[3], ic50=popt[2], r2=r2,
+                rss=float(ss_res), n=int(len(x)),      # for the curve-comparison F test
                 predict=lambda xx: f(np.asarray(xx, float), *popt))
 
 
@@ -996,7 +997,9 @@ def two_way_anova(df, value_col, factor_a, factor_b):
             return f"{name:<28} (not estimable)"
         F = (ss / ddf) / mse
         p = float(fdist.sf(F, ddf, df_err))
-        return f"{name:<28} SS={ss:>10.4g}  df={ddf:<3d} F={F:>8.3f}  p={p:.3g}"
+        eta = ss / (ss + rss_ab)                    # partial eta^2: effect vs its residual
+        return (f"{name:<28} SS={ss:>10.4g}  df={ddf:<3d} F={F:>8.3f}  p={p:.3g}"
+                f"  eta2p={eta:.3f}")
 
     lines = [f"Two-way ANOVA on {value_col}   (n={n})",
              f"Factors: {factor_a} ({len(ca)} levels) x {factor_b} ({len(cb)} levels)",
@@ -1006,8 +1009,9 @@ def two_way_anova(df, value_col, factor_a, factor_b):
              term(rss_add - rss_ab, rk_ab - rk_add, f"{factor_a} x {factor_b}"),
              f"{'Residual':<28} SS={rss_ab:>10.4g}  df={df_err:<3d} MS={mse:.4g}",
              "",
-             "Type II SS. A significant interaction means the effect of one factor",
-             "depends on the other - interpret main effects with care."]
+             "Type II SS. eta2p = partial eta squared (effect size, independent of n):",
+             "~0.01 small, ~0.06 medium, ~0.14 large. A significant interaction means",
+             "the effect of one factor depends on the other - read main effects with care."]
     return "\n".join(lines)
 
 
@@ -1048,9 +1052,12 @@ def rm_anova(df, value_col, within_col, subject_col):
     return "\n".join([
         f"Repeated-measures ANOVA on {value_col}",
         f"Within: {within_col} ({k} conditions) | Subjects: {n} complete",
-        f"F({df_c},{df_e}) = {F:.3f}, p = {p:.3g}",
+        f"F({df_c},{df_e}) = {F:.3f}, p = {p:.3g}, "
+        f"partial eta2 = {ss_cond / (ss_cond + ss_err):.3f}"
+        if ss_cond + ss_err > 0 else f"F({df_c},{df_e}) = {F:.3f}, p = {p:.3g}",
         np_line,
         "",
+        "partial eta2: ~0.01 small, ~0.06 medium, ~0.14 large.",
         "Dropped subjects with missing conditions. If sphericity is doubtful,",
         "prefer the Friedman result or a corrected (Greenhouse-Geisser) test."])
 
@@ -1463,3 +1470,310 @@ def recommend_test(df, value_col, group_col, paired=False, subject_col=None):
             + "\n".join("- " + s for s in notes)
             + "\n\nTwo factors (e.g. treatment x time)? Use Statistics > Two-way ANOVA."
             + "\nRows not independent (many cells per replicate)? Aggregate first.")
+
+
+# ======================= nested / hierarchical (anti pseudo-replication) ====== #
+def nested_test(df, value_col, group_col, rep_col):
+    """Nested (hierarchical) one-way test: cells nested in replicates nested in groups.
+
+    The group F uses the BETWEEN-REPLICATE mean square as its error term, not the
+    between-cell one. That is the whole point: the replicate is the experimental
+    unit and the cells inside it are subsamples. Also reports the naive
+    (cells-as-independent) p so the inflation is visible, and the ICC that causes it.
+    With 2 groups this is the nested t test (t = sqrt(F)).
+    """
+    from scipy.stats import f as fdist, f_oneway
+    if not (value_col and group_col and rep_col):
+        raise ValueError("Choose the value, the group and the replicate column.")
+    d = df[[value_col, group_col, rep_col]].copy()
+    d[value_col] = pd.to_numeric(d[value_col], errors="coerce")
+    d = d.dropna()
+    d[group_col] = d[group_col].astype(str)
+    # a replicate label only means something inside its group (rep "1" of A != rep "1" of B)
+    d["_rep"] = d[group_col] + " | " + d[rep_col].astype(str)
+    if d[group_col].nunique() < 2:
+        raise ValueError("Need at least 2 groups.")
+
+    cells = d.groupby("_rep").size()
+    reps = d.groupby("_rep")[value_col].mean()
+    rep_group = d.groupby("_rep")[group_col].first()
+    n_gr = cells.to_numpy(float)                       # cells per replicate
+    m_gr = reps.to_numpy(float)                        # replicate means
+    g_of = rep_group.to_numpy()
+    groups = sorted(pd.unique(g_of))
+    k, R, N = len(groups), len(m_gr), int(n_gr.sum())
+    if R <= k:
+        raise ValueError(
+            "Only %d replicate(s) for %d groups. A nested test needs 2+ replicates in "
+            "at least one group - otherwise the group effect and the replicate effect "
+            "are the same thing." % (R, k))
+
+    grand = float((n_gr * m_gr).sum() / N)
+    ss_group = ss_rep = 0.0
+    per_group = []
+    for g in groups:
+        sel = g_of == g
+        ng, mg = n_gr[sel], m_gr[sel]
+        Ng = ng.sum()
+        Mg = float((ng * mg).sum() / Ng)
+        ss_group += Ng * (Mg - grand) ** 2
+        ss_rep += float((ng * (mg - Mg) ** 2).sum())
+        per_group.append((g, int(sel.sum()), int(Ng), Mg))
+    ss_cell = float(((d[value_col].to_numpy(float)
+                      - d["_rep"].map(reps).to_numpy(float)) ** 2).sum())
+    df_g, df_r, df_c = k - 1, R - k, N - R
+    ms_g, ms_r = ss_group / df_g, ss_rep / df_r
+    ms_c = ss_cell / df_c if df_c > 0 else float("nan")
+    if ms_r <= 0:
+        raise ValueError("Replicates inside a group have identical means - there is no "
+                         "error term to test the group effect against.")
+    F = ms_g / ms_r
+    p = float(fdist.sf(F, df_g, df_r))
+    eta2 = ss_group / (ss_group + ss_rep)              # partial eta^2 at replicate level
+
+    # ICC: how much of the spread is really replicate-to-replicate. n0 is the usual
+    # coefficient for the middle level of an unbalanced nested design.
+    sq = {g: 0.0 for g in groups}
+    tot = {g: 0.0 for g in groups}
+    for g, n in zip(g_of, n_gr):
+        sq[g] += n * n
+        tot[g] += n
+    n0 = (N - sum(sq[g] / tot[g] for g in groups)) / df_r if df_r > 0 else float("nan")
+    var_rep = (ms_r - ms_c) / n0 if (n0 and n0 > 0 and np.isfinite(ms_c)) else float("nan")
+    icc = var_rep / (var_rep + ms_c) if np.isfinite(var_rep) and (var_rep + ms_c) > 0 \
+        else float("nan")
+    if np.isfinite(icc):
+        icc = max(0.0, icc)
+
+    naive = [d.loc[d[group_col] == g, value_col].to_numpy(float) for g in groups]
+    try:
+        Fn, pn = f_oneway(*naive)
+    except Exception:
+        Fn = pn = float("nan")
+
+    L = ["Nested %s on %s" % ("t test" if k == 2 else "one-way ANOVA", value_col),
+         "Groups: %s   Replicates: %s" % (group_col, rep_col),
+         "",
+         "%-24s%6s%8s%12s" % ("group", "reps", "cells", "mean")]
+    for g, r, ncell, mg in per_group:
+        L.append("%-24s%6d%8d%12.4g" % (g[:23], r, ncell, mg))
+    L += ["",
+          "Group effect      F(%d,%d) = %.3f   p = %.3g" % (df_g, df_r, F, p),
+          "   partial eta^2 = %.3f   (error term: between replicates, MS = %.4g)"
+          % (eta2, ms_r)]
+    if k == 2:
+        L.append("   nested t = %.3f  (same p)" % np.sqrt(F))
+    if np.isfinite(icc):
+        L.append("   ICC = %.3f  (%.0f%% of the variance is between replicates, "
+                 "not between cells)" % (icc, icc * 100))
+    L += ["", "If every cell had been counted as independent: F = %.3f, p = %.3g"
+          % (Fn, pn)]
+    if np.isfinite(pn) and np.isfinite(p) and 0 < pn < p:
+        L.append("   -> that naive p is %.0fx smaller, and it is wrong: cells from the"
+                 % (p / pn))
+        L.append("      same replicate are not independent. Report the nested p.")
+    L += ["",
+          "n for the test = %d replicates (not %d cells). Plot it with the SuperPlot:"
+          % (R, N),
+          "every cell faint, one big marker per replicate mean."]
+    return "\n".join(L)
+
+
+# ==================== pairs for the on-figure significance markers =========== #
+def compare_pairs(df, value_col, group_col, alpha=0.05):
+    """The same test and correction as robust_compare (Mann-Whitney, Benjamini-
+    Hochberg for 3+ groups), returned as structured pairs. The figure brackets are
+    drawn from THIS, so the markers and the written report cannot disagree."""
+    from scipy import stats as st
+    from itertools import combinations
+    d = df[[value_col, group_col]].copy()
+    d[value_col] = pd.to_numeric(d[value_col], errors="coerce")
+    d = d.dropna()
+    d[group_col] = d[group_col].astype(str)
+    arrs = {g: sub[value_col].to_numpy(float) for g, sub in d.groupby(group_col)}
+    arrs = {g: a for g, a in arrs.items() if len(a) >= 2}
+    if len(arrs) < 2:
+        raise ValueError("Need at least 2 groups with n>=2.")
+    names, raw = [], []
+    for ga, gb in combinations(arrs.keys(), 2):
+        _, pp = st.mannwhitneyu(arrs[ga], arrs[gb], alternative="two-sided")
+        names.append((ga, gb))
+        raw.append(float(pp))
+    qs = bh_correct(raw) if len(raw) > 1 else raw      # a single pair needs no correction
+    out = []
+    for (ga, gb), pp, qq in zip(names, raw, qs):
+        stars = "***" if qq < 1e-3 else "**" if qq < 1e-2 else "*" if qq < alpha else "ns"
+        out.append(dict(g1=ga, g2=gb, p=pp, q=float(qq), stars=stars,
+                        sig=bool(qq < alpha)))
+    return out
+
+
+# ================================= ROC / AUC ================================= #
+def roc_analysis(df, score_col, label_col, positive=None, n_boot=400):
+    """ROC curve for a continuous score against a binary outcome. Returns the curve,
+    the AUC with a bootstrap CI95, and the Youden-optimal cutoff."""
+    from sklearn.metrics import roc_curve, roc_auc_score
+    d = df[[score_col, label_col]].copy()
+    d[score_col] = pd.to_numeric(d[score_col], errors="coerce")
+    d = d.dropna()
+    lab = d[label_col].astype(str)
+    levels = sorted(pd.unique(lab))
+    if len(levels) != 2:
+        raise ValueError("'%s' must have exactly 2 levels (found %d: %s)."
+                         % (label_col, len(levels), ", ".join(map(str, levels[:5]))))
+    pos = str(positive) if positive not in (None, "") else levels[1]
+    if pos not in levels:
+        raise ValueError("'%s' is not a level of %s." % (pos, label_col))
+    y = (lab == pos).to_numpy(int)
+    s = d[score_col].to_numpy(float)
+    if y.sum() < 2 or (len(y) - y.sum()) < 2:
+        raise ValueError("Need at least 2 cases in each class.")
+    fpr, tpr, thr = roc_curve(y, s)
+    auc = float(roc_auc_score(y, s))
+
+    rng = np.random.default_rng(0)                     # fixed seed: reproducible CI
+    boots = []
+    for _ in range(int(n_boot)):
+        idx = rng.integers(0, len(y), len(y))
+        if len(np.unique(y[idx])) == 2:
+            boots.append(roc_auc_score(y[idx], s[idx]))
+    lo, hi = (float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))) \
+        if len(boots) > 20 else (float("nan"), float("nan"))
+
+    j = int(np.argmax(tpr - fpr))                      # Youden J
+    cut, sens, spec = float(thr[j]), float(tpr[j]), float(1 - fpr[j])
+    text = "\n".join([
+        "ROC: %s predicting %s = '%s'" % (score_col, label_col, pos),
+        "n = %d  (%d positive, %d negative)" % (len(y), y.sum(), len(y) - y.sum()),
+        "AUC = %.3f   CI95 [%.3f, %.3f]  (bootstrap, %d draws)" % (auc, lo, hi, len(boots)),
+        "Youden cutoff = %.4g   sensitivity = %.3f   specificity = %.3f"
+        % (cut, sens, spec),
+        "",
+        "AUC below 0.5 means the score runs the other way - swap the positive class."
+        if auc < 0.5 else
+        "The cutoff maximises sensitivity + specificity; that is not automatically the "
+        "clinically right one."])
+    return dict(fpr=fpr.tolist(), tpr=tpr.tolist(), auc=auc, ci=[lo, hi], cutoff=cut,
+                sens=sens, spec=spec, positive=pos, n=int(len(y)), text=text)
+
+
+# ===================== dose-response: do the curves differ? ================== #
+def compare_curves_4pl(df, x_col, y_col, group_col):
+    """Extra sum-of-squares F test: is ONE shared 4PL enough, or does each group need
+    its own curve? This is the test behind 'is the IC50 different?'."""
+    from scipy.stats import f as fdist
+    d = df[[x_col, y_col, group_col]].copy()
+    d[x_col] = pd.to_numeric(d[x_col], errors="coerce")
+    d[y_col] = pd.to_numeric(d[y_col], errors="coerce")
+    d = d.dropna()
+    d[group_col] = d[group_col].astype(str)
+    groups = [(g, sub) for g, sub in d.groupby(group_col) if len(sub) >= 4]
+    if len(groups) < 2:
+        raise ValueError("Need at least 2 groups with 4+ points each.")
+    shared = fit_4pl(d[x_col], d[y_col])
+    rss_sep, per = 0.0, []
+    for g, sub in groups:
+        fit = fit_4pl(sub[x_col], sub[y_col])
+        rss_sep += fit["rss"]
+        per.append((g, fit["ic50"], fit["b"], fit["r2"], len(sub)))
+    N, k = int(shared["n"]), len(groups)
+    df_shared, df_sep = N - 4, N - 4 * k
+    if df_sep <= 0:
+        raise ValueError("Too few points to fit a separate curve per group.")
+    den = rss_sep / df_sep
+    F = ((shared["rss"] - rss_sep) / (df_shared - df_sep)) / den if den > 0 else float("inf")
+    p = float(fdist.sf(F, df_shared - df_sep, df_sep)) if np.isfinite(F) else 0.0
+    L = ["Curve comparison (%s vs %s, by %s)" % (y_col, x_col, group_col), "",
+         "%-20s%12s%9s%8s%6s" % ("group", "IC50", "Hill", "R2", "n")]
+    for g, ic, b, r2, n in per:
+        L.append("%-20s%12.4g%9.2f%8.3f%6d" % (g[:19], ic, b, r2, n))
+    L += ["",
+          "One shared curve  RSS = %.5g  (df %d)" % (shared["rss"], df_shared),
+          "One curve/group   RSS = %.5g  (df %d)" % (rss_sep, df_sep),
+          "F(%d,%d) = %.3f   p = %.3g" % (df_shared - df_sep, df_sep, F, p),
+          ""]
+    L.append("-> the groups need SEPARATE curves: the dose-response really differs."
+             if p < 0.05 else
+             "-> one shared curve fits as well: no evidence the curves differ.")
+    L += ["",
+          "This tests the whole curve at once (IC50, slope, plateaus). A difference here",
+          "does not by itself say WHICH parameter moved - compare the IC50s above."]
+    return "\n".join(L)
+
+
+# ============================ Bland-Altman (agreement) ======================= #
+def bland_altman(df, col_a, col_b):
+    """Agreement between two methods measuring the same thing. Returns the plotting
+    arrays plus the bias and the 95% limits of agreement."""
+    from scipy.stats import t as tdist
+    d = df[[col_a, col_b]].apply(pd.to_numeric, errors="coerce").dropna()
+    if len(d) < 3:
+        raise ValueError("Need at least 3 paired measurements.")
+    a, b = d[col_a].to_numpy(float), d[col_b].to_numpy(float)
+    avg, diff = (a + b) / 2, a - b
+    n = len(diff)
+    bias, sd = float(diff.mean()), float(diff.std(ddof=1))
+    lo, hi = bias - 1.96 * sd, bias + 1.96 * sd
+    se_bias = sd / np.sqrt(n)
+    se_loa = sd * np.sqrt(3.0 / n)                     # Bland & Altman's SE for the LoA
+    tc = float(tdist.ppf(0.975, n - 1))
+    text = "\n".join([
+        "Bland-Altman: %s vs %s   (n = %d pairs)" % (col_a, col_b, n),
+        "Bias (mean difference) = %.4g   CI95 [%.4g, %.4g]"
+        % (bias, bias - tc * se_bias, bias + tc * se_bias),
+        "Limits of agreement    = %.4g to %.4g   (bias +/- 1.96 SD)" % (lo, hi),
+        "   lower LoA CI95 [%.4g, %.4g]" % (lo - tc * se_loa, lo + tc * se_loa),
+        "   upper LoA CI95 [%.4g, %.4g]" % (hi - tc * se_loa, hi + tc * se_loa),
+        "",
+        "A bias CI95 that excludes 0 means a systematic offset between the methods.",
+        "The LoA say how far apart a single pair of readings can be - whether that",
+        "width is acceptable is a biological call, not a p value."])
+    return dict(avg=avg.tolist(), diff=diff.tolist(), bias=bias, lo=lo, hi=hi,
+                n=n, text=text)
+
+
+def _demo():
+    """Self-check for the maths above (run: python -m core.stats)."""
+    rng = np.random.default_rng(7)
+    # 3 replicates per group, 40 cells each; the replicate offset is the real signal
+    rows = []
+    for g, shift in (("ctrl", 0.0), ("drug", 1.2)):
+        for r in range(3):
+            off = rng.normal(shift, 0.5)
+            for _ in range(40):
+                rows.append((g, "r%d" % r, off + rng.normal(0, 1)))
+    d = pd.DataFrame(rows, columns=["grp", "rep", "val"])
+    out = nested_test(d, "val", "grp", "rep")
+    assert "Nested t test" in out, out
+    # the nested p must be larger (honest) than the cells-as-independent one
+    nested_p = float(out.split("p = ")[1].split()[0])
+    naive_p = float(out.split("independent: F = ")[1].split("p = ")[1].split()[0])
+    assert nested_p > naive_p, (nested_p, naive_p)
+
+    # nested F on a balanced design == one-way ANOVA on the replicate means
+    from scipy.stats import f_oneway
+    means = d.groupby(["grp", "rep"])["val"].mean().reset_index()
+    _, p_means = f_oneway(*[s["val"].to_numpy() for _, s in means.groupby("grp")])
+    assert abs(nested_p - p_means) / p_means < 5e-3, (nested_p, p_means)   # %.3g printing
+
+    pairs = compare_pairs(d, "val", "grp")
+    assert len(pairs) == 1 and pairs[0]["stars"] in ("*", "**", "***", "ns")
+
+    # ROC: a score that separates perfectly must give AUC 1
+    perfect = pd.DataFrame({"s": [1, 2, 3, 9, 10, 11], "y": list("aaabbb")})
+    assert abs(roc_analysis(perfect, "s", "y", "b", n_boot=50)["auc"] - 1.0) < 1e-9
+
+    # Bland-Altman: identical methods -> zero bias
+    same = pd.DataFrame({"m1": [1.0, 2, 3, 4], "m2": [1.0, 2, 3, 4]})
+    assert abs(bland_altman(same, "m1", "m2")["bias"]) < 1e-12
+
+    # curve comparison: identical groups -> no evidence of a difference
+    x = np.tile([0.01, 0.1, 1, 10, 100, 1000], 2)
+    y = 100 / (1 + (x / 5.0) ** 1.3)
+    dd = pd.DataFrame({"x": x, "y": y, "g": ["a"] * 6 + ["b"] * 6})
+    assert "one shared curve fits as well" in compare_curves_4pl(dd, "x", "y", "g")
+    print("stats self-check OK")
+
+
+if __name__ == "__main__":
+    _demo()

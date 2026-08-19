@@ -1108,6 +1108,210 @@ class Api:
             return dict(error=str(e))
         return path
 
+    def export_figures_batch(self, states, fmt="tiff"):
+        """Re-export every open plot tab into one folder, all at the current journal
+        spec. The reformat-after-rejection case: one dialog instead of one per figure."""
+        if self._view is None or not states:
+            return dict(error="Plot a figure first.")
+        folder = self._win().create_file_dialog(webview.FOLDER_DIALOG)
+        if not folder:
+            return None
+        folder = folder if isinstance(folder, str) else folder[0]
+        ext = "." + str(fmt or "tiff").lstrip(".").lower()
+        n, failed = 0, []
+        for i, item in enumerate(states):
+            state = item.get("state") or {}
+            if not state.get("layers"):
+                continue
+            safe = "".join(c if (c.isalnum() or c in " -_") else "_"
+                           for c in str(item.get("name") or f"plot_{i + 1}")).strip()
+            path = os.path.join(folder, (safe or f"plot_{i + 1}") + ext)
+            dpi = max(300, int(state.get("export_dpi") or 300))
+            fig = Figure(dpi=dpi)
+            try:
+                self._render_into(fig, state, dpi, fixed_size=True)
+                E.export(fig, path, dpi=dpi, **self._export_kw(state))
+                n += 1
+            except Exception as e:
+                failed.append(f"{safe}: {e}")
+        if not n:
+            return dict(error="; ".join(failed) or "Nothing was exported.")
+        # partial failures are a warning, not an error: n figures really were written
+        return dict(n=n, folder=folder,
+                    warn=("Some failed - " + "; ".join(failed)) if failed else None)
+
+    # ------------------- nested / ROC / agreement / curves ------------------ #
+    def nested_test(self, value_col, group_col, rep_col):
+        return self._txt(S.nested_test, value_col, group_col, rep_col)
+
+    def curve_compare(self, x_col, y_col, group_col):
+        return self._txt(S.compare_curves_4pl, x_col, y_col, group_col)
+
+    def roc_stats(self, score_col, label_col, positive=""):
+        return self._txt(lambda d, *a: S.roc_analysis(d, *a)["text"],
+                         score_col, label_col, positive)
+
+    def agreement(self, col_a, col_b):
+        return self._txt(lambda d, *a: S.bland_altman(d, *a)["text"], col_a, col_b)
+
+    def compare_pairs(self, value_col, group_col):
+        """Structured pairs for the on-figure markers: same test as Compare groups."""
+        if self._view is None:
+            return dict(error="Load data first.")
+        try:
+            return dict(pairs=S.compare_pairs(self._view, value_col, group_col))
+        except Exception as e:
+            return dict(error=str(e))
+
+    # ------------------------------ figure legend --------------------------- #
+    # Reviewers' single most frequent figure complaint is "error bars not defined".
+    # Everything needed is already in the render state - so write the sentence.
+    _ERR_WORDS = {"SD": "standard deviation", "SEM": "standard error of the mean",
+                  "CI95": "95% confidence interval"}
+
+    def _legend_spread(self, key, p):
+        """What the drawn marks represent, in words."""
+        if key == "bar_err":
+            centre = "mean" if p.get("center", "mean") == "mean" else "median"
+            err = self._ERR_WORDS.get(p.get("error", "SEM"), p.get("error", "SEM"))
+            kind = "Bars" if p.get("kind", "bar") == "bar" else "Points"
+            s = f"{kind} show the {centre}; error bars show the {err}"
+            return s + (", with every observation overlaid." if p.get("points") else ".")
+        if key == "line" and p.get("errorbar", "none") != "none":
+            return ("Line shows the mean; the shaded band shows the "
+                    f"{self._ERR_WORDS.get(p['errorbar'], p['errorbar'])}.")
+        if key in ("box", "box_points"):
+            return ("Boxes show the median and interquartile range; whiskers extend to "
+                    "1.5x IQR" + (", with every observation overlaid."
+                                  if key == "box_points" else "."))
+        if key in ("violin", "violin_points"):
+            return ("Violins show the kernel density of the distribution" +
+                    (", with every observation overlaid." if key.endswith("points") else "."))
+        if key == "superplot":
+            return ("Small faint markers are individual observations; large markers are "
+                    "the mean of each independent replicate, coloured by replicate.")
+        if key == "regband":
+            return f"Line is the linear fit; the band is the {p.get('ci', 95)}% confidence interval."
+        if key == "km":
+            return "Curves are Kaplan-Meier estimates; ticks mark censored observations."
+        if key == "roc":
+            return "Curve is the ROC; the dashed diagonal is chance (AUC 0.5)."
+        if key == "bland_altman":
+            return ("Solid line is the mean difference (bias); dashed lines are the 95% "
+                    "limits of agreement (bias +/- 1.96 SD).")
+        return ""
+
+    def figure_legend(self, state):
+        """Draft the figure legend from what was actually drawn."""
+        if self._view is None or not state.get("layers"):
+            return "Plot a figure first."
+        lay = state["layers"][0]
+        key, m, p = lay["spec_key"], lay.get("mapping") or {}, lay.get("params") or {}
+        spec = REGISTRY.get(key)
+        df = self._view
+        out = []
+        if state.get("title"):
+            out.append(str(state["title"]).strip())
+        spread = self._legend_spread(key, p)
+        if spread:
+            out.append(spread)
+
+        # n per group - and, when the plot knows about replicates, n of BOTH levels
+        grp = m.get("x") if m.get("x") in df.columns else m.get("hue")
+        rep = m.get("rep") if m.get("rep") in df.columns else None
+        if grp and grp in df.columns:
+            parts = []
+            for g, sub in df.groupby(df[grp].astype(str)):
+                if rep:
+                    parts.append(f"{g}: n = {sub[rep].nunique()} replicates "
+                                 f"({len(sub)} observations)")
+                else:
+                    parts.append(f"{g}: n = {len(sub)}")
+            out.append("; ".join(parts) + ".")
+        else:
+            out.append(f"n = {len(df)}.")
+
+        pairs = p.get("__sig_pairs__")
+        if pairs:
+            out.append("Two-sided Mann-Whitney U test; p values corrected across all "
+                       "pairwise comparisons (Benjamini-Hochberg). "
+                       "*q < 0.05, **q < 0.01, ***q < 0.001.")
+        elif p.get("sig"):
+            out.append("Two-sided Welch t test; p values corrected across all pairwise "
+                       "comparisons (Holm). *p < 0.05, **p < 0.01, ***p < 0.001.")
+        # never let the draft claim a test it did not run: the markers come from the
+        # value/group columns as they stand, which is cell level when replicates exist
+        if rep and (pairs or p.get("sig")):
+            out.append("!! The markers above were computed over individual "
+                       "observations, not over replicate means. With several "
+                       "observations per replicate that p is anti-conservative - run "
+                       "Analysis > Nested test and report its p instead.")
+        if (state.get("filter") or "").strip():
+            out.append(f"Rows included: {state['filter'].strip()}.")
+        out.append(f"Plot: {spec.label if spec else key}. Figure produced with Nickplots.")
+        return "\n\n".join(out)
+
+    # ------------------------------- source data ---------------------------- #
+    def _source_block(self, df, key, m, p):
+        """(plotted values, summary drawn on top or None) for one layer/frame."""
+        cols = [c for c in dict.fromkeys(m.values()) if c and c in df.columns]
+        data = df[cols].dropna(how="all") if cols else df
+        summary = None
+        x, y, hue = m.get("x"), m.get("y"), m.get("hue")
+        if key in ("bar_err", "bar") and x in df.columns and y in df.columns:
+            by = [c for c in (x, hue) if c and c in df.columns]
+            g = df.dropna(subset=[y]).groupby([df[c].astype(str) for c in by])[y]
+            summary = pd.DataFrame({"n": g.size(), "mean": g.mean(), "median": g.median(),
+                                    "SD": g.std(ddof=1)})
+            summary["SEM"] = summary["SD"] / np.sqrt(summary["n"].clip(lower=1))
+            summary.index.names = by
+            summary = summary.reset_index()
+        return data, summary
+
+    def export_source_data(self, state, items=None):
+        """One .xlsx with the values behind the figure - the 'Source Data' file that
+        Nature Methods (and others) require for every main and Extended Data figure.
+        One sheet per panel frame, or one per layer for a single plot."""
+        if self._view is None or not (items or state.get("layers")):
+            return dict(error="Plot a figure first.")
+        path = self._win().create_file_dialog(
+            webview.SAVE_DIALOG, save_filename="source_data.xlsx",
+            file_types=("Excel (*.xlsx)",))
+        if not path:
+            return None
+        path = path if isinstance(path, str) else path[0]
+        blocks = []
+        if items:                      # a built panel: one sheet per frame, A, B, C...
+            import string
+            for i, it in enumerate(items):
+                df = self._panel_data.get(it.get("data_id"), self._view)
+                name = string.ascii_uppercase[i] if i < 26 else f"F{i + 1}"
+                blocks.append((name, df, it["spec_key"], it.get("mapping") or {},
+                               it.get("params") or {}))
+        else:
+            for i, lay in enumerate(state["layers"]):
+                blocks.append((f"Layer {i + 1}" if i else "Figure", self._view,
+                               lay["spec_key"], lay.get("mapping") or {},
+                               lay.get("params") or {}))
+        try:
+            with pd.ExcelWriter(path, engine="openpyxl") as xl:
+                for name, df, key, m, p in blocks:
+                    data, summary = self._source_block(df, key, m, p)
+                    sheet = str(name)[:28]
+                    data.to_excel(xl, sheet_name=sheet, index=False)
+                    if summary is not None:
+                        summary.to_excel(xl, sheet_name=f"{sheet} summary"[:31],
+                                         index=False)
+                pd.DataFrame({"Nickplots source data": [
+                    "One sheet per panel: the values plotted in that panel.",
+                    "'... summary' sheets hold the aggregate actually drawn "
+                    "(n, mean, median, SD, SEM).",
+                    f"Filter applied: {(state.get('filter') or '(none)').strip()}",
+                ]}).to_excel(xl, sheet_name="README", index=False)
+        except Exception as e:
+            return dict(error=str(e))
+        return path
+
     # ---------------------------- advanced --------------------------------- #
     def categories(self, col):
         if self._view is None or col not in self._view.columns:

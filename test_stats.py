@@ -16,7 +16,7 @@ txt = S.two_way_anova(d2, 'y', 'treat', 'time')
 print(txt); assert 'treat x time' in txt
 # interaction must be highly significant here
 inter_line = [l for l in txt.splitlines() if l.startswith('treat x time')][0]
-p_inter = float(inter_line.split('p=')[1])
+p_inter = float(inter_line.split(' p=')[1].split()[0])   # the line now also carries eta2p=
 assert p_inter < 1e-6, p_inter
 ok('two_way_anova detects the planted interaction (p=%.2g)' % p_inter)
 

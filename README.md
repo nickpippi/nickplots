@@ -23,17 +23,18 @@ pseudo‑replication.
 - [Loading & managing data](#loading--managing-data)
 - [Preparing data (wide→long, formulas, aggregation)](#preparing-data)
 - [The plot catalog](#the-plot-catalog) — every plot and the columns it takes
-- [Style tab (+ journal presets, accessibility check)](#style-tab)
-- [Legend tab](#legend-tab)
+- [Data tab (prepare the table)](#data-tab)
+- [Style tab (+ legend, journal presets, accessibility check)](#style-tab)
 - [Visual editor (edit on the canvas)](#visual-editor)
 - [Annotations](#annotations)
 - [Reshaping the figure (drag handles / mm size)](#reshaping-the-figure)
 - [Split by (facet)](#split-by-facet)
 - [Analysis tab](#analysis-tab)
-- [Bench math panel](#bench-math-panel)
-- [Statistics panel](#statistics-panel)
-- [Data tools panel](#data-tools-panel)
-- [Advanced tab](#advanced-tab)
+- [Figure assembly (Plot tab)](#figure-assembly-plot-tab)
+- [Derived output (Analysis tab)](#derived-output-analysis-tab)
+- [Bench math dialog (from the Data tab)](#bench-math-dialog)
+- [More tests dialog (from the Analysis tab)](#more-tests-dialog)
+- [Data checks dialog (from the Data tab)](#data-checks-dialog)
 - [Export & session](#export--session)
 - [Reproducibility & good‑practice notes](#reproducibility--good-practice-notes)
 
@@ -108,7 +109,7 @@ python main_web.py
 In this README each plot lists its channels as `*name(accepted types)`, where `*` means
 **required** and the types are `number`, `category`, `datetime`. A column's type is inferred
 on load; you can force a numeric column to categorical (e.g. `track_id`) with
-[Numeric → categorical](#advanced-tab).
+[Numeric → categorical](#data-tab).
 
 **Layers / overlays.** Click **▶ Plot** to draw the base layer. **＋ Overlay** stacks
 another plot on the same axes (e.g. a violin under a strip). The **▶ Plot** button is always
@@ -149,18 +150,18 @@ Tabs live for the session; `Save project` still stores the active plot.
   the ⬆ Excel button).
 - **⌨ Type data (Prism style)** — a spreadsheet you can paste into straight from
   Excel/Prism (tab = column, first row = header, optional comma‑decimal).
-- **Data preview** *(Plot tab, on load)* — a fold‑out showing the first rows, the detected
+- **Data preview** *(Data tab, on load)* — a fold‑out showing the first rows, the detected
   type per column, and a one‑line health summary (row × column count, duplicates, columns
   that look numeric but don't parse). Run the full check in Data tools → Data health.
 - **✨ Recommended plots** *(Plot tab, on load)* — reads the column types and suggests plots
   (e.g. *Area by Treatment → Box + points / Violin + points / ECDF*; *Area vs Speed →
   Scatter / Regression*). When it detects an id/replicate column it recommends a
   **SuperPlot** and warns about pseudo‑replication. Click a suggestion to apply it.
-- **Datasets (multiple files)** *(Advanced tab)* — every CSV you load is kept in a list.
+- **Datasets (multiple files)** *(Data tab)* — every CSV you load is kept in a list.
   Click one to switch to it; **✕** removes it; **Combine all** concatenates them into a
   single table with a `dataset` source column — ideal for comparing files or building a
   **SuperPlot** where each file is a replicate.
-- **Filter** *(Plot tab)* —
+- **Filter rows** *(Data tab)* —
   - *Friendly:* choose a **column**, an **operator** (is equal to / not equal / greater /
     greater‑or‑equal / less / less‑or‑equal / **contains**), a **value**, then **＋ Add
     condition**. Conditions are ANDed into the query box.
@@ -291,6 +292,17 @@ Ignoring censoring (e.g. a boxplot of `lifetime`) biases the result — use this
   `*id(track) *px(number) *py(number) time(number, order) hue(category)` · param `loglog`.
   Per‑track MSD averaged within each group; the legend shows the track count.
 
+### Diagnostic / agreement
+
+- **ROC curve (+ AUC)** `key=roc` — `*score(number) *label(2 levels)` · params
+  `positive` (which level counts as positive; empty = the last), `ci` (bootstrap CI95 of
+  the AUC, seeded so it reproduces), `mark_cutoff` (ring the Youden point).
+  AUC and its CI go in the curve's legend entry. Overlay a second layer with another
+  score column to compare two markers on one axes.
+- **Bland-Altman (agreement)** `key=bland_altman` — `*m1(number) *m2(number) hue(category)`.
+  Difference vs mean of two methods, with the bias line and the 95% limits of agreement.
+  The numbers (bias CI, LoA CI) are in *More tests > ROC / agreement*.
+
 ### Paired / specialized
 
 - **Paired (before‑after)** `key=paired` — `*x(category) *y(number) *id(subject)` ·
@@ -320,7 +332,12 @@ Ignoring censoring (e.g. a boxplot of `lifetime`) biases the result — use this
 - **Plot size / shape (mm)** — width × height in millimetres sets the exact physical shape
   (e.g. `180×70` flat, `80×160` tall) for preview, export and panels. Empty = default. You
   can also set this **visually** by dragging the handles on the plot — see below.
-- **Journal preset** — one click sets the column width (mm), font family, absolute font size
+- **Journal preset** — Nature, Cell, Science and **Autophagy** (1- and 2-column).
+  *Autophagy uses the standard Taylor & Francis two-column geometry (84 / 174 mm) —
+  check it against the journal's current author instructions.* **Edit / add…** lets you
+  correct any of them or add your own (`name = width_mm, font, font_pt, line_pt`); your
+  edits are kept locally and override the built-ins.
+  One click sets the column width (mm), font family, absolute font size
   (pt) and line weight (pt) to a journal's spec: **Nature 1‑/2‑col** (89 / 183 mm),
   **Cell 1‑col** (85 mm), **Science 1‑/2‑col** (55 / 120 mm). Height stays yours. Fine‑tune
   with the explicit **Font family**, **Font size (pt)** and **Line weight (pt)** controls
@@ -330,7 +347,7 @@ Ignoring censoring (e.g. a boxplot of `lifetime`) biases the result — use this
   increasingly require) sees it. This only changes the on‑screen preview, never the export.
   Point plots also have a **"shape by hue"** option (scatter) so colour isn't the only cue.
 
-## Legend tab
+## Legend (inside the Style tab)
 
 Show/hide; position (the named corners, **Outside** on the right, or **Free** — then
 click‑drag the legend directly on the plot); font size; number of columns; frame on/off;
@@ -382,7 +399,7 @@ exactly like setting the mm size, just hands‑on. The final shape is what gets 
   time parameters.
 - **Standard curve (+ R²)** `key=stdcurve` — `*x(known concentration) *y(signal)` ·
   param `model` (linear / 4PL). Draws the standards and the fit; interpolate unknowns in
-  the [Bench math panel](#bench-math-panel).
+  the [Bench math dialog](#bench-math-dialog).
 
 ---
 
@@ -404,6 +421,21 @@ picking and the legend/region overlays are turned off (as in a panel).
   comparisons with **Benjamini‑Hochberg** correction.
 - **📋 Methods sentence** — the same comparison as one copy‑ready sentence for a figure
   legend / methods section (test name, *n* per group, effect size + CI, p).
+- **Put the markers on the plot** — takes the pairs from the comparison above and draws
+  them as brackets on the current figure. It checks first: the plot type must accept
+  brackets, `hue` must be empty, and the plot's X/Y must be the columns you compared —
+  otherwise it says which of those failed instead of drawing something wrong. The markers
+  ride in the layer, so they survive into facets, panel frames, projects and templates,
+  and they **drop out by themselves if you change an axis** rather than following the
+  wrong data. Because they come from this test, the brackets and the report can no longer
+  disagree (the plot's own `sig` checkbox uses Welch + Holm instead).
+- **Nested test (cells in replicates)** — the SuperPlot's other half. Tests the group
+  effect against the **between-replicate** mean square, so *n* is the number of
+  replicates, not of cells; with 2 groups this is the nested *t* test. Reports partial
+  η², the **ICC** (how much of the spread is really replicate-to-replicate) and the naive
+  cells-as-independent *p* next to it, so you can see how far the pseudo-replicated
+  version was off. Pseudo-replication is the most common analytical mistake in the field;
+  this is the fix, not just the warning.
 - **Composition test (chi² / Fisher)** — association between two categorical columns
   (e.g. `treatment × outcome`): chi‑square, **Cramér's V**, and **Fisher exact** for 2×2,
   with a low‑expected‑count warning. The count table lands in the plot table (exportable).
@@ -428,7 +460,7 @@ picking and the legend/region overlays are turned off (as in a panel).
 Three toolboxes open as their own window from the buttons under the tabs. Each has its own
 left-hand menu, so the sidebar stays uncluttered.
 
-## Bench math panel
+## Bench math dialog
 
 **🧪 Bench math** — the arithmetic that otherwise sends you back to Excel.
 
@@ -445,7 +477,7 @@ left-hand menu, so the sidebar stays uncluttered.
 - **Kinetics & growth** — shortcuts to the three fits that are *pictures*: Michaelis-Menten,
   growth curve and standard curve.
 
-## Statistics panel
+## More tests dialog
 
 **📊 Statistics** — the rigor that one-way comparisons don't cover.
 
@@ -453,7 +485,8 @@ left-hand menu, so the sidebar stays uncluttered.
   Levene equal variance, paired or not) and **names the test with the reasoning** and where
   to run it. Start here if you are unsure.
 - **Two-way ANOVA** — two factors + interaction (e.g. `treatment × time`), Type II sums of
-  squares, unbalanced-safe. A significant interaction means one factor's effect depends on
+  squares, unbalanced-safe. Each term also reports **partial η²**, so a significant term
+  comes with how big it is. A significant interaction means one factor's effect depends on
   the other.
 - **Repeated measures** — within-subject ANOVA plus the right non-parametric partner
   (**Wilcoxon** for 2 conditions, **Friedman** for 3+). Subjects missing a condition are
@@ -462,11 +495,17 @@ left-hand menu, so the sidebar stays uncluttered.
   group** for your target power; an n gives the achieved power. (d = 0.8 → n = 26/group.)
 - **Outliers** — Grubbs (iterated), IQR (1.5×) or MAD (3.5), optionally within group.
   It **never deletes**: it can write a true/false column so the decision is documented.
+- **Compare curves** — dose-response: **extra sum-of-squares F test**. Is one shared 4PL
+  enough, or does each group need its own curve? This is the test behind "is the IC50
+  different?", which fitting one curve per group cannot answer on its own.
+- **ROC / agreement** — the numbers behind the two new plot types: AUC with a bootstrap
+  CI95, the Youden cutoff with its sensitivity and specificity; and Bland-Altman's bias
+  with CI, plus the limits of agreement with theirs.
 - **Correlation + p** — pairwise r with p-values **BH-corrected across all pairs**, as an
   exportable table. For the figure, use the `Heatmap (correlation)` plot with
   **significance stars** on (and Pearson/Spearman selectable).
 
-## Data tools panel
+## Data checks dialog
 
 **🩺 Data tools** — before and around the analysis.
 
@@ -482,10 +521,18 @@ left-hand menu, so the sidebar stays uncluttered.
 
 > Every checkbox list of columns in the app has an **All / None** bar.
 
-## Advanced tab
+## Data tab
 
-- **Numeric → categorical**, **Datasets**, **Aggregate**, **New column (formula)**,
-  **Plot wide columns**, **Reshape** — see [Preparing data](#preparing-data).
+The tab you start in. Everything that touches the table lives here, in the order you need it:
+
+- **Filter rows**, **New column (formula)**, **Aggregate**, **Numeric → categorical**,
+  **Reshape**, **Plot wide columns**, **Datasets** — see [Preparing data](#preparing-data).
+- Two buttons at the foot of the tab open the wider dialogs:
+  [Bench math](#bench-math-dialog) (qPCR, standard curve, normalise) and
+  [Data checks](#data-checks-dialog) (health, overview, plate import).
+
+## Figure assembly *(Plot tab)*
+
 - **Plot template** — **Save** the current plot recipe (type + channel mapping + params +
   labels) and **Apply** it to another dataset with the same column names. Unlike a project
   (which is bound to one CSV) or a style preset (which is only styling), a template is the
@@ -500,6 +547,8 @@ left-hand menu, so the sidebar stays uncluttered.
     **spans** its cells. E.g. `AC;BC` = A and B stacked on the left, C filling the whole right
     column; `ACD;BCD` = A,B left, C the middle column, D the right column. Use `.` for an empty
     cell. Each letter must form a rectangle. Leave empty for the regular grid.
+## Derived output *(Analysis tab)*
+
 - **Clustermap / Pairplot** — pick numeric columns; clustermap (optional z‑score) or pairplot
   (optional hue). Export the figure.
 - **Descriptive table** — per‑group summary statistics; view in the table area and export CSV.
@@ -512,6 +561,18 @@ Everything lives in the footer (kept compact):
   (≥300), a **transparent background** option (keeps ticks/labels/title readable by re‑inking
   dark themes), **⬇ Python code** (a runnable script + a data snapshot that reproduces the
   figure), and **Filtered CSV** (the current filtered/reshaped data).
+- **Source data (.xlsx)** — one sheet per panel frame (or per layer) holding exactly the
+  values plotted, plus a `… summary` sheet with the aggregate actually drawn (n, mean,
+  median, SD, SEM) for bar plots. This is the *Source Data* file Nature Methods requires
+  for every main and Extended Data figure.
+- **Draft the figure legend** — writes the sentence reviewers most often ask for: what the
+  error bars are, *n* per group (and, when the plot knows about replicates, *n* at **both**
+  levels — "3 replicates (75 observations)"), the test behind the stars and what the stars
+  mean. If the markers were computed over cells while replicates exist, the draft says so
+  and points at the nested test rather than letting you publish the claim.
+- **Re-export every plot tab** — rejected somewhere and resubmitting? Pick the new journal
+  preset, then this: **one folder dialog** re-exports every open plot tab at the new column
+  width, font and line weight, instead of one save dialog per figure.
 - **Session ▾** — **Save/Open project** (the full UI state + the CSV path) and
   **Save/Apply preset** (style + legend only).
 - Exact **mm size** (typed or via the drag handles) is honoured on export, so a figure keeps

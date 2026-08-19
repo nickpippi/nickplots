@@ -109,9 +109,12 @@ def _r_bar(ax, df, m, p):
 
 
 def _sig_brackets(ax, df, m, p):
-    """Significance brackets between the x groups (only when there is no hue)."""
+    """Significance brackets between the x groups (only when there is no hue).
+    Markers pushed from Analysis > Compare groups arrive in __sig_pairs__; without
+    them the plot falls back to computing its own (Welch + Holm)."""
     if p.get("sig") and m.get("x") and m.get("y") and not m.get("hue"):
-        _draw_sig(ax, df, m["x"], m["y"], list(pd.unique(df[m["x"]].dropna())))
+        _draw_sig(ax, df, m["x"], m["y"], list(pd.unique(df[m["x"]].dropna())),
+                  pairs=p.get("__sig_pairs__"))
 
 
 def _r_box(ax, df, m, p):
@@ -130,11 +133,20 @@ def _group_colors(names, p):
     return [cm.get(str(n), base[i]) for i, n in enumerate(names)]
 
 
-def _draw_sig(ax, df, xcol, ycol, cats):
-    """Draw significance brackets (Welch t-test + Holm) between groups."""
+def _draw_sig(ax, df, xcol, ycol, cats, pairs=None):
+    """Draw significance brackets between groups.
+
+    `pairs` = markers pushed from Analysis > Compare groups (Mann-Whitney + BH), so
+    the figure and the written report come from the same test. Without them the plot
+    computes its own (Welch + Holm) - convenient, but a different test.
+    """
     from .stats import pairwise_sig
     pos = {str(c): i for i, c in enumerate(cats)}
-    sig = pairwise_sig(df, ycol, xcol)
+    if pairs:
+        sig = [(str(d["g1"]), str(d["g2"]), d.get("q", 1.0), d.get("stars", "*"))
+               for d in pairs if d.get("sig")]
+    else:
+        sig = pairwise_sig(df, ycol, xcol)
     if not sig:
         return
     ymax = pd.to_numeric(df[ycol], errors="coerce").max()
@@ -179,6 +191,57 @@ def _r_dose4pl(ax, df, m, p):
             bbox=dict(fc="white", alpha=0.7, ec="none"))
 
 
+def _r_roc(ax, df, m, p):
+    """ROC curve + AUC (with bootstrap CI95) for a score against a binary outcome.
+    Overlay a second layer with another score column to compare two markers."""
+    from .stats import roc_analysis
+    r = roc_analysis(df, m["score"], m["label"], p.get("positive") or None,
+                     n_boot=300 if p.get("ci", True) else 0)
+    col = (p.get("__colors__") or {}).get(m["score"]) or sns.color_palette(
+        p.get("palette", "viridis"), 4)[0]
+    lab = f"{m['score']}  AUC={r['auc']:.3f}"
+    if p.get("ci", True) and r["ci"][0] == r["ci"][0]:
+        lab += f" [{r['ci'][0]:.2f}-{r['ci'][1]:.2f}]"
+    ax.plot(r["fpr"], r["tpr"], lw=1.8, color=col, label=lab)
+    ax.plot([0, 1], [0, 1], ls="--", lw=1, color="#999")     # chance line
+    if p.get("mark_cutoff", True):
+        ax.plot(1 - r["spec"], r["sens"], "o", ms=6, mfc="none", mew=1.6, color=col)
+        ax.annotate(f"{r['cutoff']:.3g}", (1 - r["spec"], r["sens"]),
+                    textcoords="offset points", xytext=(7, -9), fontsize=8, color=col)
+    ax.set_xlim(-0.02, 1.02); ax.set_ylim(-0.02, 1.02)
+    ax.set_xlabel("1 - specificity"); ax.set_ylabel("Sensitivity")
+    ax.set_aspect("equal", adjustable="box")
+    ax.legend(loc="lower right", fontsize=8, frameon=False)
+
+
+def _r_bland(ax, df, m, p):
+    """Bland-Altman: difference vs mean of two methods, with bias and 95% limits."""
+    from .stats import bland_altman
+    r = bland_altman(df, m["m1"], m["m2"])
+    hue = m.get("hue")
+    if hue:
+        d = df[[m["m1"], m["m2"], hue]].apply(
+            lambda c: pd.to_numeric(c, errors="coerce") if c.name != hue else c).dropna()
+        names = list(pd.unique(d[hue].astype(str)))
+        for name, col in zip(names, _group_colors(names, p)):
+            sub = d[d[hue].astype(str) == name]
+            a, b = sub[m["m1"]].to_numpy(float), sub[m["m2"]].to_numpy(float)
+            ax.scatter((a + b) / 2, a - b, s=p["psize"] * 6, alpha=p["alpha"],
+                       color=col, label=str(name))
+        ax.legend(title=hue, fontsize=8)
+    else:
+        ax.scatter(r["avg"], r["diff"], s=p["psize"] * 6, alpha=p["alpha"],
+                   color="#3a6ea5")
+    for y, ls, txt in ((r["bias"], "-", "bias"), (r["lo"], "--", "-1.96 SD"),
+                       (r["hi"], "--", "+1.96 SD")):
+        ax.axhline(y, ls=ls, lw=1.2, color="#c2410c" if ls == "-" else "#777")
+        ax.annotate(f"{txt}  {y:.3g}", (1.0, y), xycoords=("axes fraction", "data"),
+                    textcoords="offset points", xytext=(-4, 3), ha="right", fontsize=7,
+                    color="#c2410c" if ls == "-" else "#777")
+    ax.set_xlabel(f"Mean of {m['m1']} and {m['m2']}")
+    ax.set_ylabel(f"Difference ({m['m1']} - {m['m2']})")
+
+
 def _r_bar_err(ax, df, m, p):
     """Bar or point with mean/median ± error + individual points (+ significance)."""
     x, y, hue = m["x"], m["y"], m.get("hue")
@@ -196,8 +259,7 @@ def _r_bar_err(ax, df, m, p):
         sns.stripplot(data=df, x=x, y=y, hue=hue, dodge=bool(hue) and hue != x, jitter=0.18,
                       size=p["psize"], alpha=0.55, color="#1f1f1f",
                       edgecolor="white", linewidth=0.3, legend=False, ax=ax)
-    if p["sig"] and not hue:
-        _draw_sig(ax, df, x, y, list(pd.unique(df[x].dropna())))
+    _sig_brackets(ax, df, m, p)
 
 
 def _r_heatmap_matrix(ax, df, m, p):
@@ -759,6 +821,19 @@ REGISTRY: dict[str, PlotSpec] = {s.key: s for s in [
                      Param("points", "bool", True, label="show points"),
                      Param("psize", "float", 3.5, 1, 10, label="point size"),
                      Param("sig", "bool", False, label="significance bars (no hue)"), _PAL]),
+    PlotSpec("roc", "ROC curve (+ AUC)", "axes", _r_roc,
+             channels=[Channel("score", True, (NUMBER,), "score / marker"),
+                       Channel("label", True, (CATEGORY, NUMBER), "outcome (2 levels)")],
+             params=[Param("positive", "text", "", label="positive level (empty = last)"),
+                     Param("ci", "bool", True, label="bootstrap CI95 of the AUC"),
+                     Param("mark_cutoff", "bool", True, label="mark the Youden cutoff"),
+                     _PAL]),
+    PlotSpec("bland_altman", "Bland-Altman (agreement)", "axes", _r_bland,
+             channels=[Channel("m1", True, (NUMBER,), "method A"),
+                       Channel("m2", True, (NUMBER,), "method B"),
+                       Channel("hue", accepts=(CATEGORY,))],
+             params=[Param("psize", "float", 3.5, 1, 10, label="point size"),
+                     _ALPHA, _PAL]),
     PlotSpec("heatmap_matrix", "Matrix heatmap", "axes", _r_heatmap_matrix,
              channels=[], params=[Param("zscore", "bool", True, label="z-score per column"),
                                    Param("annot", "bool", False), _CMAP]),

@@ -7,9 +7,11 @@
 <style>
   :root{
     --bg:#0e1015; --panel:#161922; --panel2:#1d212c; --panel3:#232834;
-    --line:#2a3040; --txt:#e8eaf0; --mut:#98a1b3; --faint:#6b7385;
+    --line:#2a3040; --txt:#e8eaf0; --mut:#9aa3b6; --faint:#8a93a8;
     --accent:#7c5cff; --accent2:#22d3ee; --good:#34d399; --warn:#fbbf24; --bad:#fb7185;
     --radius:14px; --radius-sm:9px;
+    --ring:0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+    color-scheme:dark;              /* native selects, scrollbars and pickers follow the dark theme */
     font-synthesis:none;
   }
   *{box-sizing:border-box}
@@ -75,8 +77,11 @@
     padding:12px 13px;margin:12px 0}
   .sectile h3{margin:0 0 4px;font-size:12.5px;font-weight:650;
     display:flex;align-items:center;gap:6px}
-  .sectile p.hint{margin:2px 0 0;color:var(--faint);font-size:11px;line-height:1.45}
-  p.hint.tucked{display:none}                    /* moved into a "?" tooltip */
+  /* .hint was only styled inside .sectile — plot descriptions and tool hints elsewhere
+     fell back to 13px body text. One global rule covers every use. */
+  .hint{margin:2px 0 0;color:var(--faint);font-size:11px;line-height:1.45}
+  .hint b{color:var(--mut)}
+  .hint.tucked{display:none}                     /* moved into a "?" tooltip */
 
   /* ---------- "?" help badge + hover tooltip ---------- */
   .helpbtn{flex:0 0 auto;margin-left:auto;width:16px;height:16px;padding:0;border-radius:50%;
@@ -287,15 +292,83 @@
   /* "All / None" bar injected into every checkbox list */
   .selall{display:flex;gap:5px;margin:0 0 5px;position:sticky;top:0;background:var(--panel2);padding-bottom:3px}
   .selall .btn{width:auto;padding:2px 8px;font-size:10.5px}
-  .toolbtns{display:flex;gap:5px;margin:8px 16px 0}
-  .toolbtns .btn{flex:1;padding:6px 4px;font-size:11px}
 
   .panels::-webkit-scrollbar,.scrollbox::-webkit-scrollbar,.rowinfo::-webkit-scrollbar{width:9px}
   .panels::-webkit-scrollbar-thumb,.scrollbox::-webkit-scrollbar-thumb,.rowinfo::-webkit-scrollbar-thumb{
     background:var(--panel3);border-radius:9px;border:2px solid transparent;background-clip:padding-box}
+  .panels::-webkit-scrollbar-thumb:hover,.scrollbox::-webkit-scrollbar-thumb:hover,
+  .rowinfo::-webkit-scrollbar-thumb:hover{background:#39415a;background-clip:padding-box}
+
+  /* ---------- icons: one SVG set, inherits colour, no emoji font ---------- */
+  .ic{width:15px;height:15px;flex:0 0 auto;stroke:currentColor;fill:none;stroke-width:1.75;
+    stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px;margin-right:5px;
+    pointer-events:none}
+  .btn>.ic,.menu>summary>.ic{margin-right:0}      /* flex parents already own the gap */
+  .ic.big{width:34px;height:34px;stroke-width:1.4;display:block;margin:0 auto 8px}
+
+  /* ---------- keyboard focus: every control shows where you are ---------- */
+  .btn:focus-visible,.tab:focus-visible,.ptab:focus-visible,.helpbtn:focus-visible,
+  .menu>summary:focus-visible,.check input:focus-visible,input[type=color]:focus-visible,
+  .editmenu button:focus-visible{outline:none;box-shadow:var(--ring)}
+  select:focus-visible,input[type=text]:focus-visible,input[type=number]:focus-visible,
+  input[type=range]:focus-visible,textarea:focus-visible{
+    outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #7c5cff33}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn:disabled:hover{background:var(--panel2);border-color:var(--line);filter:none}
+
+  /* ---------- active sidebar tab: accent bar, not just a lighter box ---------- */
+  .tab{position:relative}
+  .tab.active::after{content:"";position:absolute;left:22%;right:22%;bottom:2px;height:2px;
+    border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+
+  /* ---------- render feedback: the preview says "I'm working" ---------- */
+  .previewcard::after{content:"";position:absolute;left:0;right:0;top:0;height:2px;z-index:8;
+    background:linear-gradient(90deg,transparent,var(--accent) 35%,var(--accent2) 65%,transparent);
+    background-size:38% 100%;background-repeat:no-repeat;
+    opacity:0;transition:opacity .18s;pointer-events:none}
+  .previewcard.busy::after{opacity:1;animation:sweep 1.05s linear infinite}
+  @keyframes sweep{from{background-position:-40% 0}to{background-position:140% 0}}
+  /* the bar alone, not a dimmed image: live slider drags re-render back to back and
+     a pulsing figure is exactly what you cannot judge while tuning it */
+  .empty{max-width:340px;line-height:1.6}
+  .empty kbd{display:inline-block;background:var(--panel3);border:1px solid var(--line);
+    border-radius:5px;padding:1px 6px;font-family:inherit;font-size:11px;color:var(--mut)}
+
+  /* ---------- drag the sidebar edge to give the figure more room ---------- */
+  .sidebar{position:relative}
+  #splitter{position:absolute;top:0;right:-3px;width:7px;height:100%;z-index:7;cursor:col-resize;
+    touch-action:none;transition:background .15s}
+  #splitter:hover,#splitter.on{background:var(--accent);opacity:.5}
+
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;
+      transition-duration:.01ms!important;scroll-behavior:auto!important}
+  }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5M4 20h16"/></symbol>
+<symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></symbol>
+<symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11 3l1.7 4.3L17 9l-4.3 1.7L11 15l-1.7-4.3L5 9l4.3-1.7z"/><path d="M18 14l.9 2.1L21 17l-2.1.9L18 20l-.9-2.1L15 17l2.1-.9z"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h7"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M4 20h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-7L9 5H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2z"/></symbol>
+<symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-magnet" viewBox="0 0 24 24"><path d="M6 3H3v9a9 9 0 0 0 18 0V3h-3v9a6 6 0 0 1-12 0z"/><path d="M3 8h3M18 8h3"/></symbol>
+<symbol id="i-hexagon" viewBox="0 0 24 24"><path d="M12 2l8.7 5v10L12 22l-8.7-5V7z"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M7 15l4-5 3 3 5-7"/></symbol>
+<symbol id="i-warning" viewBox="0 0 24 24"><path d="M12 3l9.5 17h-19z"/><path d="M12 9v5M12 17.5h.01"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 4v16M4.5 8l15 8M19.5 8l-15 8"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M14 6l4 4"/></symbol>
+<symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+</defs></svg>
 <div class="app">
   <!-- SIDEBAR -->
   <aside class="sidebar">
@@ -308,35 +381,29 @@
       </select>
     </div>
     <div class="pad row2">
-      <button class="btn primary" onclick="openCsv()">⬆ CSV</button>
-      <button class="btn" onclick="openExcel()">⬆ Excel</button>
+      <button class="btn primary" onclick="openCsv()"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg> CSV</button>
+      <button class="btn" onclick="openExcel()"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg> Excel</button>
     </div>
-    <div class="pad" style="margin-top:6px"><button class="btn ghost" onclick="openDataEntry()"><span data-i18n="⌨ Type data (Prism style)">⌨ Type data (Prism style)</span></button></div>
+    <div class="pad" style="margin-top:6px"><button class="btn ghost" onclick="openDataEntry()"><span data-i18n="Type data (Prism style)"><svg class="ic" aria-hidden="true"><use href="#i-keyboard"/></svg> Type data (Prism style)</span></button></div>
     <div id="sheetPick" class="pad" style="display:none;margin-top:6px">
       <div class="row2"><select id="sheetSel"></select><button class="btn sm" style="flex:0 0 auto" onclick="loadSheet()" data-i18n="Open sheet">Open sheet</button></div>
     </div>
     <div id="chip" class="chip"><span class="dot"></span><span id="chipText" data-i18n="no file">no file</span></div>
 
     <div class="tabs">
-      <div class="tab active" data-t="g" onclick="tab('g')" data-i18n="Plot">Plot</div>
+      <div class="tab active" data-t="d" onclick="tab('d')" data-i18n="Data">Data</div>
+      <div class="tab" data-t="g" onclick="tab('g')" data-i18n="Plot">Plot</div>
       <div class="tab" data-t="s" onclick="tab('s')" data-i18n="Style">Style</div>
-      <div class="tab" data-t="l" onclick="tab('l')" data-i18n="Legend">Legend</div>
       <div class="tab" data-t="a" onclick="tab('a')" data-i18n="Analysis">Analysis</div>
-      <div class="tab" data-t="x" onclick="tab('x')" data-i18n="Advanced">Advanced</div>
-    </div>
-    <div class="toolbtns">
-      <button class="btn sm" onclick="openTool('bench')" data-i18n="🧪 Bench math">🧪 Bench math</button>
-      <button class="btn sm" onclick="openTool('stats')" data-i18n="📊 Statistics">📊 Statistics</button>
-      <button class="btn sm" onclick="openTool('data')" data-i18n="🩺 Data tools">🩺 Data tools</button>
     </div>
 
     <div class="panels">
-      <!-- PLOT -->
-      <section class="panel active" id="p-g">
+      <!-- DATA — everything that touches the table, before plotting -->
+      <section class="panel active" id="p-d">
         <div id="wideBanner" class="banner" style="display:none">
           <span class="grow" data-i18n="This table looks wide (no group column). Tidy some columns to plot or compare them.">This table looks wide (no group column). Tidy some columns to plot or compare them.</span>
           <button class="btn sm" style="flex:0 0 auto" onclick="gotoWideHelper()" data-i18n="Tidy columns">Tidy columns</button>
-          <button class="btn sm ghost" style="flex:0 0 auto" onclick="$('wideBanner').style.display='none'">✕</button>
+          <button class="btn sm ghost" style="flex:0 0 auto" onclick="$('wideBanner').style.display='none'" aria-label="close"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button>
         </div>
         <details class="menu" id="dataPeek" style="display:none;margin-bottom:8px">
           <summary><span id="peekSummary" data-i18n="Data preview">Data preview</span></summary>
@@ -345,10 +412,9 @@
             <div style="overflow:auto;max-height:190px"><table id="peekTable" class="peek"></table></div>
           </div>
         </details>
-        <details class="menu" id="recoBox" style="display:none;margin-bottom:8px">
-          <summary data-i18n="✨ Recommended plots">✨ Recommended plots</summary>
-          <div class="menubody" id="recoList"></div>
-        </details>
+        <div class="sectile">
+          <h3 data-i18n="Filter rows">Filter rows</h3>
+          <p class="hint" data-i18n="Keep only the rows you want to plot. Conditions stack with AND; the box below takes a raw pandas query for anything more complex.">Keep only the rows you want to plot. Conditions stack with AND; the box below takes a raw pandas query for anything more complex.</p>
         <label class="lbl" data-i18n="Filter — build a condition">Filter — build a condition</label>
         <div class="row3">
           <select id="fCol"><option value="">column</option></select>
@@ -364,7 +430,7 @@
           <input type="text" id="fVal" placeholder="value" data-i18n-ph="value" onkeydown="if(event.key==='Enter')addFilterCond()">
         </div>
         <div class="row2" style="margin-top:5px">
-          <button class="btn sm" onclick="addFilterCond()" data-i18n="＋ Add condition">＋ Add condition</button>
+          <button class="btn sm" onclick="addFilterCond()" data-i18n="Add condition"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Add condition</button>
           <button class="btn sm ghost" onclick="$('filter').value='';applyFilter()" data-i18n="Clear filter">Clear filter</button>
         </div>
         <label class="lbl" data-i18n="Filter (pandas query — advanced)">Filter (pandas query — advanced)</label>
@@ -372,6 +438,91 @@
           <input type="text" id="filter" placeholder="dose > 5 and group == 'high'" data-i18n-ph="dose > 5 and group == 'high'">
           <button class="btn sm" style="flex:0 0 auto" onclick="applyFilter()" data-i18n="Apply">Apply</button>
         </div>
+        </div>
+        <div class="sectile">
+          <h3 data-i18n="New column (formula)">New column (formula)</h3>
+          <p class="hint" data-i18n="Create a column from a formula over existing columns. Use the builder for column op column, or type any pandas expression (wrap names with spaces in backticks).">Create a column from a formula over existing columns. Use the builder for column op column, or type any pandas expression (wrap names with spaces in backticks).</p>
+          <input type="text" id="newColName" placeholder="new column name" data-i18n-ph="new column name">
+          <div class="row3" style="margin-top:5px">
+            <select id="fcA"></select>
+            <select id="fcOp"><option value="+">+</option><option value="-">−</option><option value="*">×</option><option value="/">÷</option></select>
+            <select id="fcB"></select>
+          </div>
+          <button class="btn sm ghost" style="margin-top:5px;width:100%" onclick="buildFormula()" data-i18n="Builder → expression">Builder → expression</button>
+          <div class="row2" style="margin-top:5px">
+            <input type="text" id="newColExpr" placeholder="e.g. net_disp / cum_path" data-i18n-ph="e.g. net_disp / cum_path" style="flex:1">
+            <button class="btn sm" style="flex:0 0 auto" onclick="runComputedColumn()" data-i18n="Create">Create</button>
+          </div>
+        </div>
+        <div class="sectile">
+          <h3 data-i18n="Aggregate (per replicate / track)">Aggregate (per replicate / track)</h3>
+          <p class="hint" data-i18n="Collapse rows to one per group (mean/median…). Aggregate cells to their track/replicate BEFORE testing to avoid pseudo-replication. Pick several columns to keep groups distinct (e.g. treatment + track_id).">Collapse rows to one per group (mean/median…). Aggregate cells to their track/replicate BEFORE testing to avoid pseudo-replication. Pick several columns to keep groups distinct (e.g. treatment + track_id).</p>
+          <label class="lbl" data-i18n="Group by">Group by</label>
+          <div class="scrollbox" id="aggCols" style="max-height:120px"><span style="color:var(--faint)" data-i18n="load a CSV">load a CSV</span></div>
+          <div class="row2" style="margin-top:6px">
+            <select id="aggMethod" style="flex:1"><option>mean</option><option>median</option><option>sum</option><option>count</option></select>
+            <button class="btn sm" style="flex:0 0 auto" onclick="runAggregate()" data-i18n="Aggregate">Aggregate</button>
+          </div>
+        </div>
+        <div class="sectile">
+          <h3 data-i18n="Numeric → categorical">Numeric → categorical</h3>
+          <p class="hint" data-i18n="Converts a numeric column to text so it can be used as a category/hue.">Converts a numeric column to text so it can be used as a category/hue.</p>
+          <div class="row2">
+            <select id="toCatCol"></select>
+            <button class="btn sm" style="flex:0 0 auto" onclick="toCategory()">123→Abc</button>
+          </div>
+        </div>
+        <div class="sectile">
+          <h3 data-i18n="Reshape data (long ⇄ wide)">Reshape data (long ⇄ wide)</h3>
+          <p class="hint" data-i18n="Wide→long (melt): collapses several measure columns into one. Long→wide (pivot): spreads categories into columns.">Wide→long (melt): collapses several measure columns into one. Long→wide (pivot): spreads categories into columns.</p>
+          <label class="lbl" data-i18n="Keep (id_vars)">Keep (id_vars)</label>
+          <div class="scrollbox" id="meltId" style="max-height:90px"></div>
+          <label class="lbl" data-i18n="Melt (value_vars)">Melt (value_vars)</label>
+          <div class="scrollbox" id="meltVal" style="max-height:90px"></div>
+          <button class="btn sm" style="margin-top:6px;width:100%" onclick="doMelt()">Wide → Long (melt)</button>
+          <label class="lbl" style="margin-top:8px" data-i18n="Pivot: index / columns / values">Pivot: index / columns / values</label>
+          <select id="pvIndex"></select><select id="pvCols" style="margin-top:4px"></select><select id="pvVals" style="margin-top:4px"></select>
+          <button class="btn sm" style="margin-top:6px;width:100%" onclick="doPivot()">Long → Wide (pivot)</button>
+        </div>
+        <div class="sectile" id="widePlotTile">
+          <h3 data-i18n="Plot wide columns (no melting)">Plot wide columns (no melting)</h3>
+          <p class="hint" data-i18n="Your measurement is spread across several columns (e.g. control / treated / washout, each holding values)? Pick those columns and a plot type: it tidies them for you and plots, with the columns as the X categories. Also readies the data for Compare groups.">Your measurement is spread across several columns (e.g. control / treated / washout, each holding values)? Pick those columns and a plot type: it tidies them for you and plots, with the columns as the X categories. Also readies the data for Compare groups.</p>
+          <label class="lbl" data-i18n="Value columns (the wide measure)">Value columns (the wide measure)</label>
+          <div class="scrollbox" id="wideCols" style="max-height:120px"><span style="color:var(--faint)" data-i18n="load a CSV">load a CSV</span></div>
+          <label class="lbl" data-i18n="Keep as ID (optional)">Keep as ID (optional)</label>
+          <select id="wideId"><option value="">—</option></select>
+          <div class="row2" style="margin-top:6px">
+            <select id="widePlot" style="flex:1">
+              <option value="box_points">box + points</option>
+              <option value="box">box</option>
+              <option value="violin">violin</option>
+              <option value="bar_err">bar ± error</option>
+              <option value="strip">strip</option>
+            </select>
+            <button class="btn sm" style="flex:0 0 auto" onclick="widePlotGo()" data-i18n="Tidy & plot">Tidy &amp; plot</button>
+          </div>
+        </div>
+        <div class="sectile">
+          <h3 data-i18n="Datasets (multiple files)">Datasets (multiple files)</h3>
+          <p class="hint" data-i18n="Every CSV you load is kept here. Click one to switch to it, or combine all into one table (adds a source column) to compare across files or build SuperPlots by replicate.">Every CSV you load is kept here. Click one to switch to it, or combine all into one table (adds a source column) to compare across files or build SuperPlots by replicate.</p>
+          <div id="datasetList" class="statusbox" data-i18n="no datasets">no datasets</div>
+          <div class="row2" style="margin-top:6px;align-items:center">
+            <input type="text" id="combineCol" value="dataset" style="flex:1">
+            <button class="btn sm" style="flex:0 0 auto" onclick="combineDatasets()" data-i18n="Combine all">Combine all</button>
+          </div>
+        </div>
+        <div style="margin-top:14px">
+          <button class="btn" onclick="openTool('bench')" data-i18n="Bench math (qPCR, standard curve, normalise)…">Bench math (qPCR, standard curve, normalise)…</button>
+          <button class="btn" style="margin-top:6px" onclick="openTool('data')" data-i18n="Data checks (health, overview, plate import)…">Data checks (health, overview, plate import)…</button>
+        </div>
+      </section>
+
+      <!-- PLOT — build the figure -->
+      <section class="panel" id="p-g">
+        <details class="menu" id="recoBox" style="display:none;margin-bottom:8px">
+          <summary data-i18n="Recommended plots"><svg class="ic" aria-hidden="true"><use href="#i-sparkles"/></svg> Recommended plots</summary>
+          <div class="menubody" id="recoList"></div>
+        </details>
         <label class="lbl" data-i18n="Plot type">Plot type</label>
         <select id="plotType" onchange="buildConfig()"></select>
         <p id="plotDesc" class="hint" style="margin:3px 0 0"></p>
@@ -389,16 +540,50 @@
           <input type="text" id="ylabel" placeholder="Y label" data-i18n-ph="Y label" oninput="dRender()">
         </div>
         <div style="margin-top:12px">
-          <button class="btn primary" onclick="plotBase()" data-i18n="▶  Plot">▶  Plot</button>
+          <button class="btn primary" onclick="plotBase()" data-i18n="Plot"><svg class="ic" aria-hidden="true"><use href="#i-play"/></svg> Plot</button>
           <div class="row2" style="margin-top:7px">
-            <button class="btn sm" onclick="overlay()" data-i18n="＋ Overlay">＋ Overlay</button>
+            <button class="btn sm" onclick="overlay()" data-i18n="Overlay"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Overlay</button>
             <button class="btn sm ghost" onclick="clearLayers()" data-i18n="Clear">Clear</button>
           </div>
           <div class="layers" id="layersLbl" style="margin-top:8px">layers: —</div>
         </div>
+        <div class="sectile">
+          <h3 data-i18n="Plot template">Plot template</h3>
+          <p class="hint" data-i18n="Save the current plot recipe (type + columns + options + labels) and re-apply it to another dataset with the same column names.">Save the current plot recipe (type + columns + options + labels) and re-apply it to another dataset with the same column names.</p>
+          <div class="row2">
+            <button class="btn sm" onclick="saveTemplate()" data-i18n="Save template"><svg class="ic" aria-hidden="true"><use href="#i-save"/></svg> Save template</button>
+            <button class="btn sm ghost" onclick="applyTemplate()" data-i18n="Apply template"><svg class="ic" aria-hidden="true"><use href="#i-folder"/></svg> Apply template</button>
+          </div>
+        </div>
+        <div class="sectile">
+          <h3 data-i18n="Multi-figure panel (A/B/C)">Multi-figure panel (A/B/C)</h3>
+          <p class="hint" data-i18n-html="adv.panelHint">Build the plot in the "Plot" tab, then add it as a panel frame. Each frame keeps the <b>title and axis labels</b> you typed for it. After building, <b>drag the dividers on the panel</b> to resize the plots; the mm size in the Style tab applies to the panel too.</p>
+          <button class="btn sm" onclick="addPanelItem()" data-i18n="Add current plot to the panel"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Add current plot to the panel</button>
+          <button class="btn sm" style="width:100%;margin-top:4px" onclick="panelFromTabs()" data-i18n="Build panel from all open tabs"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg> Build panel from all open tabs</button>
+          <div id="panelList" class="statusbox" style="margin-top:6px" data-i18n="empty panel">empty panel</div>
+          <label class="lbl" data-i18n="Panel columns">Panel columns</label>
+          <div class="slider"><input type="range" id="ncols" min="1" max="4" step="1" value="2" oninput="badge(this);onPanelGridChange()"><span class="val">2</span></div>
+          <label class="lbl" data-i18n="Irregular layout (optional)">Irregular layout (optional)</label>
+          <p class="hint" data-i18n-html="panel.mosaicHint"></p>
+          <div class="row2">
+            <input type="text" id="panelMosaic" placeholder="e.g. AC;BC" data-i18n-ph="e.g. AC;BC" oninput="if(PANELRENDER)buildPanel()">
+            <button class="btn sm ghost" style="flex:0 0 auto" onclick="$('panelMosaic').value='';if(PANELRENDER)buildPanel()" data-i18n="Clear">Clear</button>
+          </div>
+          <div class="row3" style="margin-top:4px">
+            <button class="btn sm ghost" onclick="setMosaic('AC;BC')" title="A,B stacked left · C spans right">◱◲</button>
+            <button class="btn sm ghost" onclick="setMosaic('AB;CC')" title="A,B top · C spans bottom">⬒</button>
+            <button class="btn sm ghost" onclick="setMosaic('AA;BC')" title="A spans top · B,C bottom">⬓</button>
+          </div>
+          <div class="row2" style="margin-top:6px">
+            <button class="btn sm" onclick="buildPanel()" data-i18n="Build panel">Build panel</button>
+            <button class="btn sm ghost" onclick="clearPanel()" data-i18n="Clear">Clear</button>
+          </div>
+          <button class="btn sm ghost" style="margin-top:4px;width:100%" onclick="resetPanelSizes()" data-i18n="Reset plot sizes">Reset plot sizes</button>
+          <button class="btn sm" style="margin-top:4px;width:100%" onclick="exportPanel()" data-i18n="Export panel">Export panel</button>
+        </div>
       </section>
 
-      <!-- STYLE -->
+      <!-- STYLE — appearance, legend included -->
       <section class="panel" id="p-s">
         <label class="lbl" data-i18n="Theme">Theme</label>
         <select id="theme" onchange="dRender()"></select>
@@ -457,6 +642,11 @@
             <button class="btn sm" onclick="journalPreset('science2')">Science 2-col</button>
             <button class="btn sm ghost" onclick="journalPreset('clear')" data-i18n="Clear">Clear</button>
           </div>
+          <div class="row3" style="margin-top:5px">
+            <button class="btn sm" onclick="journalPreset('autophagy1')">Autophagy 1-col</button>
+            <button class="btn sm" onclick="journalPreset('autophagy2')">Autophagy 2-col</button>
+            <button class="btn sm ghost" onclick="editPresets()" data-i18n="Edit / add…">Edit / add…</button>
+          </div>
           <div class="toolgrid" style="margin-top:8px">
             <label><b data-i18n="Font family">Font family</b>
               <select id="fontFamily" onchange="dRender()">
@@ -469,21 +659,8 @@
           </div>
         </div>
         <div class="sectile">
-          <h3 data-i18n="Accessibility check">Accessibility check</h3>
-          <p class="hint" data-i18n="Preview the figure as a colour-blind reader (or in grayscale) sees it — the test journals increasingly require. This only changes the on-screen preview, never the export. Point plots also have a 'shape by hue' option so colour is not the only cue.">Preview the figure as a colour-blind reader (or in grayscale) sees it — the test journals increasingly require. This only changes the on-screen preview, never the export. Point plots also have a 'shape by hue' option so colour is not the only cue.</p>
-          <label class="lbl" data-i18n="Simulate">Simulate</label>
-          <select id="cvdMode" onchange="dRender()">
-            <option value="" data-i18n="normal vision">normal vision</option>
-            <option value="deuteranopia" data-i18n="deuteranopia (red-green, most common)">deuteranopia (red-green, most common)</option>
-            <option value="protanopia" data-i18n="protanopia (red-green)">protanopia (red-green)</option>
-            <option value="tritanopia" data-i18n="tritanopia (blue-yellow)">tritanopia (blue-yellow)</option>
-            <option value="grayscale" data-i18n="grayscale (print test)">grayscale (print test)</option>
-          </select>
-        </div>
-      </section>
-
-      <!-- LEGEND -->
-      <section class="panel" id="p-l">
+          <h3 data-i18n="Legend">Legend</h3>
+          <p class="hint" data-i18n-html="legend.tip"></p>
         <label class="check"><input type="checkbox" id="legShow" checked onchange="dRender()"> <span data-i18n="Show legend">Show legend</span></label>
         <label class="lbl" data-i18n="Position">Position</label>
         <select id="legPos" onchange="dRender()">
@@ -505,6 +682,7 @@
         <label class="check"><input type="checkbox" id="legFit" checked onchange="dRender()"> <span data-i18n="Open space (legend outside). Turn off to drag it inside the plot.">Open space (legend outside). Turn off to drag it inside the plot.</span></label>
         <label class="lbl" data-i18n="Legend title">Legend title</label>
         <input type="text" id="legTitle" placeholder="(default = group name)" data-i18n-ph="(default = group name)" oninput="dRender()">
+        </div>
         <div class="sectile">
           <h3 data-i18n="Rename items">Rename items</h3>
           <p class="hint" data-i18n="Changes the names shown in the legend (does not alter the data).">Changes the names shown in the legend (does not alter the data).</p>
@@ -517,10 +695,21 @@
           <button class="btn sm" onclick="loadColumnAliases()" data-i18n="Load current columns">Load current columns</button>
           <div id="aliasList" style="margin-top:6px"></div>
         </div>
-        <div class="sectile"><p class="hint" data-i18n-html="legend.tip">Tip: you can <b>click and drag the legend</b> directly on the plot — it switches to "Free" mode and stays where you drop it.</p></div>
+        <div class="sectile">
+          <h3 data-i18n="Accessibility check">Accessibility check</h3>
+          <p class="hint" data-i18n="Preview the figure as a colour-blind reader (or in grayscale) sees it — the test journals increasingly require. This only changes the on-screen preview, never the export. Point plots also have a 'shape by hue' option so colour is not the only cue.">Preview the figure as a colour-blind reader (or in grayscale) sees it — the test journals increasingly require. This only changes the on-screen preview, never the export. Point plots also have a 'shape by hue' option so colour is not the only cue.</p>
+          <label class="lbl" data-i18n="Simulate">Simulate</label>
+          <select id="cvdMode" onchange="dRender()">
+            <option value="" data-i18n="normal vision">normal vision</option>
+            <option value="deuteranopia" data-i18n="deuteranopia (red-green, most common)">deuteranopia (red-green, most common)</option>
+            <option value="protanopia" data-i18n="protanopia (red-green)">protanopia (red-green)</option>
+            <option value="tritanopia" data-i18n="tritanopia (blue-yellow)">tritanopia (blue-yellow)</option>
+            <option value="grayscale" data-i18n="grayscale (print test)">grayscale (print test)</option>
+          </select>
+        </div>
       </section>
 
-      <!-- ANALYSIS -->
+      <!-- ANALYSIS — statistics and derived output -->
       <section class="panel" id="p-a">
         <div class="sectile">
           <h3 data-i18n="Dimensionality reduction">Dimensionality reduction</h3>
@@ -535,8 +724,21 @@
           <label class="lbl" data-i18n="Value (numeric)">Value (numeric)</label><select id="testVal"></select>
           <label class="lbl" data-i18n="Group (categorical)">Group (categorical)</label><select id="testGrp"></select>
           <button class="btn sm" style="margin-top:8px;width:100%" onclick="runTest()" data-i18n="Compare (non-parametric + effect + CI)">Compare (non-parametric + effect + CI)</button>
-          <button class="btn sm ghost" style="margin-top:6px;width:100%" onclick="runMethods()" data-i18n="📋 Methods sentence (copy-ready)">📋 Methods sentence (copy-ready)</button>
+          <button class="btn sm ghost" style="margin-top:6px;width:100%" onclick="runMethods()" data-i18n="Methods sentence (copy-ready)"><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Methods sentence (copy-ready)</button>
+          <div class="row2" style="margin-top:6px">
+            <button class="btn sm" onclick="pushSigMarkers()" data-i18n="Put the markers on the plot"><svg class="ic" aria-hidden="true"><use href="#i-star"/></svg> Put the markers on the plot</button>
+            <button class="btn sm ghost" onclick="clearSigMarkers()" data-i18n="Remove markers">Remove markers</button>
+          </div>
           <div class="statusbox" id="testOut" style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:11px">—</div>
+        </div>
+        <div class="sectile">
+          <h3 data-i18n="Nested test (cells in replicates)">Nested test (cells in replicates)</h3>
+          <p class="hint" data-i18n="For several cells per replicate. Tests the group effect against the BETWEEN-REPLICATE variation, so n = replicates, not cells. Pair it with the SuperPlot. It also prints the naive p (cells as independent) so you can see how much it was inflated.">For several cells per replicate. Tests the group effect against the BETWEEN-REPLICATE variation, so n = replicates, not cells. Pair it with the SuperPlot. It also prints the naive p (cells as independent) so you can see how much it was inflated.</p>
+          <label class="lbl" data-i18n="Value (numeric)">Value (numeric)</label><select id="nestVal"></select>
+          <label class="lbl" data-i18n="Group (categorical)">Group (categorical)</label><select id="nestGrp"></select>
+          <label class="lbl" data-i18n="Replicate / experiment (categorical)">Replicate / experiment (categorical)</label><select id="nestRep"></select>
+          <button class="btn sm" style="margin-top:8px;width:100%" onclick="runNested()" data-i18n="Run nested test">Run nested test</button>
+          <div class="statusbox" id="nestOut" style="white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:11px">—</div>
         </div>
         <div class="sectile">
           <h3 data-i18n="Composition test (chi² / Fisher)">Composition test (chi² / Fisher)</h3>
@@ -588,7 +790,7 @@
           </div>
           <div class="row2" style="margin-top:6px;align-items:center">
             <input type="color" id="lnColor" value="#e23b3b" style="flex:0 0 auto">
-            <button class="btn sm" style="flex:1" onclick="addLine()" data-i18n="＋ Add line">＋ Add line</button>
+            <button class="btn sm" style="flex:1" onclick="addLine()" data-i18n="Add line"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Add line</button>
           </div>
           <button class="btn sm ghost" id="lnPickBtn" style="margin-top:4px;width:100%" onclick="toggleLinePick()" data-i18n="Click the plot to pick X,Y">Click the plot to pick X,Y</button>
           <div id="lineList" class="statusbox" style="margin-top:6px" data-i18n="no lines">no lines</div>
@@ -596,12 +798,12 @@
             <button class="btn sm ghost editModeBtn" style="flex:1" onclick="toggleGateMode()" data-i18n="Edit on the plot (drag regions/lines)">Edit on the plot (drag regions/lines)</button>
             <button class="btn sm" style="flex:1" onclick="analyzeRegions()" data-i18n="Analyze regions">Analyze regions</button>
           </div>
-          <button class="btn sm" style="margin-top:6px;width:100%" onclick="generateGatesFromLines()" data-i18n="⬇ Build regions from the lines (intersection cells)">⬇ Build regions from the lines (intersection cells)</button>
+          <button class="btn sm" style="margin-top:6px;width:100%" onclick="generateGatesFromLines()" data-i18n="Build regions from the lines (intersection cells)"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Build regions from the lines (intersection cells)</button>
         </div>
         <div class="sectile">
           <h3 data-i18n="Named regions (gating)">Named regions (gating)</h3>
           <p class="hint" data-i18n-html="analysis.gatingHint">Draw closed regions (straight-edged, tiltable polygons), <b>name</b> them and <b>drag them on the plot</b> to adjust. Double-click an <b>edge</b> to insert a vertex; double-click or <b>right-click</b> a vertex to remove it (min. 3). Drag the <b>name</b> to reposition it. The live per-group count appears below. "Create column" generates a categorical column with each observation's region name. Uses the X/Y/hue from the Plot tab.</p>
-          <label class="check"><input type="checkbox" id="showGates" checked onchange="toggleShowGates()"> <span data-i18n="👁 Show regions on the plot (turn off to preview without them)">👁 Show regions on the plot (turn off to preview without them)</span></label>
+          <label class="check"><input type="checkbox" id="showGates" checked onchange="toggleShowGates()"> <span data-i18n="Show regions on the plot (turn off to preview without them)"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg> Show regions on the plot (turn off to preview without them)</span></label>
           <div class="row2" style="align-items:center;margin-top:6px">
             <input type="text" id="gateName" placeholder="name (e.g. LR)" data-i18n-ph="name (e.g. LR)" style="flex:1">
             <input type="color" id="gateColor" value="#e23b3b" style="flex:0 0 auto">
@@ -616,13 +818,13 @@
             <div class="slider" style="flex:1"><input type="range" id="gateWidth" min="0.5" max="5" step="0.5" value="1.4" oninput="badge(this)"><span class="val">1.4</span></div>
           </div>
           <div class="row2" style="margin-top:6px">
-            <button class="btn sm" style="flex:1" onclick="addGate()" data-i18n="＋ Region">＋ Region</button>
+            <button class="btn sm" style="flex:1" onclick="addGate()" data-i18n="Region"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> Region</button>
             <button class="btn sm ghost editModeBtn" style="flex:1" id="gateModeBtn" onclick="toggleGateMode()" data-i18n="Edit on the plot (drag regions/lines)">Edit on the plot (drag regions/lines)</button>
           </div>
           <div id="gateList" style="margin-top:6px"></div>
           <div class="row2" style="margin-top:6px">
             <button class="btn sm ghost" style="flex:1" onclick="countGates()" data-i18n="Refresh count">Refresh count</button>
-            <button class="btn sm" style="flex:1" onclick="mergeGates()" data-i18n="⬡ Merge same-named">⬡ Merge same-named</button>
+            <button class="btn sm" style="flex:1" onclick="mergeGates()" data-i18n="Merge same-named"><svg class="ic" aria-hidden="true"><use href="#i-hexagon"/></svg> Merge same-named</button>
           </div>
           <div class="row2" style="margin-top:6px;align-items:center">
             <input type="text" id="gateColName" placeholder="column name" data-i18n-ph="column name" value="Region" style="flex:1">
@@ -632,7 +834,7 @@
           <details class="menu" style="margin-top:8px">
             <summary data-i18n="Editing options">Editing options</summary>
             <div class="menubody">
-              <label class="check"><input type="checkbox" id="gateMagnet" checked> <span data-i18n="🧲 Magnet: vertex snaps to vertices/edges of other regions">🧲 Magnet: vertex snaps to vertices/edges of other regions</span></label>
+              <label class="check"><input type="checkbox" id="gateMagnet" checked> <span data-i18n="Magnet: vertex snaps to vertices/edges of other regions"><svg class="ic" aria-hidden="true"><use href="#i-magnet"/></svg> Magnet: vertex snaps to vertices/edges of other regions</span></label>
               <label class="check"><input type="checkbox" id="gatesLock" onchange="toggleGatesLock()"> <span data-i18n="Lock regions (keep position when swapping X/Y)">Lock regions (keep position when swapping X/Y)</span></label>
               <p class="hint" data-i18n="In edit mode: drag the vertices or the interior; double-click the body adds a vertex, on a vertex removes it.">In edit mode: drag the vertices or the interior; double-click the body adds a vertex, on a vertex removes it.</p>
               <p class="hint" data-i18n-html="analysis.mergeHint">To <b>merge</b> regions, give them the <b>same name</b> — they are counted together and get the same label in the created column.</p>
@@ -644,8 +846,8 @@
             <div class="menubody">
               <p class="hint" data-i18n-html="analysis.saveLoadHint">Save regions + lines to a file to <b>reuse on another sheet</b> (with the same axes). It warns if you load them on different axes.</p>
               <div class="row2">
-                <button class="btn sm" style="flex:1" onclick="saveRegions()" data-i18n="💾 Save regions">💾 Save regions</button>
-                <button class="btn sm ghost" style="flex:1" onclick="loadRegions()" data-i18n="📂 Load regions">📂 Load regions</button>
+                <button class="btn sm" style="flex:1" onclick="saveRegions()" data-i18n="Save regions"><svg class="ic" aria-hidden="true"><use href="#i-save"/></svg> Save regions</button>
+                <button class="btn sm ghost" style="flex:1" onclick="loadRegions()" data-i18n="Load regions"><svg class="ic" aria-hidden="true"><use href="#i-folder"/></svg> Load regions</button>
               </div>
               <label class="check"><input type="checkbox" id="loadByFrac"> <span data-i18n="Load by plot proportion (fraction) — to reuse at different scales">Load by plot proportion (fraction) — to reuse at different scales</span></label>
             </div>
@@ -658,92 +860,12 @@
               <div id="gateExportList" style="max-height:120px;overflow:auto;border:1px solid var(--panel3);border-radius:8px;padding:6px 8px"></div>
               <div class="row2" style="align-items:center">
                 <select id="gateExportFmt" style="flex:0 0 auto;width:auto"><option value="csv">CSV</option><option value="xlsx">Excel</option></select>
-                <button class="btn sm" style="flex:1" onclick="exportGated()" data-i18n="⬇ Export checked">⬇ Export checked</button>
+                <button class="btn sm" style="flex:1" onclick="exportGated()" data-i18n="Export checked"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Export checked</button>
               </div>
               <label class="check"><input type="checkbox" id="gateExportPer"> <span data-i18n="Export 1 file per region (pick a folder)">Export 1 file per region (pick a folder)</span></label>
               <button class="btn sm ghost" style="width:100%" onclick="exportGatedAll()" data-i18n="Export everything (+ Region column)">Export everything (+ Region column)</button>
             </div>
           </details>
-        </div>
-      </section>
-
-      <!-- ADVANCED -->
-      <section class="panel" id="p-x">
-        <div class="sectile">
-          <h3 data-i18n="Numeric → categorical">Numeric → categorical</h3>
-          <p class="hint" data-i18n="Converts a numeric column to text so it can be used as a category/hue.">Converts a numeric column to text so it can be used as a category/hue.</p>
-          <div class="row2">
-            <select id="toCatCol"></select>
-            <button class="btn sm" style="flex:0 0 auto" onclick="toCategory()">123→Abc</button>
-          </div>
-        </div>
-        <div class="sectile">
-          <h3 data-i18n="Datasets (multiple files)">Datasets (multiple files)</h3>
-          <p class="hint" data-i18n="Every CSV you load is kept here. Click one to switch to it, or combine all into one table (adds a source column) to compare across files or build SuperPlots by replicate.">Every CSV you load is kept here. Click one to switch to it, or combine all into one table (adds a source column) to compare across files or build SuperPlots by replicate.</p>
-          <div id="datasetList" class="statusbox" data-i18n="no datasets">no datasets</div>
-          <div class="row2" style="margin-top:6px;align-items:center">
-            <input type="text" id="combineCol" value="dataset" style="flex:1">
-            <button class="btn sm" style="flex:0 0 auto" onclick="combineDatasets()" data-i18n="Combine all">Combine all</button>
-          </div>
-        </div>
-        <div class="sectile">
-          <h3 data-i18n="Aggregate (per replicate / track)">Aggregate (per replicate / track)</h3>
-          <p class="hint" data-i18n="Collapse rows to one per group (mean/median…). Aggregate cells to their track/replicate BEFORE testing to avoid pseudo-replication. Pick several columns to keep groups distinct (e.g. treatment + track_id).">Collapse rows to one per group (mean/median…). Aggregate cells to their track/replicate BEFORE testing to avoid pseudo-replication. Pick several columns to keep groups distinct (e.g. treatment + track_id).</p>
-          <label class="lbl" data-i18n="Group by">Group by</label>
-          <div class="scrollbox" id="aggCols" style="max-height:120px"><span style="color:var(--faint)" data-i18n="load a CSV">load a CSV</span></div>
-          <div class="row2" style="margin-top:6px">
-            <select id="aggMethod" style="flex:1"><option>mean</option><option>median</option><option>sum</option><option>count</option></select>
-            <button class="btn sm" style="flex:0 0 auto" onclick="runAggregate()" data-i18n="Aggregate">Aggregate</button>
-          </div>
-        </div>
-        <div class="sectile">
-          <h3 data-i18n="New column (formula)">New column (formula)</h3>
-          <p class="hint" data-i18n="Create a column from a formula over existing columns. Use the builder for column op column, or type any pandas expression (wrap names with spaces in backticks).">Create a column from a formula over existing columns. Use the builder for column op column, or type any pandas expression (wrap names with spaces in backticks).</p>
-          <input type="text" id="newColName" placeholder="new column name" data-i18n-ph="new column name">
-          <div class="row3" style="margin-top:5px">
-            <select id="fcA"></select>
-            <select id="fcOp"><option value="+">+</option><option value="-">−</option><option value="*">×</option><option value="/">÷</option></select>
-            <select id="fcB"></select>
-          </div>
-          <button class="btn sm ghost" style="margin-top:5px;width:100%" onclick="buildFormula()" data-i18n="Builder → expression">Builder → expression</button>
-          <div class="row2" style="margin-top:5px">
-            <input type="text" id="newColExpr" placeholder="e.g. net_disp / cum_path" data-i18n-ph="e.g. net_disp / cum_path" style="flex:1">
-            <button class="btn sm" style="flex:0 0 auto" onclick="runComputedColumn()" data-i18n="Create">Create</button>
-          </div>
-        </div>
-        <div class="sectile">
-          <h3 data-i18n="Plot template">Plot template</h3>
-          <p class="hint" data-i18n="Save the current plot recipe (type + columns + options + labels) and re-apply it to another dataset with the same column names.">Save the current plot recipe (type + columns + options + labels) and re-apply it to another dataset with the same column names.</p>
-          <div class="row2">
-            <button class="btn sm" onclick="saveTemplate()" data-i18n="💾 Save template">💾 Save template</button>
-            <button class="btn sm ghost" onclick="applyTemplate()" data-i18n="📂 Apply template">📂 Apply template</button>
-          </div>
-        </div>
-        <div class="sectile">
-          <h3 data-i18n="Multi-figure panel (A/B/C)">Multi-figure panel (A/B/C)</h3>
-          <p class="hint" data-i18n-html="adv.panelHint">Build the plot in the "Plot" tab, then add it as a panel frame. Each frame keeps the <b>title and axis labels</b> you typed for it. After building, <b>drag the dividers on the panel</b> to resize the plots; the mm size in the Style tab applies to the panel too.</p>
-          <button class="btn sm" onclick="addPanelItem()" data-i18n="＋ Add current plot to the panel">＋ Add current plot to the panel</button>
-          <button class="btn sm" style="width:100%;margin-top:4px" onclick="panelFromTabs()" data-i18n="⧉ Build panel from all open tabs">⧉ Build panel from all open tabs</button>
-          <div id="panelList" class="statusbox" style="margin-top:6px" data-i18n="empty panel">empty panel</div>
-          <label class="lbl" data-i18n="Panel columns">Panel columns</label>
-          <div class="slider"><input type="range" id="ncols" min="1" max="4" step="1" value="2" oninput="badge(this);onPanelGridChange()"><span class="val">2</span></div>
-          <label class="lbl" data-i18n="Irregular layout (optional)">Irregular layout (optional)</label>
-          <p class="hint" data-i18n-html="panel.mosaicHint"></p>
-          <div class="row2">
-            <input type="text" id="panelMosaic" placeholder="e.g. AC;BC" data-i18n-ph="e.g. AC;BC" oninput="if(PANELRENDER)buildPanel()">
-            <button class="btn sm ghost" style="flex:0 0 auto" onclick="$('panelMosaic').value='';if(PANELRENDER)buildPanel()" data-i18n="Clear">Clear</button>
-          </div>
-          <div class="row3" style="margin-top:4px">
-            <button class="btn sm ghost" onclick="setMosaic('AC;BC')" title="A,B stacked left · C spans right">◱◲</button>
-            <button class="btn sm ghost" onclick="setMosaic('AB;CC')" title="A,B top · C spans bottom">⬒</button>
-            <button class="btn sm ghost" onclick="setMosaic('AA;BC')" title="A spans top · B,C bottom">⬓</button>
-          </div>
-          <div class="row2" style="margin-top:6px">
-            <button class="btn sm" onclick="buildPanel()" data-i18n="Build panel">Build panel</button>
-            <button class="btn sm ghost" onclick="clearPanel()" data-i18n="Clear">Clear</button>
-          </div>
-          <button class="btn sm ghost" style="margin-top:4px;width:100%" onclick="resetPanelSizes()" data-i18n="Reset plot sizes">Reset plot sizes</button>
-          <button class="btn sm" style="margin-top:4px;width:100%" onclick="exportPanel()" data-i18n="Export panel">Export panel</button>
         </div>
         <div class="sectile">
           <h3>Clustermap / Pairplot</h3>
@@ -758,36 +880,6 @@
           </div>
           <button class="btn sm" style="margin-top:4px;width:100%" onclick="exportAdvanced()" data-i18n="Export this figure">Export this figure</button>
         </div>
-        <div class="sectile" id="widePlotTile">
-          <h3 data-i18n="Plot wide columns (no melting)">Plot wide columns (no melting)</h3>
-          <p class="hint" data-i18n="Your measurement is spread across several columns (e.g. control / treated / washout, each holding values)? Pick those columns and a plot type: it tidies them for you and plots, with the columns as the X categories. Also readies the data for Compare groups.">Your measurement is spread across several columns (e.g. control / treated / washout, each holding values)? Pick those columns and a plot type: it tidies them for you and plots, with the columns as the X categories. Also readies the data for Compare groups.</p>
-          <label class="lbl" data-i18n="Value columns (the wide measure)">Value columns (the wide measure)</label>
-          <div class="scrollbox" id="wideCols" style="max-height:120px"><span style="color:var(--faint)" data-i18n="load a CSV">load a CSV</span></div>
-          <label class="lbl" data-i18n="Keep as ID (optional)">Keep as ID (optional)</label>
-          <select id="wideId"><option value="">—</option></select>
-          <div class="row2" style="margin-top:6px">
-            <select id="widePlot" style="flex:1">
-              <option value="box_points">box + points</option>
-              <option value="box">box</option>
-              <option value="violin">violin</option>
-              <option value="bar_err">bar ± error</option>
-              <option value="strip">strip</option>
-            </select>
-            <button class="btn sm" style="flex:0 0 auto" onclick="widePlotGo()" data-i18n="Tidy & plot">Tidy &amp; plot</button>
-          </div>
-        </div>
-        <div class="sectile">
-          <h3 data-i18n="Reshape data (long ⇄ wide)">Reshape data (long ⇄ wide)</h3>
-          <p class="hint" data-i18n="Wide→long (melt): collapses several measure columns into one. Long→wide (pivot): spreads categories into columns.">Wide→long (melt): collapses several measure columns into one. Long→wide (pivot): spreads categories into columns.</p>
-          <label class="lbl" data-i18n="Keep (id_vars)">Keep (id_vars)</label>
-          <div class="scrollbox" id="meltId" style="max-height:90px"></div>
-          <label class="lbl" data-i18n="Melt (value_vars)">Melt (value_vars)</label>
-          <div class="scrollbox" id="meltVal" style="max-height:90px"></div>
-          <button class="btn sm" style="margin-top:6px;width:100%" onclick="doMelt()">Wide → Long (melt)</button>
-          <label class="lbl" style="margin-top:8px" data-i18n="Pivot: index / columns / values">Pivot: index / columns / values</label>
-          <select id="pvIndex"></select><select id="pvCols" style="margin-top:4px"></select><select id="pvVals" style="margin-top:4px"></select>
-          <button class="btn sm" style="margin-top:6px;width:100%" onclick="doPivot()">Long → Wide (pivot)</button>
-        </div>
         <div class="sectile">
           <h3 data-i18n="Descriptive table">Descriptive table</h3>
           <label class="lbl" data-i18n="Group by (optional)">Group by (optional)</label>
@@ -797,13 +889,16 @@
             <button class="btn sm ghost" onclick="exportTable()" data-i18n="Export CSV">Export CSV</button>
           </div>
         </div>
+        <div style="margin-top:14px">
+          <button class="btn" onclick="openTool('stats')" data-i18n="More tests (ANOVA, repeated measures, power, outliers)…">More tests (ANOVA, repeated measures, power, outliers)…</button>
+        </div>
       </section>
     </div>
 
     <div class="footer">
-      <button class="btn" onclick="exportFig()" data-i18n="⬇  Export figure (TIFF/PNG/PDF/SVG)">⬇  Export figure (TIFF/PNG/PDF/SVG)</button>
+      <button class="btn" onclick="exportFig()" data-i18n="Export figure (TIFF/PNG/PDF/SVG)"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Export figure (TIFF/PNG/PDF/SVG)</button>
       <details class="menu">
-        <summary data-i18n="Export ▾ (options, code, data)">Export ▾ (options, code, data)</summary>
+        <summary data-i18n="Export (options, code, data)">Export (options, code, data)</summary>
         <div class="menubody">
           <div class="dpirow">
             <span data-i18n="Export DPI">Export DPI</span>
@@ -812,16 +907,30 @@
             <span class="muted" data-i18n="(min. 300)">(min. 300)</span>
           </div>
           <label class="check" style="margin:2px 0"><input type="checkbox" id="exportTransparent"> <span data-i18n="Transparent background (keeps ticks, labels and title)">Transparent background (keeps ticks, labels and title)</span></label>
-          <button class="btn sm" onclick="exportCode()" data-i18n="⬇ Python code">⬇ Python code</button>
+          <button class="btn sm" onclick="exportCode()" data-i18n="Python code"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Python code</button>
           <button class="btn sm ghost" onclick="exportCsv()" data-i18n="Filtered CSV">Filtered CSV</button>
+          <button class="btn sm" onclick="exportSourceData()" data-i18n="Source data (.xlsx, one sheet per panel)"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Source data (.xlsx, one sheet per panel)</button>
+          <button class="btn sm ghost" onclick="showFigureLegend()" data-i18n="Draft the figure legend"><svg class="ic" aria-hidden="true"><use href="#i-clipboard"/></svg> Draft the figure legend</button>
+          <div id="legendDraft" style="display:none">
+            <textarea id="legendText" readonly rows="7" style="margin-top:6px"></textarea>
+            <div class="row2" style="margin-top:4px">
+              <button class="btn sm" onclick="copyLegend()" data-i18n="Copy"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg> Copy</button>
+              <button class="btn sm ghost" onclick="$('legendDraft').style.display='none'" data-i18n="Hide">Hide</button>
+            </div>
+          </div>
+          <div class="row2" style="margin-top:4px">
+            <button class="btn sm" onclick="exportAllTabs()" data-i18n="Re-export every plot tab"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Re-export every plot tab</button>
+            <select id="batchFmt" style="flex:0 0 88px"><option>tiff</option><option>png</option><option>pdf</option><option>svg</option></select>
+          </div>
+          <p class="hint" data-i18n="Rejected somewhere and resubmitting? Pick the new journal preset above, then this: one folder dialog re-exports every open plot tab at the new column width, font and line weight.">Rejected somewhere and resubmitting? Pick the new journal preset above, then this: one folder dialog re-exports every open plot tab at the new column width, font and line weight.</p>
         </div>
       </details>
       <details class="menu">
-        <summary data-i18n="Session ▾ (project, preset)">Session ▾ (project, preset)</summary>
+        <summary data-i18n="Session (project, preset)">Session (project, preset)</summary>
         <div class="menubody">
           <div class="row2">
-            <button class="btn sm" onclick="saveProject()" data-i18n="💾 Save project">💾 Save project</button>
-            <button class="btn sm" onclick="openProject()" data-i18n="📂 Open project">📂 Open project</button>
+            <button class="btn sm" onclick="saveProject()" data-i18n="Save project"><svg class="ic" aria-hidden="true"><use href="#i-save"/></svg> Save project</button>
+            <button class="btn sm" onclick="openProject()" data-i18n="Open project"><svg class="ic" aria-hidden="true"><use href="#i-folder"/></svg> Open project</button>
           </div>
           <div class="row2">
             <button class="btn sm ghost" onclick="savePreset()" data-i18n="Save preset">Save preset</button>
@@ -830,6 +939,8 @@
         </div>
       </details>
     </div>
+    <div id="splitter" data-i18n-title="Drag to resize the panel · double-click to reset"
+         title="Drag to resize the panel · double-click to reset"></div>
   </aside>
 
   <!-- STAGE -->
@@ -837,20 +948,22 @@
     <div class="topbar">
       <div class="layers" id="hintTop" data-i18n="Load a CSV to start.">Load a CSV to start.</div>
       <div class="anntools">
-        <button class="btn sm primary" onclick="plotBase()" data-i18n="▶  Plot">▶  Plot</button>
+        <button class="btn sm primary" onclick="plotBase()" data-i18n="Plot"><svg class="ic" aria-hidden="true"><use href="#i-play"/></svg> Plot</button>
         <input type="text" id="annText" placeholder="annotation text" data-i18n-ph="annotation text" style="width:150px">
         <button class="btn sm" onclick="setAnnot('text')" id="annTextBtn" data-i18n="Text">Text</button>
         <button class="btn sm" onclick="setAnnot('arrow')" id="annArrowBtn" data-i18n="Arrow">Arrow</button>
-        <button class="btn sm" onclick="setAnnot('star')" id="annStarBtn">✱</button>
+        <button class="btn sm" onclick="setAnnot('star')" id="annStarBtn" aria-label="star"><svg class="ic" aria-hidden="true"><use href="#i-star"/></svg></button>
         <button class="btn sm ghost" onclick="undoAnnot()" data-i18n="Undo">Undo</button>
         <button class="btn sm ghost" onclick="clearAnnot()" data-i18n="Clear">Clear</button>
       </div>
     </div>
     <div class="plottabs" id="plotTabs"></div>
     <div class="previewcard" id="card">
-      <div class="empty" id="empty"><div class="big">📈</div><span data-i18n="Your figure appears here">Your figure appears here</span></div>
+      <div class="empty" id="empty"><div class="big"><svg class="ic big" aria-hidden="true"><use href="#i-chart"/></svg></div><span data-i18n="Your figure appears here">Your figure appears here</span>
+        <div class="hint" style="margin-top:8px" data-i18n-html="empty.next">Load a CSV (or drop one anywhere), map your columns, then press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to plot.</div>
+      </div>
       <div class="errcard" id="errCard" style="display:none">
-        <div class="big">⚠</div>
+        <div class="big"><svg class="ic big" aria-hidden="true"><use href="#i-warning"/></svg></div>
         <h4 id="errTitle"></h4>
         <p id="errWhy"></p>
         <ul id="errTips"></ul>
@@ -863,17 +976,17 @@
       <div id="hBottom" class="sizeh" onpointerdown="sizeDown(event,'h')" data-i18n-title="Drag: flatten / stretch the height">​</div>
       <div id="hCorner" class="sizeh" onpointerdown="sizeDown(event,'wh')" ondblclick="resetShape()" data-i18n-title="Drag: reshape both · double-click: reset to auto">​</div>
     </div>
-    <div class="rowinfo" id="rowinfo"><div class="rowinfohead"><h4 data-i18n="Selected point">Selected point</h4><button class="btn sm ghost" style="width:auto;padding:3px 10px" onclick="copyRowTable()" data-i18n="⧉ Copy">⧉ Copy</button></div><table id="rowtable"></table></div>
+    <div class="rowinfo" id="rowinfo"><div class="rowinfohead"><h4 data-i18n="Selected point">Selected point</h4><button class="btn sm ghost" style="width:auto;padding:3px 10px" onclick="copyRowTable()" data-i18n="Copy"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg> Copy</button></div><table id="rowtable"></table></div>
   </main>
 </div>
-<div class="toast" id="toast"></div>
-<div id="dropZone"><div class="inner">⬇ <span data-i18n="Drop your CSV here">Drop your CSV here</span><div class="sub" data-i18n="CSV — for Excel use the ⬆ Excel button">CSV — for Excel use the ⬆ Excel button</div></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="dropZone"><div class="inner"><svg class="ic big" aria-hidden="true"><use href="#i-download"/></svg> <span data-i18n="Drop your CSV here">Drop your CSV here</span><div class="sub" data-i18n="CSV — for Excel use the Excel button">CSV — for Excel use the Excel button</div></div></div>
 
 <div id="toolModal" class="modal">
   <div class="modal-card toolcard">
     <div class="modal-head">
       <h3 id="toolTitle">Tools</h3>
-      <button class="btn sm ghost" onclick="closeTool()">✕</button>
+      <button class="btn sm ghost" onclick="closeTool()" aria-label="close"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button>
     </div>
     <div class="toolbody">
       <div class="toolnav" id="toolNav"></div>
@@ -1025,6 +1138,36 @@
           <div class="toolout" id="corrOut">—</div>
         </div>
 
+        <div class="toolpane" data-group="stats" data-name="Compare curves">
+          <h4 data-i18n="Dose-response: do the curves differ?">Dose-response: do the curves differ?</h4>
+          <p class="desc" data-i18n="Extra sum-of-squares F test: is one shared 4PL enough, or does each group need its own curve? This is the test behind 'is the IC50 different?'.">Extra sum-of-squares F test: is one shared 4PL enough, or does each group need its own curve? This is the test behind 'is the IC50 different?'.</p>
+          <div class="toolgrid">
+            <label><b data-i18n="Dose (column)">Dose (column)</b><select id="ccX"></select></label>
+            <label><b data-i18n="Response (column)">Response (column)</b><select id="ccY"></select></label>
+            <label><b data-i18n="Group (column)">Group (column)</b><select id="ccG"></select></label>
+          </div>
+          <div class="toolrow"><button class="btn sm" onclick="runCurveCompare()" data-i18n="Compare curves">Compare curves</button></div>
+          <div class="toolout" id="ccOut">—</div>
+        </div>
+
+        <div class="toolpane" data-group="stats" data-name="ROC / agreement">
+          <h4 data-i18n="ROC and method agreement">ROC and method agreement</h4>
+          <p class="desc" data-i18n="The numbers behind the 'ROC curve' and 'Bland-Altman' plot types: AUC with CI, the Youden cutoff, bias and limits of agreement.">The numbers behind the 'ROC curve' and 'Bland-Altman' plot types: AUC with CI, the Youden cutoff, bias and limits of agreement.</p>
+          <div class="toolgrid">
+            <label><b data-i18n="Score / marker (numeric)">Score / marker (numeric)</b><select id="rocScore"></select></label>
+            <label><b data-i18n="Outcome (2 levels)">Outcome (2 levels)</b><select id="rocLabel" onchange="fillRocPositive()"></select></label>
+            <label><b data-i18n="Which level is positive">Which level is positive</b><select id="rocPos"></select></label>
+          </div>
+          <div class="toolrow"><button class="btn sm" onclick="runRoc()" data-i18n="ROC + AUC">ROC + AUC</button></div>
+          <div class="toolout" id="rocOut">—</div>
+          <div class="toolgrid" style="margin-top:12px">
+            <label><b data-i18n="Method A (numeric)">Method A (numeric)</b><select id="baA"></select></label>
+            <label><b data-i18n="Method B (numeric)">Method B (numeric)</b><select id="baB"></select></label>
+          </div>
+          <div class="toolrow"><button class="btn sm" onclick="runAgreement()" data-i18n="Bland-Altman">Bland-Altman</button></div>
+          <div class="toolout" id="baOut">—</div>
+        </div>
+
         <!-- ============ DATA TOOLS ============ -->
         <div class="toolpane" data-group="data" data-name="Data health">
           <h4 data-i18n="Data health check">Data health check</h4>
@@ -1069,13 +1212,13 @@
   <div class="modal-card">
     <div class="modal-head">
       <h3 data-i18n="Type data">Type data</h3>
-      <button class="btn sm ghost" onclick="closeDataEntry()">✕</button>
+      <button class="btn sm ghost" onclick="closeDataEntry()" aria-label="close"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button>
     </div>
     <div class="modal-tools">
-      <button class="btn sm" onclick="gridAddRow()" data-i18n="＋ row">＋ row</button>
-      <button class="btn sm" onclick="gridAddCol()" data-i18n="＋ column">＋ column</button>
-      <button class="btn sm ghost" onclick="gridDelRow()" data-i18n="− row">− row</button>
-      <button class="btn sm ghost" onclick="gridDelCol()" data-i18n="− column">− column</button>
+      <button class="btn sm" onclick="gridAddRow()" data-i18n="row"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> row</button>
+      <button class="btn sm" onclick="gridAddCol()" data-i18n="column"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg> column</button>
+      <button class="btn sm ghost" onclick="gridDelRow()" data-i18n="row"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg> row</button>
+      <button class="btn sm ghost" onclick="gridDelCol()" data-i18n="column"><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg> column</button>
       <button class="btn sm" onclick="gridHeaderFromRow()" data-i18n="1st row → header">1st row → header</button>
       <label class="check" style="margin-left:auto"><input type="checkbox" id="gridComma"> <span data-i18n="comma = decimal">comma = decimal</span></label>
       <span class="muted" data-i18n="Paste (Ctrl+V) straight from Excel/Prism — tab becomes a column. Header = column name.">Paste (Ctrl+V) straight from Excel/Prism — tab becomes a column. Header = column name.</span>
@@ -1101,14 +1244,59 @@ let LANG = 'en';
 // Portuguese for every plain UI string; the English text is the key and the fallback.
 const PT = {
   "Publication figures · Python":"Figuras de publicação · Python",
-  "⌨ Type data (Prism style)":"⌨ Digitar dados (estilo Prism)",
+  "Type data (Prism style)":"Digitar dados (estilo Prism)",
   "Open sheet":"Abrir aba", "no file":"nenhum arquivo",
-  "Plot":"Gráfico","Style":"Estilo","Legend":"Legenda","Analysis":"Análise","Advanced":"Avançado",
+  "Plot":"Gráfico","Style":"Estilo","Legend":"Legenda","Analysis":"Análise","Data":"Dados",
+  "Filter rows":"Filtrar linhas",
+  "Put the markers on the plot":"Colocar os marcadores no gráfico",
+  "Remove markers":"Remover marcadores",
+  "Markers removed":"Marcadores removidos",
+  "Nested test (cells in replicates)":"Teste aninhado (células dentro de réplicas)",
+  "Replicate / experiment (categorical)":"Réplica / experimento (categórica)",
+  "Run nested test":"Rodar teste aninhado",
+  "For several cells per replicate. Tests the group effect against the BETWEEN-REPLICATE variation, so n = replicates, not cells. Pair it with the SuperPlot. It also prints the naive p (cells as independent) so you can see how much it was inflated.":"Para várias células por réplica. Testa o efeito de grupo contra a variação ENTRE RÉPLICAS, então n = réplicas, não células. Combine com o SuperPlot. Também mostra o p ingênuo (células como independentes) para você ver o quanto ele estava inflado.",
+  "Choose the value and the group column":"Escolha a coluna de valor e a de grupo",
+  "This plot type does not take significance brackets. Use box, violin, strip, box/violin + points or Bar/point ± error.":"Esse tipo de gráfico não aceita colchetes de significância. Use box, violino, strip, box/violino + pontos ou Barra/ponto ± erro.",
+  "Brackets are drawn between the X categories, so the plot cannot also be split by hue. Clear the hue channel.":"Os colchetes são desenhados entre as categorias do X, então o gráfico não pode também estar separado por hue. Limpe o canal hue.",
+  "The plot is showing other columns. Map X = ":"O gráfico está mostrando outras colunas. Mapeie X = ",
+  " and Y = ":" e Y = ",
+  " in the Plot tab first.":" na aba Plot primeiro.",
+  "No pair survives the correction — nothing to draw.":"Nenhum par sobrevive à correção — nada a desenhar.",
+  " marker(s) added — Mann-Whitney + BH, same as the report":" marcador(es) adicionado(s) — Mann-Whitney + BH, igual ao relatório",
+  "Dose-response: do the curves differ?":"Dose-resposta: as curvas diferem?",
+  "Extra sum-of-squares F test: is one shared 4PL enough, or does each group need its own curve? This is the test behind 'is the IC50 different?'.":"Teste F de soma extra de quadrados: uma 4PL compartilhada basta, ou cada grupo precisa da sua curva? É o teste por trás de 'o IC50 é diferente?'.",
+  "Dose (column)":"Dose (coluna)",
+  "Response (column)":"Resposta (coluna)",
+  "Group (column)":"Grupo (coluna)",
+  "Compare curves":"Comparar curvas",
+  "ROC and method agreement":"ROC e concordância entre métodos",
+  "The numbers behind the 'ROC curve' and 'Bland-Altman' plot types: AUC with CI, the Youden cutoff, bias and limits of agreement.":"Os números por trás dos tipos 'Curva ROC' e 'Bland-Altman': AUC com IC, o ponto de corte de Youden, viés e limites de concordância.",
+  "Score / marker (numeric)":"Escore / marcador (numérica)",
+  "Outcome (2 levels)":"Desfecho (2 níveis)",
+  "Which level is positive":"Qual nível é o positivo",
+  "ROC + AUC":"ROC + AUC",
+  "Method A (numeric)":"Método A (numérica)",
+  "Method B (numeric)":"Método B (numérica)",
+  "Bland-Altman":"Bland-Altman",
+  "Source data (.xlsx, one sheet per panel)":"Dados-fonte (.xlsx, uma aba por painel)",
+  "Draft the figure legend":"Rascunhar a legenda da figura",
+  "Legend copied":"Legenda copiada",
+  "Hide":"Ocultar",
+  "Re-export every plot tab":"Reexportar todas as abas de gráfico",
+  "Rejected somewhere and resubmitting? Pick the new journal preset above, then this: one folder dialog re-exports every open plot tab at the new column width, font and line weight.":"Rejeitado e ressubmetendo? Escolha o preset do novo journal acima e clique aqui: um diálogo de pasta reexporta todas as abas abertas na nova largura de coluna, fonte e espessura de linha.",
+  "No plotted tab to export.":"Nenhuma aba plotada para exportar.",
+  " figure(s) exported to ":" figura(s) exportada(s) para ",
+  "Edit / add…":"Editar / adicionar…",
+  "Unknown preset: ":"Preset desconhecido: ",
+  "One preset per line:  name = width_mm, font, font_pt, line_pt":"Um preset por linha:  nome = largura_mm, fonte, fonte_pt, linha_pt",
+  " preset(s) saved":" preset(s) salvo(s)",
+  "Computing…":"Calculando…",
+  "Keep only the rows you want to plot. Conditions stack with AND; the box below takes a raw pandas query for anything more complex.":"Mantenha só as linhas que você quer plotar. As condições se acumulam com E; a caixa abaixo aceita uma query pandas crua para casos mais complexos.",
   "Filter (pandas query)":"Filtro (consulta pandas)",
   "dose > 5 and group == 'high'":"dose > 5 and grupo == 'alta'",
   "Apply":"Aplicar","Plot type":"Tipo de gráfico","Labels":"Rótulos",
   "Title":"Título","X label":"Rótulo X","Y label":"Rótulo Y",
-  "▶  Plot":"▶  Plotar","＋ Overlay":"＋ Sobrepor","Clear":"Limpar","layers":"camadas",
+  "Plot":"Plotar","Overlay":"Sobrepor","Clear":"Limpar","layers":"camadas",
   "Theme":"Tema","Context (scale)":"Contexto (escala)","Font scale":"Escala da fonte","Grid":"Grade",
   "Color override":"Sobrescrever cor",
   "Overrides the theme background. Clear to go back to the theme.":"Sobrepõe o fundo do tema. Limpe para voltar ao tema.",
@@ -1144,30 +1332,30 @@ const PT = {
   "Rank pairs":"Ranquear pares","Computing…":"Calculando…",
   "Threshold lines & regions":"Linhas de limiar e regiões","Line type":"Tipo de linha",
   "Horizontal (give Y)":"Horizontal (informe Y)","Vertical (give X)":"Vertical (informe X)","Slanted (X, Y, angle)":"Inclinada (X, Y, ângulo)",
-  "angle°":"ângulo°","＋ Add line":"＋ Adicionar linha","Click the plot to pick X,Y":"Clique no gráfico para pegar X,Y",
+  "angle°":"ângulo°","Add line":"Adicionar linha","Click the plot to pick X,Y":"Clique no gráfico para pegar X,Y",
   "no lines":"nenhuma linha","remove":"remover","angle":"ângulo",
   "Edit on the plot (drag regions/lines)":"Editar no gráfico (arrastar regiões/linhas)",
   "Editing — drag on the plot (click to exit)":"Editando — arraste no gráfico (clique p/ sair)",
-  "⬇ Build regions from the lines (intersection cells)":"⬇ Gerar regiões das retas (células do cruzamento)",
+  "Build regions from the lines (intersection cells)":"Gerar regiões das retas (células do cruzamento)",
   "Analyze regions":"Analisar regiões","Regions analyzed":"Regiões analisadas",
   "Named regions (gating)":"Regiões nomeadas (gating)",
-  "👁 Show regions on the plot (turn off to preview without them)":"👁 Mostrar regiões no gráfico (desligue para ver sem elas)",
-  "🧲 Magnet: vertex snaps to vertices/edges of other regions":"🧲 Ímã: vértice gruda em vértices/arestas de outras regiões",
-  "name (e.g. LR)":"nome (ex.: LR)","＋ Region":"＋ Região",
+  "Show regions on the plot (turn off to preview without them)":"Mostrar regiões no gráfico (desligue para ver sem elas)",
+  "Magnet: vertex snaps to vertices/edges of other regions":"Ímã: vértice gruda em vértices/arestas de outras regiões",
+  "name (e.g. LR)":"nome (ex.: LR)","Region":"Região",
   "In edit mode: drag the vertices or the interior; double-click the body adds a vertex, on a vertex removes it.":"No modo edição: arraste os vértices ou o interior; duplo-clique no corpo adiciona vértice, no vértice remove.",
   "Lock regions (keep position when swapping X/Y)":"Travar regiões (manter posição ao trocar X/Y)",
-  "Refresh count":"Atualizar contagem","⬡ Merge geometrically (same-named regions)":"⬡ Mesclar geometricamente (regiões de mesmo nome)",
+  "Refresh count":"Atualizar contagem","Merge geometrically (same-named regions)":"Mesclar geometricamente (regiões de mesmo nome)",
   "column name":"nome da coluna","Create column":"Criar coluna",
-  "💾 Save regions":"💾 Salvar regiões","📂 Load regions":"📂 Carregar regiões",
+  "Save regions":"Salvar regiões","Load regions":"Carregar regiões",
   "Load by plot proportion (fraction) — to reuse at different scales":"Carregar pela proporção do gráfico (fração) — para reusar em escalas diferentes",
-  "⬇ Export checked":"⬇ Exportar marcadas","Export 1 file per region (pick a folder)":"Exportar 1 arquivo por região (escolhe uma pasta)",
+  "Export checked":"Exportar marcadas","Export 1 file per region (pick a folder)":"Exportar 1 arquivo por região (escolhe uma pasta)",
   "Export everything (+ Region column)":"Exportar tudo (+ coluna Região)",
   "no regions — add one and drag it on the plot":"nenhuma região — adicione e arraste no gráfico",
   "name the regions to export by gating":"nomeie as regiões para poder exportar por gating",
   "Numeric → categorical":"Numérica → categórica",
   "Converts a numeric column to text so it can be used as a category/hue.":"Converte uma coluna numérica em texto, para usar como categoria/hue.",
   "Multi-figure panel (A/B/C)":"Painel multi-figura (A/B/C)",
-  "＋ Add current plot to the panel":"＋ Adicionar gráfico atual ao painel","empty panel":"painel vazio",
+  "Add current plot to the panel":"Adicionar gráfico atual ao painel","empty panel":"painel vazio",
   "Panel columns":"Colunas do painel","Build panel":"Montar painel","Export panel":"Exportar painel",
   "Reset plot sizes":"Redefinir tamanhos dos gráficos",
   "z-score (clustermap)":"z-score (clustermap)","Hue (pairplot, optional)":"Hue (pairplot, opcional)",
@@ -1181,15 +1369,15 @@ const PT = {
   "Descriptive statistics":"Estatística descritiva","Table saved":"Tabela salva",
   "Export DPI":"DPI da exportação","(min. 300)":"(mín. 300)",
   "Transparent background (keeps ticks, labels and title)":"Fundo transparente (mantém ticks, rótulos e título)",
-  "⬇  Export figure (TIFF/PNG/PDF/SVG)":"⬇  Exportar figura (TIFF/PNG/PDF/SVG)",
-  "⬇ Python code":"⬇ Código .py","Filtered CSV":"CSV filtrado",
-  "💾 Save project":"💾 Salvar projeto","📂 Open project":"📂 Abrir projeto",
+  "Export figure (TIFF/PNG/PDF/SVG)":"Exportar figura (TIFF/PNG/PDF/SVG)",
+  "Python code":"Código .py","Filtered CSV":"CSV filtrado",
+  "Save project":"Salvar projeto","Open project":"Abrir projeto",
   "Save preset":"Salvar preset","Apply preset":"Aplicar preset",
   "Load a CSV to start.":"Carregue um CSV para começar.",
   "Configure the plot and click Plot.":"Configure o gráfico e clique em Plotar.",
   "annotation text":"texto da anotação","Text":"Texto","Arrow":"Seta","Undo":"Desfazer",
-  "Your figure appears here":"Sua figura aparece aqui","Selected point":"Ponto selecionado","⧉ Copy":"⧉ Copiar",
-  "Type data":"Digitar dados","＋ row":"＋ linha","＋ column":"＋ coluna","− row":"− linha","− column":"− coluna",
+  "Your figure appears here":"Sua figura aparece aqui","Selected point":"Ponto selecionado","Copy":"Copiar",
+  "Type data":"Digitar dados","row":"linha","column":"coluna","row":"linha","column":"coluna",
   "1st row → header":"1ª linha → cabeçalho","comma = decimal":"vírgula = decimal",
   "Paste (Ctrl+V) straight from Excel/Prism — tab becomes a column. Header = column name.":"Cole (Ctrl+V) direto do Excel/Prism — tab vira coluna. Cabeçalho = nome da coluna.",
   "Cancel":"Cancelar","Use this data":"Usar estes dados",
@@ -1246,7 +1434,7 @@ const PT = {
   "is equal to":"é igual a","is not equal to":"é diferente de","greater than":"maior que",
   "greater or equal":"maior ou igual","less than":"menor que","less or equal":"menor ou igual",
   "contains (text)":"contém (texto)","value":"valor",
-  "＋ Add condition":"＋ Adicionar condição","Clear filter":"Limpar filtro",
+  "Add condition":"Adicionar condição","Clear filter":"Limpar filtro",
   "Filter (pandas query — advanced)":"Filtro (query pandas — avançado)",
   "Choose a column":"Escolha uma coluna",
   // --- style ---
@@ -1272,7 +1460,7 @@ const PT = {
   // --- template ---
   "Plot template":"Template de gráfico",
   "Save the current plot recipe (type + columns + options + labels) and re-apply it to another dataset with the same column names.":"Salve a receita do gráfico atual (tipo + colunas + opções + rótulos) e reaplique em outro banco de dados com os mesmos nomes de coluna.",
-  "💾 Save template":"💾 Salvar template","📂 Apply template":"📂 Aplicar template",
+  "Save template":"Salvar template","Apply template":"Aplicar template",
   "Template saved":"Template salvo","Template applied":"Template aplicado",
   // --- wide helper + banner ---
   "Plot wide columns (no melting)":"Plotar colunas wide (sem melting)",
@@ -1284,21 +1472,24 @@ const PT = {
   "This table looks wide (no group column). Tidy some columns to plot or compare them.":"Esta tabela parece estar no formato wide (sem coluna de grupo). Arrume algumas colunas para plotar ou compará-las.",
   "Tidy columns":"Arrumar colunas",
   // --- analysis: methods + contingency ---
-  "📋 Methods sentence (copy-ready)":"📋 Frase de métodos (pronta para colar)",
+  "Methods sentence (copy-ready)":"Frase de métodos (pronta para colar)",
   "Composition test (chi² / Fisher)":"Teste de composição (qui² / Fisher)",
   "Association between two categorical columns (e.g. treatment × outcome). Chi-square, Cramér's V, and Fisher exact for 2×2. The count table feeds the plot table (exportable).":"Associação entre duas colunas categóricas (ex.: treatment × outcome). Qui-quadrado, V de Cramér e Fisher exato para 2×2. A tabela de contagem alimenta a tabela do gráfico (exportável).",
   "Rows (categorical)":"Linhas (categórica)","Columns (categorical)":"Colunas (categórica)",
   "Test association":"Testar associação","Contingency table":"Tabela de contingência",
   // --- footer menus ---
-  "Export ▾ (options, code, data)":"Exportar ▾ (opções, código, dados)",
-  "Session ▾ (project, preset)":"Sessão ▾ (projeto, preset)",
+  "Export (options, code, data)":"Exportar (opções, código, dados)",
+  "Session (project, preset)":"Sessão (projeto, preset)",
   // --- reshape drag handles ---
   "Drag: flatten / stretch the width (real reshape, not a stretched image)":"Arraste: achatar / alongar a largura (reshape real, não uma imagem esticada)",
   "Drag: flatten / stretch the height":"Arraste: achatar / alongar a altura",
   "Drag: reshape both · double-click: reset to auto":"Arraste: reformatar os dois · duplo-clique: voltar ao automático",
   "Shape reset to auto":"Formato voltou ao automático",
   // --- tool modal + facet + select all ---
-  "🧪 Bench math":"🧪 Cálculos de bancada","📊 Statistics":"📊 Estatística","🩺 Data tools":"🩺 Ferramentas de dados",
+  "Bench math":"Cálculos de bancada","Statistics":"Estatística","Data checks":"Conferência dos dados",
+  "Bench math (qPCR, standard curve, normalise)…":"Cálculos de bancada (qPCR, curva padrão, normalizar)…",
+  "Data checks (health, overview, plate import)…":"Conferência dos dados (saúde, visão geral, importar placa)…",
+  "More tests (ANOVA, repeated measures, power, outliers)…":"Mais testes (ANOVA, medidas repetidas, poder, outliers)…",
   "Tools":"Ferramentas","All":"Todas","None":"Nenhuma",
   "Split by (facet) — one panel per level":"Dividir por (facet) — um painel por nível",
   "same scale":"mesma escala",
@@ -1313,7 +1504,7 @@ const PT = {
   "Data overview":"Visão geral dos dados","Plate import":"Importar placa",
   // bench panes
   "qPCR relative quantification (2^-ΔΔCt)":"Quantificação relativa de qPCR (2^-ΔΔCt)",
-  "Averages technical replicates per sample+gene, computes ΔCt (target − housekeeping), ΔΔCt against the reference group, and fold change. The tidy result becomes your working data, ready to plot.":"Faz a média das réplicas técnicas por amostra+gene, calcula ΔCt (alvo − housekeeping), ΔΔCt contra o grupo de referência, e o fold change. O resultado organizado vira seus dados de trabalho, pronto para plotar.",
+  "Averages technical replicates per sample+gene, computes ΔCt (target housekeeping), ΔΔCt against the reference group, and fold change. The tidy result becomes your working data, ready to plot.":"Faz a média das réplicas técnicas por amostra+gene, calcula ΔCt (alvo housekeeping), ΔΔCt contra o grupo de referência, e o fold change. O resultado organizado vira seus dados de trabalho, pronto para plotar.",
   "Compute ΔΔCt":"Calcular ΔΔCt","ΔΔCt computed":"ΔΔCt calculado",
   "Done: fold_change / ddCt columns created. This tidy table is now your data — plot fold_change by group.":"Pronto: colunas fold_change / ddCt criadas. Esta tabela agora são seus dados — plote fold_change por grupo.",
   "Standard curve + interpolate unknowns":"Curva-padrão + interpolar desconhecidos",
@@ -1404,21 +1595,21 @@ const PT = {
   // --- gating: folded sub-menus ---
   "Editing options":"Opções de edição","Save / load regions":"Salvar / carregar regiões",
   "Export gating (data by region)":"Exportar gating (dados por região)",
-  "⬡ Merge same-named":"⬡ Mesclar de mesmo nome",
+  "Merge same-named":"Mesclar de mesmo nome",
   // --- line / edge styles ---
   "solid":"contínua","dashed":"tracejada","dotted":"pontilhada","dash-dot":"traço-ponto","width":"espessura","color":"cor",
-  "Data preview":"Prévia dos dados","✨ Recommended plots":"✨ Gráficos recomendados",
+  "Data preview":"Prévia dos dados","Recommended plots":"Gráficos recomendados",
   "Could not build this plot":"Não foi possível montar este gráfico",
   // --- visual editor ---
   "Double-click to edit · right-click for options":"Duplo-clique para editar · botão-direito para opções",
   "(auto)":"(automático)","Edit text":"Editar texto","Reset to default":"Voltar ao padrão",
   "Font & size (Style tab)":"Fonte & tamanho (aba Estilo)",
   "Drag to move · double-click an entry to rename":"Arraste para mover · duplo-clique num item para renomear",
-  "Drop your CSV here":"Solte seu CSV aqui","CSV — for Excel use the ⬆ Excel button":"CSV — para Excel use o botão ⬆ Excel",
-  "For Excel, use the ⬆ Excel button":"Para Excel, use o botão ⬆ Excel","Drop a CSV file":"Solte um arquivo CSV",
+  "Drop your CSV here":"Solte seu CSV aqui","CSV — for Excel use the Excel button":"CSV — para Excel use o botão Excel",
+  "For Excel, use the Excel button":"Para Excel, use o botão Excel","Drop a CSV file":"Solte um arquivo CSV",
   "Double-click to rename":"Duplo-clique para renomear","Close":"Fechar",
   "New plot tab (duplicates the current)":"Nova aba de plot (duplica a atual)",
-  "⧉ Build panel from all open tabs":"⧉ Montar painel com todas as abas abertas",
+  "Build panel from all open tabs":"Montar painel com todas as abas abertas",
   "No tab has a plot yet":"Nenhuma aba tem um plot ainda"," tabs added to the panel":" abas adicionadas ao painel",
   // --- journal preset / fonts / accessibility / mosaic ---
   "Journal preset":"Preset de revista",
@@ -1439,6 +1630,9 @@ const PT = {
 
 // Rich hints (contain markup), keyed by id.
 const HTML_HINTS = {
+  "empty.next":{
+    en:'Load a CSV (or drop one anywhere), map your columns, then press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> to plot.',
+    pt:'Carregue um CSV (ou arraste um para a janela), mapeie as colunas e aperte <kbd>Ctrl</kbd>+<kbd>Enter</kbd> para plotar.'},
   "style.groupColorsHint":{
     en:'Pick the <b>exact</b> color of each hue (or X) category. Overrides the palette and does not reshuffle when you swap axes or filter (each category keeps its color).',
     pt:'Escolha a cor <b>exata</b> de cada categoria do hue (ou X). Sobrepõe a paleta e não se embaralha ao trocar os eixos ou filtrar (cada categoria mantém a cor).'},
@@ -1726,14 +1920,17 @@ function setupAccordion(){
 }
 
 function tab(t){
-  document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('active',e.dataset.t===t));
+  document.querySelectorAll('.tab').forEach(e=>{
+    const on = e.dataset.t===t; e.classList.toggle('active',on); e.setAttribute('aria-selected',on); });
   document.querySelectorAll('.panel').forEach(e=>e.classList.remove('active'));
   $('p-'+t).classList.add('active');
 }
 function badge(el){ el.parentElement.querySelector('.val').textContent =
   (el.step<1? (+el.value).toFixed(2): el.value); }
+let _toastTimer=null;
 function toast(msg,kind=''){ const t=$('toast'); t.textContent=msg; t.className='toast show '+kind;
-  setTimeout(()=>t.className='toast',2600); }
+  // one timer only: back-to-back toasts used to inherit the previous timer and vanish early
+  clearTimeout(_toastTimer); _toastTimer=setTimeout(()=>t.className='toast',2600); }
 
 let COLS={numeric:[],category:[],kinds:{}};
 async function openCsv(){
@@ -1784,7 +1981,7 @@ async function loadReco(){
   $('recoList').innerHTML = r.recs.map(rec=>{
     const chips=rec.plots.map(k=>`<button class="btn sm" onclick="applyReco('${k}','${rec.x}','${rec.y}','${rec.rep||''}')">${lbl(k)}</button>`).join('');
     return `<div class="reco"><b>${rec.title.replace(/</g,'&lt;')}</b><div class="chips">${chips}</div>`+
-           (rec.note?`<div class="note">💡 ${rec.note.replace(/</g,'&lt;')}</div>`:'')+`</div>`;
+           (rec.note?`<div class="note"><svg class="ic" aria-hidden="true"><use href="#i-sparkles"/></svg>${rec.note.replace(/</g,'&lt;')}</div>`:'')+`</div>`;
   }).join('');
 }
 function applyReco(key,x,y,rep){
@@ -1818,7 +2015,7 @@ function maybeWideBanner(){
   b.style.display = (COLS.category.length===0 && COLS.numeric.length>=2) ? 'flex' : 'none';
 }
 function gotoWideHelper(){
-  tab('x');
+  tab('d');
   const tile=$('widePlotTile'); if(!tile) return;
   tile.parentElement.querySelectorAll('.sectile').forEach(s=>{ s.classList.add('collapsed'); const v=s.querySelector('h3 .chev'); if(v)v.textContent='▸'; });
   tile.classList.remove('collapsed'); const c=tile.querySelector('h3 .chev'); if(c)c.textContent='▾';
@@ -1963,6 +2160,12 @@ function readLayer(){
     params[p.name] = p.kind==='bool'? w.checked : (p.kind==='int'? parseInt(w.value):
                      (p.kind==='float'? parseFloat(w.value): w.value));
   });
+  // Markers pushed from Analysis ride along in the layer params, so they survive into
+  // facets, panel frames, saved projects and templates. Bound to the exact columns they
+  // were computed on: change an axis and they drop out instead of lying about the data.
+  if(SIGPAIRS && mapping.x===SIGPAIRS.group && mapping.y===SIGPAIRS.value){
+    params.__sig_pairs__ = SIGPAIRS.pairs;
+  }
   return {spec_key:SPEC.key, mapping, params};
 }
 
@@ -2020,24 +2223,14 @@ function gather(){
   };
 }
 function dRender(){ if(rAF) clearTimeout(rAF); rAF=setTimeout(render,140); }
-// [width mm, font family, font pt, line weight pt] per journal column spec
-function journalPreset(k){
-  if(k==='clear'){ $('figwmm').value=''; $('fontFamily').value=''; $('basePt').value=0; $('linePt').value=0;
-    dRender(); toast(t('Journal preset cleared'),'good'); return; }
-  const P={nature1:[89,'Arial',7,0.5], nature2:[183,'Arial',7,0.5], cell1:[85,'Arial',7,0.5],
-           science1:[55,'Arial',7,0.5], science2:[120,'Arial',7,0.5]}[k];
-  if(!P) return;
-  $('figwmm').value=P[0]; $('fontFamily').value=P[1]; $('basePt').value=P[2]; $('linePt').value=P[3];
-  dRender(); toast(t('Preset applied — now set the height (Plot size or drag the handles)'),'good');
-}
 
 async function render(){
   if(!STACK.length || busy) return;
-  busy=true;
+  busy=true; $('card').classList.add('busy');    // a render can take seconds: say so on the canvas
   let r;
   try{ r = await window.pywebview.api.render(gather()); }
   catch(err){ console.error('render failed:', err); toast(t('Render error'),'bad'); }
-  finally{ busy=false; }                         // make sure busy never sticks at true
+  finally{ busy=false; $('card').classList.remove('busy'); }   // never sticks at true
   if(!r){ pendingGateFrac=null; maybeLive(); return; }
   if(r.error){ pendingGateFrac=null; showError(r); maybeLive(); return; }
   hideError();
@@ -2156,8 +2349,8 @@ function editText(key){
 function editMenu(key,e){
   closeEditMenu();
   const m=document.createElement('div'); m.className='editmenu'; m.id='editMenu';
-  m.innerHTML=`<button onclick="editText('${key}')">✎ ${t('Edit text')}</button>`+
-              `<button onclick="$('${key}').value='';render();closeEditMenu()">↺ ${t('Reset to default')}</button>`+
+  m.innerHTML=`<button onclick="editText('${key}')"><svg class="ic" aria-hidden="true"><use href="#i-pencil"/></svg>${t('Edit text')}</button>`+
+              `<button onclick="$('${key}').value='';render();closeEditMenu()"><svg class="ic" aria-hidden="true"><use href="#i-reset"/></svg>${t('Reset to default')}</button>`+
               `<button onclick="goStyleFonts()">Aa ${t('Font & size (Style tab)')}</button>`;
   m.style.left=Math.min(e.clientX,innerWidth-170)+'px'; m.style.top=e.clientY+'px';
   document.body.appendChild(m);
@@ -2175,11 +2368,11 @@ function initTabs(){ PLOTTABS=[{name:'Plot 1', ui:captureUI(), ds:ACTIVE_DS}]; a
 function renderTabs(){
   const bar=$('plotTabs'); if(!bar) return;
   bar.innerHTML = PLOTTABS.map((tb,i)=>
-    `<div class="ptab${i===activeTab?' on':''}" onclick="switchTab(${i})" ondblclick="renameTab(${i},event)" title="${t('Double-click to rename')}">`+
+    `<div class="ptab${i===activeTab?' on':''}" role="tab" tabindex="0" aria-selected="${i===activeTab}" onclick="switchTab(${i})" ondblclick="renameTab(${i},event)" title="${t('Double-click to rename')}">`+
       `<span>${(tb.name||('Plot '+(i+1))).replace(/</g,'&lt;')}</span>`+
-      (PLOTTABS.length>1?`<button class="x" title="${t('Close')}" onclick="event.stopPropagation();closeTab(${i})">✕</button>`:'')+
+      (PLOTTABS.length>1?`<button class="x" title="${t('Close')}" onclick="event.stopPropagation();closeTab(${i})" aria-label="close"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button>`:'')+
     `</div>`).join('')+
-    `<button class="ptab add" onclick="newTab()" title="${t('New plot tab (duplicates the current)')}">＋</button>`;
+    `<button class="ptab add" onclick="newTab()" title="${t('New plot tab (duplicates the current)')}" aria-label="new tab"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>`;
 }
 function saveActiveTab(){ if(PLOTTABS[activeTab]){ PLOTTABS[activeTab].ui=captureUI(); PLOTTABS[activeTab].ds=ACTIVE_DS; } }
 async function activateTabState(i){
@@ -2226,7 +2419,7 @@ async function panelFromTabs(){
   }
   await activateTabState(orig); activeTab=orig; renderTabs();
   if(!added){ toast(t('No tab has a plot yet'),'bad'); return; }
-  tab('x'); await buildPanel();
+  tab('g'); await buildPanel();
   toast(added+t(' tabs added to the panel'),'good');
 }
 // a small floating text editor at (x,y); commit(value) runs on Enter/blur, Esc cancels
@@ -2276,7 +2469,7 @@ function setupDrop(){
       };
       rd.readAsText(f);
     } else if(/\.(xlsx|xls)$/.test(nm)){
-      toast(t('For Excel, use the ⬆ Excel button'),'bad');
+      toast(t('For Excel, use the Excel button'),'bad');
     } else {
       toast(t('Drop a CSV file'),'bad');
     }
@@ -2358,8 +2551,8 @@ function showPointPopup(row, x, y){
   closePointPop();
   const p=document.createElement('div'); p.id='pointPop'; p.className='pointpop';
   p.innerHTML=`<div class="pophead"><b data-i18n="Selected point">${t('Selected point')}</b>`+
-    `<span><button class="btn sm ghost" onclick="copyPop()">⧉</button>`+
-    `<button class="btn sm ghost" onclick="closePointPop()">✕</button></span></div>`+
+    `<span><button class="btn sm ghost" onclick="copyPop()" aria-label="copy"><svg class="ic" aria-hidden="true"><use href="#i-copy"/></svg></button>`+
+    `<button class="btn sm ghost" onclick="closePointPop()" aria-label="close"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button></span></div>`+
     `<table id="popTable">`+Object.entries(row).map(([k,v])=>`<tr><td>${k}</td><td>${(''+v).replace(/</g,'&lt;')}</td></tr>`).join('')+`</table>`;
   p.style.left=Math.min(x+8, innerWidth-260)+'px';
   p.style.top=Math.min(y+8, innerHeight-320)+'px';
@@ -2610,10 +2803,16 @@ function buildNumCols(){
     : '<span style="color:var(--faint)">'+t('no numeric columns')+'</span>';
 }
 function fillTestSelects(){
-  $('testVal').innerHTML=COLS.numeric.map(c=>`<option>${c}</option>`).join('');
-  $('testGrp').innerHTML=COLS.category.map(c=>`<option>${c}</option>`).join('');
-  $('pairGrp').innerHTML=COLS.category.map(c=>`<option>${c}</option>`).join('');
-  $('shanGrp').innerHTML=COLS.category.map(c=>`<option>${c}</option>`).join('');
+  const num=COLS.numeric.map(c=>`<option>${c}</option>`).join('');
+  const cat=COLS.category.map(c=>`<option>${c}</option>`).join('');
+  $('testVal').innerHTML=num;
+  $('testGrp').innerHTML=cat;
+  $('pairGrp').innerHTML=cat;
+  $('shanGrp').innerHTML=cat;
+  // nested test: the replicate column is often numeric (1/2/3), so it takes anything
+  $('nestVal').innerHTML=num;
+  $('nestGrp').innerHTML=cat;
+  $('nestRep').innerHTML=Object.keys(COLS.kinds).map(c=>`<option>${c}</option>`).join('');
 }
 async function runShannon(){
   const grp=$('shanGrp').value;
@@ -2959,7 +3158,7 @@ function renderGateList(){
        <div class="row2" style="align-items:center;gap:4px">
          <span style="color:${g.color};font-size:14px">●</span>
          <input type="text" value="${(g.name||'').replace(/"/g,'&quot;')}" oninput="renameGate(${i},this.value)" style="flex:1;padding:3px 6px">
-         <button class="btn sm ghost" style="width:auto;padding:3px 8px" onclick="removeGate(${i})">✕</button>
+         <button class="btn sm ghost" style="width:auto;padding:3px 8px" onclick="removeGate(${i})" aria-label="remove"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button>
        </div>
        ${styleRow('gate',i,g)}
      </div>`).join('') : '<span style="color:var(--faint);font-size:11px">'+t('no regions — add one and drag it on the plot')+'</span>';
@@ -3084,7 +3283,7 @@ function buildAdvanced(){
 function advSelectedCols(){ return [...$('advCols').querySelectorAll('input:checked')].map(i=>i.value); }
 
 /* ===================== tool modal (bench / stats / data) ===================== */
-const TOOL_TITLES={bench:'🧪 Bench math', stats:'📊 Statistics', data:'🩺 Data tools'};
+const TOOL_TITLES={bench:'Bench math', stats:'Statistics', data:'Data checks'};
 function openTool(group){
   if(!Object.keys(COLS.kinds).length){ toast(t('Load a CSV first'),'bad'); return; }
   fillToolSelects();
@@ -3140,9 +3339,12 @@ function fillToolSelects(){
   set('rmVal',num); set('rmWithin',cat||all); set('rmSubj',all);
   set('olVal',num); set('olGrp',none+cat);
   set('ovGroup',none+cat);
+  set('ccX',num); set('ccY',num); set('ccG',cat||all);
+  set('rocScore',num); set('rocLabel',cat||all);
+  set('baA',num); set('baB',num);
   const cks=arr=>arr.map(c=>`<label class="check"><input type="checkbox" value="${c}"> ${c}</label>`).join('');
   set('corrCols',cks(numCols)); set('ovCols',cks(numCols));
-  fillGeneAndRef(); nzUI();
+  fillGeneAndRef(); nzUI(); fillRocPositive();
 }
 // the housekeeping gene and the reference group are VALUES of a column, not columns
 async function fillGeneAndRef(){
@@ -3254,7 +3456,7 @@ function renderDatasets(list, active){
     const safe=n.replace(/"/g,'&quot;');
     return `<div class="row2" style="align-items:center;margin:2px 0;min-width:0">
       <button class="btn sm ${on?'':'ghost'}" title="${safe}" style="flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="activateDataset('${safe}')">${on?'● ':''}${n}</button>
-      <button class="btn sm ghost" style="flex:0 0 auto" onclick="removeDataset('${safe}')">✕</button></div>`;
+      <button class="btn sm ghost" style="flex:0 0 auto" onclick="removeDataset('${safe}')" aria-label="remove"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button></div>`;
   }).join('');
 }
 async function activateDataset(name){
@@ -3537,6 +3739,221 @@ async function exportTable(){
   const r=await window.pywebview.api.export_table();
   if(r) toast(t('Table saved'),'good');
 }
+
+
+/* ============ significance markers: Analysis -> the plot ============ */
+/* The brackets the plot draws on its own use Welch + Holm; Compare groups uses
+   Mann-Whitney + BH. Pushing the pairs from Analysis makes the figure and the
+   written report come from the same test instead of two different ones. */
+let SIGPAIRS = null;
+
+function _sigTargetLayer(){
+  /* the base layer must be a plot that can carry brackets, with matching columns */
+  if(!STACK.length) return {err:t('Plot a figure first.')};
+  const lay = STACK[0], spec = CATALOG.find(s=>s.key===lay.spec_key);
+  if(!spec || !spec.params.some(p=>p.name==='sig'))
+    return {err:t('This plot type does not take significance brackets. Use box, violin, strip, box/violin + points or Bar/point ± error.')};
+  if(lay.mapping.hue)
+    return {err:t('Brackets are drawn between the X categories, so the plot cannot also be split by hue. Clear the hue channel.')};
+  return {lay, spec};
+}
+
+async function pushSigMarkers(){
+  const val=$('testVal').value, grp=$('testGrp').value;
+  if(!val || !grp){ toast(t('Choose the value and the group column'),'bad'); return; }
+  const tg=_sigTargetLayer();
+  if(tg.err){ toast(tg.err,'bad'); return; }
+  if(tg.lay.mapping.x!==grp || tg.lay.mapping.y!==val){
+    toast(t('The plot is showing other columns. Map X = ')+grp+t(' and Y = ')+val+t(' in the Plot tab first.'),'bad');
+    return;
+  }
+  const r=await window.pywebview.api.compare_pairs(val,grp);
+  if(!r){ toast(t('Load a CSV'),'bad'); return; }
+  if(r.error){ toast(r.error,'bad'); return; }
+  SIGPAIRS={value:val, group:grp, pairs:r.pairs};
+  const on=r.pairs.filter(p=>p.sig);
+  if(!on.length){
+    SIGPAIRS=null;
+    toast(t('No pair survives the correction — nothing to draw.'),'bad');
+    return;
+  }
+  const cb=$('plotConfig').querySelector('[data-pp="sig"]');   // tick the plot's own switch
+  if(cb) cb.checked=true;
+  STACK[0]=readLayer(); render();
+  toast(on.length+t(' marker(s) added — Mann-Whitney + BH, same as the report'),'good');
+}
+
+function clearSigMarkers(){
+  SIGPAIRS=null;
+  const cb=$('plotConfig').querySelector('[data-pp="sig"]');
+  if(cb) cb.checked=false;
+  if(STACK.length){ STACK[0]=readLayer(); render(); }
+  toast(t('Markers removed'));
+}
+
+/* ============ nested test (cells inside replicates) ============ */
+async function runNested(){
+  const out=await window.pywebview.api.nested_test($('nestVal').value,$('nestGrp').value,$('nestRep').value);
+  $('nestOut').textContent=out||'—';
+}
+
+/* ============ curve comparison / ROC / agreement ============ */
+async function runCurveCompare(){
+  $('ccOut').textContent=t('Computing…');
+  $('ccOut').textContent=await window.pywebview.api.curve_compare($('ccX').value,$('ccY').value,$('ccG').value)||'—';
+}
+async function fillRocPositive(){
+  const sel=$('rocPos'), lab=$('rocLabel');
+  if(!sel||!lab||!lab.value) return;
+  const levels=await window.pywebview.api.categories(lab.value);
+  sel.innerHTML=(levels||[]).map(v=>`<option>${v}</option>`).join('');
+  if(sel.options.length) sel.selectedIndex=sel.options.length-1;   // backend default
+}
+async function runRoc(){
+  $('rocOut').textContent=t('Computing…');
+  $('rocOut').textContent=await window.pywebview.api.roc_stats(
+    $('rocScore').value,$('rocLabel').value,$('rocPos').value)||'—';
+}
+async function runAgreement(){
+  $('baOut').textContent=await window.pywebview.api.agreement($('baA').value,$('baB').value)||'—';
+}
+
+/* ============ source data + figure legend ============ */
+async function exportSourceData(){
+  const items = (PANEL && PANEL.length) ? PANEL : null;
+  const r=await window.pywebview.api.export_source_data(gather(), items);
+  if(!r) return;
+  if(r.error){ toast(r.error,'bad'); return; }
+  toast(t('Saved: ')+r,'good');
+}
+async function showFigureLegend(){
+  const txt=await window.pywebview.api.figure_legend(gather());
+  $('legendText').value=txt||'';
+  $('legendDraft').style.display='block';
+}
+function copyLegend(){ copyText($('legendText').value, t('Legend copied')); }
+
+/* ============ journal presets (editable) + batch re-export ============ */
+/* [width mm, font family, font pt, line weight pt] per journal column spec.
+   Autophagy uses the standard Taylor & Francis two-column geometry - check it
+   against the current author instructions and correct it with "Edit / add…". */
+const PRESETS_BUILTIN={nature1:[89,'Arial',7,0.5], nature2:[183,'Arial',7,0.5],
+  cell1:[85,'Arial',7,0.5], science1:[55,'Arial',7,0.5], science2:[120,'Arial',7,0.5],
+  autophagy1:[84,'Arial',7,0.5], autophagy2:[174,'Arial',7,0.5]};
+function allPresets(){
+  let extra={};
+  try{ extra=JSON.parse(localStorage.getItem('nickplots.presets')||'{}'); }catch(e){}
+  return Object.assign({}, PRESETS_BUILTIN, extra);
+}
+function journalPreset(k){
+  if(k==='clear'){ $('figwmm').value=''; $('fontFamily').value=''; $('basePt').value=0; $('linePt').value=0;
+    dRender(); toast(t('Journal preset cleared'),'good'); return; }
+  const P=allPresets()[k];
+  if(!P){ toast(t('Unknown preset: ')+k,'bad'); return; }
+  $('figwmm').value=P[0]; $('fontFamily').value=P[1]; $('basePt').value=P[2]; $('linePt').value=P[3];
+  dRender(); toast(t('Preset applied — now set the height (Plot size or drag the handles)'),'good');
+}
+function editPresets(){
+  const cur=allPresets();
+  const txt=prompt(t('One preset per line:  name = width_mm, font, font_pt, line_pt'),
+    Object.keys(cur).map(k=>k+' = '+cur[k].join(', ')).join('\n'));
+  if(txt===null) return;
+  const out={};
+  txt.split('\n').forEach(line=>{
+    const m=line.split('=');
+    if(m.length<2) return;
+    const name=m[0].trim();
+    const v=m.slice(1).join('=').split(',').map(s=>s.trim());
+    if(name && v.length>=4) out[name]=[parseFloat(v[0]), v[1], parseFloat(v[2]), parseFloat(v[3])];
+  });
+  try{ localStorage.setItem('nickplots.presets', JSON.stringify(out)); }catch(e){}
+  toast(Object.keys(out).length+t(' preset(s) saved'),'good');
+}
+async function exportAllTabs(){
+  /* rejected by one journal, submitting to the next: apply the preset once and
+     re-export every open plot tab, one dialog instead of one per figure. */
+  if(PLOTTABS.length<2 && !STACK.length){ toast(t('Plot a figure first.'),'bad'); return; }
+  saveActiveTab();
+  const style=gather().style, back=activeTab, states=[];
+  for(let i=0;i<PLOTTABS.length;i++){
+    await switchTab(i);
+    if(!STACK.length) continue;
+    const s=gather();
+    s.style=style;                       // the journal spec wins over each tab's own
+    states.push({name:(PLOTTABS[i].name||('plot_'+(i+1))), state:s});
+  }
+  await switchTab(back);
+  if(!states.length){ toast(t('No plotted tab to export.'),'bad'); return; }
+  const r=await window.pywebview.api.export_figures_batch(states, $('batchFmt').value);
+  if(!r) return;
+  if(r.error){ toast(r.error,'bad'); return; }
+  toast(r.n+t(' figure(s) exported to ')+r.folder, r.warn?'bad':'good');
+  if(r.warn) console.warn(r.warn);
+}
+
+/* ===================== shell UX: resize, keyboard, modals ===================== */
+
+/* ---- drag the sidebar edge: give the figure more room on small laptops ---- */
+const SIDE_MIN=320, SIDE_MAX=680, SIDE_DEF=392;
+function setSidebar(px){
+  const w=Math.max(SIDE_MIN,Math.min(SIDE_MAX,Math.round(px)));
+  const s=document.querySelector('.sidebar');
+  s.style.width=w+'px'; s.style.flexBasis=w+'px';
+  try{ localStorage.setItem('nickplots.sidebar',w); }catch(e){}
+  placeSizeHandles();                      // overlays are anchored to the image: re-place them
+  if(LASTRENDER){ placeLegend(LASTRENDER); placeGates(LASTRENDER); placeEditors(LASTRENDER); }
+}
+(function(){
+  const sp=$('splitter'); if(!sp) return;
+  try{ const v=+localStorage.getItem('nickplots.sidebar'); if(v) setSidebar(v); }catch(e){}
+  sp.addEventListener('pointerdown',e=>{
+    e.preventDefault(); sp.setPointerCapture(e.pointerId); sp.classList.add('on');
+    const move=ev=>setSidebar(ev.clientX);
+    const up=()=>{ sp.classList.remove('on');
+      sp.removeEventListener('pointermove',move); sp.removeEventListener('pointerup',up); };
+    sp.addEventListener('pointermove',move); sp.addEventListener('pointerup',up);
+  });
+  sp.addEventListener('dblclick',()=>setSidebar(SIDE_DEF));
+})();
+
+/* ---- sidebar tabs reachable from the keyboard (they are divs, not buttons) ---- */
+(function(){
+  const tabs=[...document.querySelectorAll('.tabs .tab')];
+  const bar=document.querySelector('.tabs');
+  if(bar) bar.setAttribute('role','tablist');
+  tabs.forEach(el=>{ el.tabIndex=0; el.setAttribute('role','tab');
+    el.setAttribute('aria-selected', el.classList.contains('active')); });
+  document.addEventListener('keydown',e=>{
+    const el=document.activeElement;
+    if(!el || !el.classList) return;
+    if(el.classList.contains('tab')){
+      const i=tabs.indexOf(el);
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); tab(el.dataset.t); }
+      else if((e.key==='ArrowRight'||e.key==='ArrowLeft') && i>=0){
+        e.preventDefault();
+        const n=tabs[(i+(e.key==='ArrowRight'?1:tabs.length-1))%tabs.length];
+        n.focus(); tab(n.dataset.t);
+      }
+    }else if(el.classList.contains('ptab') && (e.key==='Enter'||e.key===' ')){
+      e.preventDefault(); el.click();
+    }
+  });
+})();
+
+/* ---- Esc closes what is open · Ctrl+Enter plots from anywhere ---- */
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    const open=[...document.querySelectorAll('.modal.show')];
+    if(open.length){ e.preventDefault(); open.forEach(m=>m.classList.remove('show')); return; }
+    if(typeof closeEditMenu==='function') closeEditMenu();
+  }else if(e.key==='Enter' && (e.ctrlKey||e.metaKey)){
+    e.preventDefault(); plotBase();
+  }
+});
+/* ---- click the dimmed backdrop (never the card) to dismiss a modal ---- */
+document.querySelectorAll('.modal').forEach(m=>{
+  m.addEventListener('pointerdown',e=>{ if(e.target===m) m.classList.remove('show'); });
+});
 </script>
 </body>
 </html>
