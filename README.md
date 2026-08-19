@@ -184,6 +184,11 @@ Plot tab when the data looks wide).
 - **New column (formula).** Create a column from a formula over existing ones. Use the
   builder (`colA op colB`) or type any pandas expression, e.g. `net_disp / cum_path`
   (persistence). Wrap names containing spaces in backticks.
+  **Text works too**, which is how you build a short label column out of a long id:
+  `barcode.str.slice(0, 12)`, `barcode.str.split('.').str[1]`,
+  `np.where(prob_positive > 0.5, 'high', 'low')`. The columns, `pd` and `np` are in
+  scope. Arithmetic goes through `df.eval` first; anything it cannot parse falls back
+  to a plain expression.
 - **Aggregate (per replicate / track).** Collapse rows to **one row per group**
   (mean / median / sum / count of every numeric column). **This is the fix for
   pseudo‑replication:** aggregate cells to their track/replicate *before* testing, so *n*
@@ -272,11 +277,25 @@ between the x groups when there is no hue.
   "last one wins"), `gap`, **`number size`** (0 = auto), `palette`.
   The model × task / gene × sample matrix: give it a **tidy** table (one row per pair)
   and it pivots for you. Renames and column aliases apply to both axes.
-- **Matrix heatmap** `key=heatmap_matrix` — `labels(category, optional)`; the numeric
-  matrix itself · params **`columns to include`**, `zscore` (per column), `annot`,
-  **`number size`**, `palette`.
-  For an already-**wide** table (one row per subject, one column per measure). Map
-  `labels` to the text column that names the rows, otherwise the Y axis is 0, 1, 2…
+- **Matrix heatmap** `key=heatmap_matrix` — **pheatmap layout**.
+  `labels(category, optional)` · params **`columns to include`**,
+  **`annotation strips`**, **`features as rows`**, **`strip width`**, `zscore`,
+  `annot`, **`number size`**, `palette`.
+  For an already-**wide** table (one row per sample, one column per measure). With
+  `features as rows` on (the default) it transposes: the measures run down the rows
+  with their names on the right, the samples across the columns.
+  **`annotation strips`** takes one or more categorical columns and draws a colour
+  band per column above the matrix — pheatmap's `annotation_col`. Rows are sorted by
+  those columns so each group is a contiguous block, each strip gets its own colormap
+  and is named at its left end, and the sample ids are hidden unless you map `labels`
+  (with hundreds of samples the ids are noise; the strip is the label).
+  All the tracks share **one** legend with a header row each. Separate legend artists
+  have to be stacked by hand, and hand-rolled stacking breaks the moment the axes is
+  resized — which `tight_layout` does right after the plot is drawn. The colourbar
+  sits **under** the matrix for the same reason: the strip on the right belongs to the
+  legend, and putting both there means putting both on top of each other.
+  `zscore` also centres the colormap on 0, so a diverging palette (`coolwarm`, `vlag`)
+  reads as above/below the mean.
 
 ### Categorical composition
 
@@ -370,7 +389,9 @@ are set via the aliases (visual only). You can also **double‑click a legend en
 title) directly on the plot** to rename it (see [Visual editor](#visual-editor)).
 
 Relabelling reaches **every place a category is shown**, not just the legend: the
-ridgeline's Y ticks, and the categorical **X** ticks of box / violin / strip / bar. It
+ridgeline's Y ticks, the categorical **X** ticks of box / violin / strip / bar, and
+the row names of the matrix heatmap. **Load items** follows whichever channel that
+plot actually uses for its categories (`hue`, `row names`, `rows`…), not just `hue`. It
 composes with **Show n per group** — rename to `Control` with `show n` on and the tick
 reads `Control (n=30)`. Renaming is visual only: gating, point picking and the exported
 data still use the value as it is in the table.

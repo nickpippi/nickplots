@@ -66,12 +66,52 @@ def _layer_code(spec_key, m, p):
         else:
             L.append(f"data=(num-num.mean())/num.std() if {p['zscore']} else num")
             lab = m.get("labels")
+            tracks = list(p.get("annots") or [])
+            flip = bool(p.get("transpose"))
+            if tracks:
+                L.append(f"_order=df.sort_values({tracks!r}, kind='stable').index")
+                L.append("data=data.loc[_order]")
             if lab:
-                L.append(f"data=data.set_axis([str(v) for v in df[{_lit(lab)}]], axis=0)")
+                src = f"df[{_lit(lab)}].loc[_order]" if tracks else f"df[{_lit(lab)}]"
+                L.append(f"data=data.set_axis([str(v) for v in {src}], axis=0)")
+            if flip:
+                L.append("data=data.T")
             L.append(f"sns.heatmap(data, cmap={_lit(p['palette'])}, annot={p['annot']}{kws}, "
-                     "cbar=True, ax=ax)")
-            if lab:
-                L.append("ax.tick_params(axis='y', rotation=0)")
+                     f"center={0 if p.get('zscore') else None}, cbar=True, ax=ax, "
+                     "cbar_kws=dict(orientation='horizontal', pad=0.06, shrink=0.45, "
+                     "aspect=28, fraction=0.05))")
+            L.append("ax.tick_params(axis='y', rotation=0)")
+            if not lab:
+                L.append("ax.set_xticks([])" if flip else "ax.set_yticks([])")
+            if tracks:
+                w = float(p.get("annot_bar", 0.6))
+                L.append("from matplotlib.patches import Rectangle as _Rect")
+                L.append("_pal=('Purples','BuGn','Oranges','Blues','Reds'); _sub=df.loc[_order]")
+                L.append(f"for _k,_c in enumerate({tracks!r}):")
+                L.append("    _g=_sub[_c].astype(str).to_numpy(); _nm=list(dict.fromkeys(_g))")
+                L.append("    _sh=sns.color_palette(_pal[_k%len(_pal)],max(len(_nm)+1,3))[1:]")
+                L.append("    _cm={n:_sh[i%len(_sh)] for i,n in enumerate(_nm)}")
+                L.append(f"    _off=-{w}*({len(tracks)}-_k); _s0=0")
+                L.append("    for _i in range(len(_g)+1):")
+                L.append("        if _i==len(_g) or _g[_i]!=_g[_s0]:")
+                L.append(f"            _xy=(_s0,_off) if {flip} else (_off,_s0)")
+                L.append(f"            _wh=(_i-_s0,{w*0.8}) if {flip} else ({w*0.8},_i-_s0)")
+                L.append("            ax.add_patch(_Rect(_xy,*_wh,facecolor=_cm[_g[_s0]],"
+                         "edgecolor='none',clip_on=False))")
+                L.append("            _s0=_i")
+                if flip:
+                    L.append(f"    ax.text(-0.25,_off+{w*0.4},_c,ha='right',va='center',"
+                             "fontsize=8,fontweight='bold',clip_on=False)")
+                else:
+                    L.append(f"    ax.text(_off+{w*0.4},-0.3,_c,ha='center',va='bottom',rotation=90,"
+                             "fontsize=8,fontweight='bold',clip_on=False)")
+                L.append("    ax.add_patch(_Rect((0,0),0,0,alpha=0,label=_c))")
+                L.append("    for _n in _nm: ax.add_patch(_Rect((0,0),0,0,facecolor=_cm[_n],label='   '+_n))")
+                if flip:
+                    L.append(f"ax.set_ylim(ax.get_ylim()[0], -{w}*{len(tracks)})")
+                else:
+                    L.append(f"ax.set_xlim(-{w}*{len(tracks)}, ax.get_xlim()[1])")
+                L.append("ax.legend(loc='upper left', bbox_to_anchor=(1.02,1), frameon=True, fontsize=8)")
     elif spec_key == "regband":
         if hue:
             L.append(f"for _n,_s in df.groupby({_lit(hue)}):")

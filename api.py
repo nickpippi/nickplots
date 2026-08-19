@@ -850,8 +850,17 @@ class Api:
             return dict(error="Give the new column a name.")
         try:
             values = self._df.eval(expr)
-        except Exception as e:
-            return dict(error=f"Invalid formula: {e}")
+        except Exception:
+            # df.eval is arithmetic only - it cannot slice or split text. Fall back to a
+            # plain expression with the columns in scope, which is the same trust level
+            # as the pandas query box, and makes label columns possible:
+            #   barcode.str.slice(0, 12)   |   barcode.str.split('.').str[:3].str.join('-')
+            scope = {c: self._df[c] for c in self._df.columns}
+            scope.update(pd=pd, np=np, df=self._df)
+            try:
+                values = eval(expr, {"__builtins__": {}}, scope)      # noqa: S307
+            except Exception as e:
+                return dict(error=f"Invalid formula: {e}")
         self._df = self._df.copy()
         self._df[name] = values
         if self._view is not self._df:

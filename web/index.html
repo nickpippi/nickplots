@@ -1248,6 +1248,10 @@ const PT = {
   "Open sheet":"Abrir aba", "no file":"nenhum arquivo",
   "Plot":"Gráfico","Style":"Estilo","Legend":"Legenda","Analysis":"Análise","Data":"Dados",
   "Filter rows":"Filtrar linhas",
+  "annotation strips (which group each sample is in)":"faixas de anotação (de que grupo é cada amostra)",
+  "features as rows (pheatmap)":"variáveis nas linhas (estilo pheatmap)",
+  "strip width":"largura da faixa","sample names (optional)":"nomes das amostras (opcional)",
+  "Map a category channel first (hue, row names, rows…)":"Mapeie um canal de categoria primeiro (hue, nomes das linhas, linhas…)",
   "columns to include (none ticked = all)":"colunas a incluir (nenhuma marcada = todas)",
   "All":"Todas","None":"Nenhuma",
   "Double-click to rename this category":"Duplo clique para renomear esta categoria",
@@ -2123,14 +2127,15 @@ function buildConfig(){
       // value stays canonical (English); only the shown text is translated
       h+=`<label class="lbl">${tParam(p.label)}</label><select data-pp="${p.name}" onchange="dRender()">`+
          p.choices.map(c=>`<option value="${c}" ${c===p.default?'selected':''}>${p.kind==='palette'?c:tChoice(c)}</option>`).join('')+`</select>`;
-    }else if(p.kind==='columns'){
+    }else if(p.kind==='columns'||p.kind==='cat_columns'){
+      const src = p.kind==='cat_columns' ? COLS.category : COLS.numeric;
       h+=`<label class="lbl">${tParam(p.label)}</label>
           <div class="row2" style="margin-bottom:4px">
             <button class="btn sm" onclick="colsAll('${p.name}',true)" data-i18n="All">All</button>
             <button class="btn sm ghost" onclick="colsAll('${p.name}',false)" data-i18n="None">None</button>
           </div>
           <div class="scrollbox" data-pp="${p.name}" data-kind="columns">`+
-         COLS.numeric.map(c=>`<label class="check"><input type="checkbox" value="${c}" onchange="dRender()"> ${c}</label>`).join('')+
+         src.map(c=>`<label class="check"><input type="checkbox" value="${c}" onchange="dRender()"> ${c}</label>`).join('')+
          `</div>`;
     }else if(p.kind==='text'){
       h+=`<label class="lbl">${tParam(p.label)}</label><input type="text" data-pp="${p.name}" value="${p.default||''}" oninput="dRender()">`;
@@ -2169,7 +2174,7 @@ function readLayer(){
   $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>{ mapping[s.dataset.ch]= s.value||null; });
   $('plotConfig').querySelectorAll('[data-pp]').forEach(w=>{
     const p = SPEC.params.find(x=>x.name===w.dataset.pp);
-    params[p.name] = p.kind==='columns'? [...w.querySelectorAll('input:checked')].map(i=>i.value)
+    params[p.name] = (p.kind==='columns'||p.kind==='cat_columns')? [...w.querySelectorAll('input:checked')].map(i=>i.value)
                      : p.kind==='bool'? w.checked : (p.kind==='int'? parseInt(w.value):
                      (p.kind==='float'? parseFloat(w.value): w.value));
   });
@@ -2783,10 +2788,19 @@ async function applyPreset(){
 async function exportCode(){ const r=await window.pywebview.api.export_code(gather()); if(r&&r.error)toast(r.error,'bad'); else if(r)toast(t('Code saved: ')+r,'good'); }
 
 /* ---------- rename legend items ---------- */
+// The channel that carries the categories is not always "hue": the matrix heatmap
+// names its rows with "labels", heatmap_xy uses "row"/"col". Renaming has to follow
+// whichever one this plot actually uses, not assume hue.
+function categoryChannel(){
+  for(const name of ['hue','labels','row','col','x']){
+    const el=$('plotConfig').querySelector(`[data-ch="${name}"]`);
+    if(el && el.value) return el.value;
+  }
+  return null;
+}
 async function loadLegendLabels(){
-  const hueSel=$('plotConfig').querySelector('[data-ch="hue"]');
-  const col=hueSel&&hueSel.value;
-  if(!col){ toast(t('Set the hue channel first'),'bad'); return; }
+  const col=categoryChannel();
+  if(!col){ toast(t('Map a category channel first (hue, row names, rows…)'),'bad'); return; }
   const cats=await window.pywebview.api.categories(col);
   if(!cats.length){ toast(t('No categories'),'bad'); return; }
   $('legRelabel').innerHTML=cats.map(c=>{
@@ -2934,8 +2948,7 @@ function renderGroupColorPickers(){
   $('clearColorsBtn').style.display = cats.length ? 'block' : 'none';
 }
 async function loadGroupColors(){
-  const hueSel=$('plotConfig').querySelector('[data-ch="hue"]');
-  const col=(hueSel&&hueSel.value)||($('plotConfig').querySelector('[data-ch="x"]')||{}).value;
+  const col=categoryChannel();
   if(!col){ toast(t('Set X or hue first'),'bad'); return; }
   const palSel=$('plotConfig').querySelector('[data-pp="palette"]');
   const m=await window.pywebview.api.group_colors(col,(palSel&&palSel.value)||'viridis');

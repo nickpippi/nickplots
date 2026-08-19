@@ -309,16 +309,92 @@ def _pick_numeric(df, p):
 
 
 def _r_heatmap_matrix(ax, df, m, p):
+    """Numeric matrix, pheatmap style: transposed, the features run down the rows and the
+    samples across the columns, with stacked annotation strips naming each sample's group.
+
+    The row labels stay on the LEFT and the strips are named on the left too: the right
+    side belongs to the colourbar and the legend, and three things competing for one strip
+    of space is how you get a colourbar printed over the labels.
+    """
     num = _pick_numeric(df, p)
-    data = (num - num.mean()) / num.std() if p["zscore"] else num
-    lab = m.get("labels")
-    if lab and lab in df.columns:          # name the rows instead of 0,1,2...
-        rl = p.get("__relabel__") or {}
-        data = data.set_axis([rl.get(str(v), str(v)) for v in df[lab]], axis=0)
+    data = (num - num.mean()) / num.std() if p.get("zscore") else num
+    lab, rl = m.get("labels"), (p.get("__relabel__") or {})
+    tracks = [c for c in (p.get("annots") or []) if c in df.columns]
+    order = df.index
+    if tracks:
+        # sort by every track so each group is one contiguous block, outermost first
+        order = df.sort_values(tracks, kind="stable").index
+        data = data.loc[order]
+    if lab and lab in df.columns:
+        data = data.set_axis([rl.get(str(v), str(v)) for v in df[lab].loc[order]], axis=0)
+    flip = bool(p.get("transpose"))
+    if flip:                                 # pheatmap layout: features become the rows
+        data = data.T
+    # colourbar goes UNDER the matrix, not beside it: the right-hand strip belongs to the
+    # annotation legend, and both of them there is how they end up drawn on top of each other
     sns.heatmap(data, cmap=p["palette"], annot=p["annot"], annot_kws=_annot_kws(p),
-                cbar=True, ax=ax)
-    if lab:
-        ax.tick_params(axis="y", rotation=0)
+                center=0 if p.get("zscore") else None, cbar=True, ax=ax,
+                cbar_kws=dict(orientation="horizontal", pad=0.06, shrink=0.45,
+                              aspect=28, fraction=0.05))
+    ax.tick_params(axis="y", rotation=0)
+    if flip and not lab:                     # sample ids are noise; the strip is the label
+        ax.set_xticks([])
+    elif not flip and not lab:
+        ax.set_yticks([])
+    if tracks:
+        _annot_tracks(ax, df.loc[order], tracks, p, flip, rl)
+
+
+def _annot_tracks(ax, sub, tracks, p, flip, relabel):
+    """pheatmap's annotation_col: a colour strip per categorical column saying which group
+    every sample is in.
+
+    All the tracks go into ONE legend with a bold header row per track, instead of one
+    legend artist each: separate artists have to be stacked by hand, and any hand-rolled
+    stacking breaks as soon as the axes is resized (which tight_layout does right after
+    this runs). One legend is positioned by the engine like every other plot's.
+    """
+    from matplotlib.patches import Rectangle, Patch
+    w = float(p.get("annot_bar", 0.6))
+    n = len(sub)
+    for k, col in enumerate(tracks):
+        g = sub[col].astype(str).to_numpy()
+        names = list(dict.fromkeys(g))
+        shades = sns.color_palette(_TRACK_PAL[k % len(_TRACK_PAL)], max(len(names) + 1, 3))[1:]
+        cols = {nm: shades[i % len(shades)] for i, nm in enumerate(names)}
+        off = -w * (len(tracks) - k)          # the first track sits furthest from the matrix
+        start = 0
+        for i in range(n + 1):
+            if i == n or g[i] != g[start]:
+                xy = (start, off) if flip else (off, start)
+                wh = (i - start, w * 0.8) if flip else (w * 0.8, i - start)
+                ax.add_patch(Rectangle(xy, *wh, facecolor=cols[g[start]],
+                                       edgecolor="none", clip_on=False))
+                start = i
+        # name the strip on the left, where only the (short) sample ids can be
+        tname = relabel.get(col, col)
+        if flip:
+            ax.text(-0.25, off + w * 0.4, tname, ha="right", va="center",
+                    fontsize=8, fontweight="bold", clip_on=False)
+        else:
+            ax.text(off + w * 0.4, -0.3, tname, ha="center", va="bottom", rotation=90,
+                    fontsize=8, fontweight="bold", clip_on=False)
+        # one legend, with a header row per track: Patch(alpha=0) draws nothing but keeps
+        # the label, so the engine's normal legend renders the sections in order
+        # one legend, with a header row per track: an invisible handle keeps the label,
+        # and the entries under it are indented, so the sections read in order
+        ax.add_patch(Rectangle((0, 0), 0, 0, alpha=0, label=tname))
+        for nm in names:
+            ax.add_patch(Rectangle((0, 0), 0, 0, facecolor=cols[nm],
+                                   label="   " + relabel.get(nm, nm)))
+    if flip:
+        ax.set_ylim(ax.get_ylim()[0], -w * len(tracks))
+    else:
+        ax.set_xlim(-w * len(tracks), ax.get_xlim()[1])
+
+
+# each strip gets its own colormap, so two tracks never read as one
+_TRACK_PAL = ("Purples", "BuGn", "Oranges", "Blues", "Reds")
 
 
 def _r_ecdf(ax, df, m, p):
@@ -909,8 +985,13 @@ REGISTRY: dict[str, PlotSpec] = {s.key: s for s in [
                      Param("gap", "float", 0.0, 0.0, 2.0, label="gap between cells"),
                      _ANNSZ, _CMAP]),
     PlotSpec("heatmap_matrix", "Matrix heatmap", "axes", _r_heatmap_matrix,
-             channels=[Channel("labels", accepts=(CATEGORY,), label="row names (optional)")],
-             params=[_COLS, Param("zscore", "bool", True, label="z-score per column"),
+             channels=[Channel("labels", accepts=(CATEGORY,), label="sample names (optional)")],
+             params=[_COLS,
+                     Param("annots", "cat_columns", [],
+                           label="annotation strips (which group each sample is in)"),
+                     Param("transpose", "bool", True, label="features as rows (pheatmap)"),
+                     Param("annot_bar", "float", 0.6, 0.2, 2.0, label="strip width"),
+                     Param("zscore", "bool", True, label="z-score per column"),
                      Param("annot", "bool", False), _ANNSZ, _CMAP]),
     PlotSpec("ecdf", "ECDF (cumulative distribution)", "axes", _r_ecdf,
              channels=[Channel("x", True, (NUMBER,)), Channel("hue", accepts=(CATEGORY,))], params=[]),
