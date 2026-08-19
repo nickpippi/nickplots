@@ -260,8 +260,12 @@ between the x groups when there is no hue.
 
 ### Correlation / matrices
 
-- **Heatmap (correlation)** `key=heatmap` — no channels; correlation matrix of all numeric
-  columns · params `annot`, **`number size`**, `palette` (colormap).
+- **Heatmap (correlation)** `key=heatmap` — no channels; correlation matrix of the numeric
+  columns · params **`columns to include`**, `annot`, **`number size`**, `palette`.
+  Both heatmaps take a **column picker** (with All / None): a table normally carries ids
+  and side measurements that have no business in the matrix. Nothing ticked = every
+  numeric column, as before. The selection is saved in the project and honoured by the
+  exported Python.
 - **Heatmap (rows × columns)** `key=heatmap_xy` — `*row(category) *col(category)
   *value(number)` · params `annot` (write the value in each cell), `decimals`,
   `agg` (how to collapse a repeated row/column pair — mean by default, never a silent
@@ -269,7 +273,8 @@ between the x groups when there is no hue.
   The model × task / gene × sample matrix: give it a **tidy** table (one row per pair)
   and it pivots for you. Renames and column aliases apply to both axes.
 - **Matrix heatmap** `key=heatmap_matrix` — `labels(category, optional)`; the numeric
-  matrix itself · params `zscore` (per column), `annot`, **`number size`**, `palette`.
+  matrix itself · params **`columns to include`**, `zscore` (per column), `annot`,
+  **`number size`**, `palette`.
   For an already-**wide** table (one row per subject, one column per measure). Map
   `labels` to the text column that names the rows, otherwise the Y axis is 0, 1, 2…
 
@@ -579,6 +584,12 @@ Everything lives in the footer (kept compact):
   (≥300), a **transparent background** option (keeps ticks/labels/title readable by re‑inking
   dark themes), **⬇ Python code** (a runnable script + a data snapshot that reproduces the
   figure), and **Filtered CSV** (the current filtered/reshaped data).
+  The script covers **every one of the 32 plot types** and is standalone — it imports only
+  numpy / pandas / seaborn / matplotlib (plus scipy or scikit‑learn where the plot fits a
+  curve or a ROC), never Nickplots itself. Composite plots emit the real computation
+  inline: the Kaplan‑Meier estimator, the per‑track MSD, the KDE stack of the ridgeline,
+  the 4PL / Michaelis‑Menten / growth fits. `python test_codegen.py` runs every generated
+  script and checks it draws.
 - **Source data (.xlsx)** — one sheet per panel frame (or per layer) holding exactly the
   values plotted, plus a `… summary` sheet with the aggregate actually drawn (n, mean,
   median, SD, SEM) for bar plots. This is the *Source Data* file Nature Methods requires
@@ -591,8 +602,12 @@ Everything lives in the footer (kept compact):
 - **Re-export every plot tab** — rejected somewhere and resubmitting? Pick the new journal
   preset, then this: **one folder dialog** re-exports every open plot tab at the new column
   width, font and line weight, instead of one save dialog per figure.
-- **Session ▾** — **Save/Open project** (the full UI state + the CSV path) and
-  **Save/Apply preset** (style + legend only).
+- **Session ▾** — **Save/Open project** and **Save/Apply preset** (style + legend only).
+  A project is the **whole session**: every plot tab (with the dataset each one used),
+  and **every table** you had loaded, not just the last one — reopening it reloads them
+  all, re-applies the *Combine all* if you had combined them, and lands on the tab you
+  were on. A table that moved or was dropped in as text cannot be reopened: the project
+  says which ones and keeps the plots.
 - Exact **mm size** (typed or via the drag handles) is honoured on export, so a figure keeps
   its journal‑column shape instead of being cropped to content.
 

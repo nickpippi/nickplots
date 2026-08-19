@@ -1248,6 +1248,8 @@ const PT = {
   "Open sheet":"Abrir aba", "no file":"nenhum arquivo",
   "Plot":"Gráfico","Style":"Estilo","Legend":"Legenda","Analysis":"Análise","Data":"Dados",
   "Filter rows":"Filtrar linhas",
+  "columns to include (none ticked = all)":"colunas a incluir (nenhuma marcada = todas)",
+  "All":"Todas","None":"Nenhuma",
   "Double-click to rename this category":"Duplo clique para renomear esta categoria",
   "Put the markers on the plot":"Colocar os marcadores no gráfico",
   "Remove markers":"Remover marcadores",
@@ -2121,6 +2123,15 @@ function buildConfig(){
       // value stays canonical (English); only the shown text is translated
       h+=`<label class="lbl">${tParam(p.label)}</label><select data-pp="${p.name}" onchange="dRender()">`+
          p.choices.map(c=>`<option value="${c}" ${c===p.default?'selected':''}>${p.kind==='palette'?c:tChoice(c)}</option>`).join('')+`</select>`;
+    }else if(p.kind==='columns'){
+      h+=`<label class="lbl">${tParam(p.label)}</label>
+          <div class="row2" style="margin-bottom:4px">
+            <button class="btn sm" onclick="colsAll('${p.name}',true)" data-i18n="All">All</button>
+            <button class="btn sm ghost" onclick="colsAll('${p.name}',false)" data-i18n="None">None</button>
+          </div>
+          <div class="scrollbox" data-pp="${p.name}" data-kind="columns">`+
+         COLS.numeric.map(c=>`<label class="check"><input type="checkbox" value="${c}" onchange="dRender()"> ${c}</label>`).join('')+
+         `</div>`;
     }else if(p.kind==='text'){
       h+=`<label class="lbl">${tParam(p.label)}</label><input type="text" data-pp="${p.name}" value="${p.default||''}" oninput="dRender()">`;
     }else{
@@ -2158,7 +2169,8 @@ function readLayer(){
   $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>{ mapping[s.dataset.ch]= s.value||null; });
   $('plotConfig').querySelectorAll('[data-pp]').forEach(w=>{
     const p = SPEC.params.find(x=>x.name===w.dataset.pp);
-    params[p.name] = p.kind==='bool'? w.checked : (p.kind==='int'? parseInt(w.value):
+    params[p.name] = p.kind==='columns'? [...w.querySelectorAll('input:checked')].map(i=>i.value)
+                     : p.kind==='bool'? w.checked : (p.kind==='int'? parseInt(w.value):
                      (p.kind==='float'? parseFloat(w.value): w.value));
   });
   // Markers pushed from Analysis ride along in the layer params, so they survive into
@@ -2656,7 +2668,9 @@ function chk(id,val){ const el=$(id); if(el)el.checked=!!val; }
 function captureUI(){
   const cfg={ch:{},pp:{}};
   $('plotConfig').querySelectorAll('[data-ch]').forEach(s=>cfg.ch[s.dataset.ch]=s.value);
-  $('plotConfig').querySelectorAll('[data-pp]').forEach(w=>cfg.pp[w.dataset.pp]=(w.type==='checkbox'?w.checked:w.value));
+  $('plotConfig').querySelectorAll('[data-pp]').forEach(w=>cfg.pp[w.dataset.pp]=
+    (w.dataset.kind==='columns'? [...w.querySelectorAll('input:checked')].map(i=>i.value)
+     : w.type==='checkbox'? w.checked : w.value));
   return {filter:$('filter').value, plotType:$('plotType').value, cfg,
     title:$('title').value,xlabel:$('xlabel').value,ylabel:$('ylabel').value,
     style:{theme:$('theme').value,context:$('context').value,fontScale:$('fontScale').value,grid:$('grid').checked,
@@ -2708,7 +2722,9 @@ function applyUI(u){
   $('filter').value=u.filter||''; $('plotType').value=u.plotType||$('plotType').value; buildConfig();
   if(u.cfg){
     for(const[k,v]of Object.entries(u.cfg.ch||{})){const el=$('plotConfig').querySelector(`[data-ch="${k}"]`); if(el)el.value=v;}
-    for(const[k,v]of Object.entries(u.cfg.pp||{})){const el=$('plotConfig').querySelector(`[data-pp="${k}"]`); if(el){ if(el.type==='checkbox')el.checked=v; else {el.value=v; if(el.type==='range')badge(el);} }}
+    for(const[k,v]of Object.entries(u.cfg.pp||{})){const el=$('plotConfig').querySelector(`[data-pp="${k}"]`); if(el){
+      if(el.dataset.kind==='columns'){ const want=new Set(v||[]); el.querySelectorAll('input').forEach(i=>i.checked=want.has(i.value)); }
+      else if(el.type==='checkbox')el.checked=v; else {el.value=v; if(el.type==='range')badge(el);} }}
   }
   $('title').value=u.title||''; $('xlabel').value=u.xlabel||''; $('ylabel').value=u.ylabel||'';
   const s=u.style||{};
@@ -2727,11 +2743,31 @@ function applyUI(u){
   PANELRENDER=null; hidePanelLayer(); ensurePanelGrid();
   updLayers(); renderPanelList(); render();
 }
-async function saveProject(){ const r=await window.pywebview.api.save_project(captureUI()); if(r&&r.error)toast(r.error,'bad'); else if(r)toast(t('Project saved'),'good'); }
+async function saveProject(){
+  // a project is the whole session: every plot tab, not just the one on screen
+  saveActiveTab();
+  const state=captureUI();
+  state.tabs=PLOTTABS; state.activeTab=activeTab;
+  const r=await window.pywebview.api.save_project(state);
+  if(r&&r.error)toast(r.error,'bad'); else if(r)toast(t('Project saved'),'good');
+}
 async function openProject(){
   const r=await window.pywebview.api.open_project(); if(!r)return; if(r.error){toast(r.error,'bad');return;}
-  if(r.data){ if(r.data.error)toast(r.data.error,'bad'); else onData(r.data); }
-  resetHistory(); applyUI(r.ui); toast(t('Project opened'),'good');
+  if(r.data){
+    if(r.data.error)toast(r.data.error,'bad'); else onData(r.data);
+    if(r.data.warn) toast(r.data.warn,'bad');
+  }
+  resetHistory();
+  const tabs=(r.ui&&r.ui.tabs)||r.tabs;
+  if(Array.isArray(tabs) && tabs.length){
+    PLOTTABS=tabs;
+    activeTab=Math.min(Math.max(0,(r.ui&&r.ui.activeTab)||r.activeTab||0), PLOTTABS.length-1);
+    renderTabs();
+    await activateTabState(activeTab);       // restores that tab's data + UI + plot
+  } else {
+    applyUI(r.ui);                           // project saved before multi-tab
+  }
+  toast(t('Project opened'),'good');
 }
 async function savePreset(){ const r=await window.pywebview.api.save_preset(gather()); if(r&&r.error)toast(r.error,'bad'); else if(r)toast(t('Preset saved'),'good'); }
 async function applyPreset(){
@@ -3766,6 +3802,12 @@ async function exportTable(){
   if(r) toast(t('Table saved'),'good');
 }
 
+
+function colsAll(name,on){
+  const box=$('plotConfig').querySelector(`[data-pp="${name}"]`); if(!box) return;
+  box.querySelectorAll('input').forEach(i=>i.checked=on);
+  dRender();
+}
 
 /* ============ significance markers: Analysis -> the plot ============ */
 /* The brackets the plot draws on its own use Welch + Holm; Compare groups uses

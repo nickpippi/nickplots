@@ -31,7 +31,7 @@ class Channel:
 @dataclass
 class Param:
     name: str
-    kind: str                 # "float" | "int" | "bool" | "choice" | "palette"
+    kind: str                 # "float"|"int"|"bool"|"choice"|"palette"|"text"|"columns"
     default: object
     lo: float | None = None
     hi: float | None = None
@@ -299,8 +299,17 @@ def _r_heatmap_xy(ax, df, m, p):
     ax.tick_params(axis="y", rotation=0)
 
 
-def _r_heatmap_matrix(ax, df, m, p):
+def _pick_numeric(df, p):
+    """The numeric block, narrowed to the columns the user ticked (empty = all).
+    A table usually carries ids and side measurements that have no business in the
+    heatmap; without this the plot silently includes them."""
     num = df.select_dtypes("number")
+    chosen = [c for c in (p.get("cols") or []) if c in num.columns]
+    return num[chosen] if chosen else num
+
+
+def _r_heatmap_matrix(ax, df, m, p):
+    num = _pick_numeric(df, p)
     data = (num - num.mean()) / num.std() if p["zscore"] else num
     lab = m.get("labels")
     if lab and lab in df.columns:          # name the rows instead of 0,1,2...
@@ -529,7 +538,7 @@ def _r_ridge(ax, df, m, p):
 
 
 def _r_heatmap(ax, df, m, p):
-    num = df.select_dtypes("number")
+    num = _pick_numeric(df, p)
     if not p.get("stars"):
         sns.heatmap(num.corr(numeric_only=True), annot=p["annot"], cmap=p["palette"],
                     annot_kws=_annot_kws(p), ax=ax)
@@ -812,6 +821,7 @@ _PAL = Param("palette", "palette", "colorblind",
 # Heatmaps use the "palette" as a matplotlib colormap, so it must be a valid
 # colormap name (a categorical palette like "colorblind" is not a colormap).
 _ANNSZ = Param("annot_size", "float", 0, 0, 24, label="number size (0 = auto)")
+_COLS = Param("cols", "columns", [], label="columns to include (none ticked = all)")
 _CMAP = Param("palette", "palette", "viridis",
               choices=("viridis", "magma", "rocket", "mako", "crest", "flare",
                        "cividis", "coolwarm", "Spectral", "vlag", "icefire"))
@@ -900,7 +910,7 @@ REGISTRY: dict[str, PlotSpec] = {s.key: s for s in [
                      _ANNSZ, _CMAP]),
     PlotSpec("heatmap_matrix", "Matrix heatmap", "axes", _r_heatmap_matrix,
              channels=[Channel("labels", accepts=(CATEGORY,), label="row names (optional)")],
-             params=[Param("zscore", "bool", True, label="z-score per column"),
+             params=[_COLS, Param("zscore", "bool", True, label="z-score per column"),
                      Param("annot", "bool", False), _ANNSZ, _CMAP]),
     PlotSpec("ecdf", "ECDF (cumulative distribution)", "axes", _r_ecdf,
              channels=[Channel("x", True, (NUMBER,)), Channel("hue", accepts=(CATEGORY,))], params=[]),
@@ -922,7 +932,7 @@ REGISTRY: dict[str, PlotSpec] = {s.key: s for s in [
              channels=[Channel("x", True, (NUMBER,)), Channel("hue", True, (CATEGORY,))],
              params=[Param("overlap", "float", 1.1, 0.3, 3.0, label="overlap"), _ALPHA, _PAL]),
     PlotSpec("heatmap", "Heatmap (correlation)", "axes", _r_heatmap,
-             channels=[], params=[Param("annot", "bool", True), _ANNSZ,
+             channels=[], params=[_COLS, Param("annot", "bool", True), _ANNSZ,
                                   Param("stars", "bool", False, label="significance stars (BH)"),
                                   Param("method", "choice", "pearson", choices=("pearson", "spearman")),
                                   _CMAP]),

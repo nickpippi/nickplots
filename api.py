@@ -75,6 +75,8 @@ class Api:
         self._panel_data = {}     # id -> dataframe snapshot, one per panel frame
         self._panel_seq = 0
         self._datasets = {}       # name -> loaded dataframe (multi-dataset manager)
+        self._dataset_paths = {}  # name -> file it was loaded from (None if dropped as text)
+        self._combined_col = None  # the tag column of the last "Combine all", for projects
         self._active = None
 
     def _win(self):
@@ -113,6 +115,7 @@ class Api:
         while name in self._datasets:                 # keep every loaded file distinct
             name = f"{base} ({i})"; i += 1
         self._datasets[name] = self._df
+        self._dataset_paths[name] = path
         self._active = name
         return self._info(path)
 
@@ -130,6 +133,7 @@ class Api:
 
     def remove_dataset(self, name):
         self._datasets.pop(name, None)
+        self._dataset_paths.pop(name, None)
         if self._active == name:
             if self._datasets:
                 self._active = next(iter(self._datasets))
@@ -148,6 +152,7 @@ class Api:
         frames = [df.assign(**{col: name}) for name, df in self._datasets.items()]
         self._df = self._view = pd.concat(frames, ignore_index=True)
         self._active = "(combined)"
+        self._combined_col = col           # so a project can redo the combine on open
         self._csv_path = None
         return self._info("(combined)")
 
@@ -217,6 +222,7 @@ class Api:
         while name in self._datasets:
             name = f"{base} ({i})"; i += 1
         self._datasets[name] = self._df
+        self._dataset_paths[name] = None      # dropped as text: nothing to reopen later
         self._active = name
         return self._info(name)
 
@@ -1477,7 +1483,10 @@ class Api:
         if not path:
             return None
         path = path if isinstance(path, str) else path[0]
-        proj = dict(csv_path=self._csv_path, ui=state)
+        proj = dict(csv_path=self._csv_path, ui=state, active=self._active,
+                    combined_col=self._combined_col,
+                    datasets=[dict(name=n, path=self._dataset_paths.get(n))
+                              for n in self._datasets])
         with open(path, "w", encoding="utf-8") as f:
             json.dump(proj, f, ensure_ascii=False, indent=2)
         return path
@@ -1491,16 +1500,47 @@ class Api:
             proj = json.load(open(res[0], encoding="utf-8"))
         except Exception as e:
             return dict(error=str(e))
-        data = None
-        if proj.get("csv_path"):
+        data, warn = None, []
+        if proj.get("datasets"):
+            # reopen EVERY table the project was built from and restore which one was active
+            self._datasets, self._dataset_paths = {}, {}
+            for item in proj["datasets"]:
+                nm, pth = item.get("name"), item.get("path")
+                if not pth:
+                    warn.append(f"{nm}: was dropped in as text, there is no file to reopen")
+                    continue
+                try:
+                    self._datasets[nm] = DL.load_csv(pth)
+                    self._dataset_paths[nm] = pth
+                except Exception as e:
+                    warn.append(f"{nm}: {e}")
+            act = proj.get("active")
+            if act == "(combined)" and len(self._datasets) >= 2:
+                self.combine_datasets(proj.get("combined_col") or "dataset")
+            elif act in self._datasets:
+                self.activate_dataset(act)
+            elif self._datasets:
+                self.activate_dataset(next(iter(self._datasets)))
+            if self._view is None:
+                data = dict(error="None of the project's tables could be reopened. "
+                                  "Load them manually - the plots are kept.")
+            else:
+                data = self._info(self._active)
+        elif proj.get("csv_path"):                     # projects saved before multi-table
             try:
                 self._df = DL.load_csv(proj["csv_path"])
                 self._view = self._df
                 self._csv_path = proj["csv_path"]
+                self._datasets = {os.path.basename(proj["csv_path"]): self._df}
+                self._dataset_paths = {os.path.basename(proj["csv_path"]): proj["csv_path"]}
+                self._active = next(iter(self._datasets))
                 data = self._info(proj["csv_path"])
             except Exception:
                 data = dict(error=f"Could not reopen the original CSV ({proj.get('csv_path')}). Load it manually.")
-        return dict(ui=proj.get("ui"), data=data)
+        if data and warn and not data.get("error"):
+            data["warn"] = "Could not reopen: " + "; ".join(warn)
+        return dict(ui=proj.get("ui"), data=data,
+                    tabs=proj.get("tabs"), activeTab=proj.get("activeTab"))
 
     def save_preset(self, state):
         path = self._win().create_file_dialog(
